@@ -16,3 +16,5 @@ LLM_Env.ps1
 # Old nested repo metadata backup
 .agentshire-git-backup/
 Agentshire/.git/
+
+.vercel
