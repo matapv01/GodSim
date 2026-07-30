@@ -6,13 +6,15 @@ const CAR_MODELS = ['car_sedan', 'car_hatchback', 'car_taxi'] as const
 
 const ROAD_Y = 0.06
 const LANE_OFFSET = 0.32
-const PRIVATE_ROUTE_COUNT = 3
 
 interface RoadPoint { x: number; z: number }
 interface VehicleRoute {
+  id: string
+  ownerNpcId: string
   owner: string
-  driver: string
-  occupantNpcId?: string
+  appearance: string
+  homeParking: RoadPoint
+  travelHours: [number, number]
   from: string
   to: string
   purpose: string
@@ -27,55 +29,40 @@ interface VehicleCallbacks {
 
 const VEHICLE_ROUTES: VehicleRoute[] = [
   {
+    id: 'minh_sedan',
+    ownerNpcId: 'citizen_1',
     owner: 'Minh',
-    driver: 'Minh',
-    occupantNpcId: 'citizen_1',
-    from: 'Nhà Minh, An và Bảo',
+    appearance: 'sedan',
+    homeParking: { x: 4.65, z: 8.25 },
+    travelHours: [6, 9],
+    from: 'Nhà Minh',
     to: 'Công ty chính',
     purpose: 'đi làm',
     points: [{ x: 6.0, z: 7.5 }, { x: 16, z: 7.5 }, { x: 16, z: 10.5 }, { x: 24.4, z: 10.5 }, { x: 24.4, z: 13.0 }],
   },
   {
+    id: 'lan_hatchback',
+    ownerNpcId: 'citizen_2',
     owner: 'Lan',
-    occupantNpcId: 'citizen_2',
-    driver: 'Khôi',
-    from: 'Nhà Lan và Khôi',
+    appearance: 'hatchback nhỏ',
+    homeParking: { x: 4.65, z: 13.75 },
+    travelHours: [8, 11],
+    from: 'Nhà Lan',
     to: 'Khu chợ',
     purpose: 'mua đồ',
     points: [{ x: 6.0, z: 13.0 }, { x: 16, z: 13.0 }, { x: 16, z: 18.0 }, { x: 38.8, z: 18.0 }, { x: 38.8, z: 10.5 }],
   },
   {
+    id: 'vy_city_car',
+    ownerNpcId: 'citizen_6',
     owner: 'Vy',
-    driver: 'Vy',
-    occupantNpcId: 'citizen_6',
-    from: 'Nhà Hà và Vy',
+    appearance: 'xe đô thị',
+    homeParking: { x: 12.65, z: 19.25 },
+    travelHours: [16, 21],
+    from: 'Nhà Vy',
     to: 'Quán cà phê',
     purpose: 'gặp người quen',
     points: [{ x: 14.0, z: 18.5 }, { x: 16, z: 18.5 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 38.8, z: 18.0 }],
-  },
-  {
-    owner: 'Bảo',
-    driver: 'An',
-    from: 'Công ty chính',
-    to: 'Nhà Minh, An và Bảo',
-    purpose: 'về nhà',
-    points: [{ x: 11.2, z: 11.75 }, { x: 16, z: 11.75 }, { x: 16, z: 10.5 }, { x: 24.4, z: 10.5 }, { x: 24.4, z: 13.0 }],
-  },
-  {
-    owner: 'Taxi thị trấn',
-    driver: 'Bác Tùng',
-    from: 'Đường chính',
-    to: 'Nhà văn hóa',
-    purpose: 'chở khách',
-    points: [{ x: -8, z: 32 }, { x: 16, z: 32 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 38.8, z: 25.5 }],
-  },
-  {
-    owner: 'Taxi thị trấn',
-    driver: 'Cô Mai',
-    from: 'Quán ăn gia đình',
-    to: 'Đường chính',
-    purpose: 'đón khách xong rời thị trấn',
-    points: [{ x: 42.4, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 38.8, z: 32 }, { x: 64, z: 32 }],
   },
 ]
 
@@ -118,6 +105,7 @@ interface PooledVehicle {
   distance: number
   duration: number
   parkTimer: number
+  lastTripDay: number
   homeRoute: VehicleRoute
   route: VehicleRoute | null
   routePoints: RoadPoint[]
@@ -139,7 +127,7 @@ export class VehicleManager {
   private yOffsets: number[] = [] // per-template Y offset to fix wheel sinking
   private ridingNpcIds = new Set<string>()
 
-  private static readonly POOL_SIZE = PRIVATE_ROUTE_COUNT
+  private static readonly POOL_SIZE = VEHICLE_ROUTES.length
 
   constructor(scene: THREE.Scene, callbacks: VehicleCallbacks = {}) {
     this.scene = scene
@@ -216,6 +204,11 @@ export class VehicleManager {
       const homeRoute = VEHICLE_ROUTES[i]
       const templateIdx = i % this.templates.length
       const wrapper = this.templates[templateIdx].clone()
+      wrapper.name = `vehicle_${homeRoute.id}`
+      wrapper.userData.vehicleId = homeRoute.id
+      wrapper.userData.ownerNpcId = homeRoute.ownerNpcId
+      wrapper.userData.ownerName = homeRoute.owner
+      wrapper.userData.appearance = homeRoute.appearance
       wrapper.visible = true
       this.group.add(wrapper)
 
@@ -253,6 +246,7 @@ export class VehicleManager {
         distance: 0,
         duration: 0,
         parkTimer: 0,
+        lastTripDay: -1,
         homeRoute,
         route: homeRoute,
         routePoints: [],
@@ -267,17 +261,20 @@ export class VehicleManager {
     }
   }
 
-  private getAvailableParkedVehicle(): PooledVehicle | null {
+  private getAvailableParkedVehicle(hour: number, dayCount: number): PooledVehicle | null {
     return this.pool.find(v =>
       !v.active
       && v.phase === 'parked'
-      && (!v.homeRoute.occupantNpcId || !this.ridingNpcIds.has(v.homeRoute.occupantNpcId))
-      && (!v.homeRoute.occupantNpcId || this.callbacks.canBoard?.(v.homeRoute.occupantNpcId, this.getHomeParkingPoint(v.homeRoute)) !== false)
+      && v.lastTripDay !== dayCount
+      && hour >= v.homeRoute.travelHours[0]
+      && hour < v.homeRoute.travelHours[1]
+      && !this.ridingNpcIds.has(v.homeRoute.ownerNpcId)
+      && this.callbacks.canBoard?.(v.homeRoute.ownerNpcId, this.getHomeParkingPoint(v.homeRoute)) !== false
     ) ?? null
   }
 
-  private spawn(isNight: boolean) {
-    const vehicle = this.getAvailableParkedVehicle()
+  private spawn(isNight: boolean, hour: number, dayCount: number) {
+    const vehicle = this.getAvailableParkedVehicle(hour, dayCount)
     if (!vehicle) return
 
     const route = vehicle.homeRoute
@@ -291,6 +288,7 @@ export class VehicleManager {
     vehicle.parkTimer = 0
     vehicle.phase = 'driving'
     vehicle.active = true
+    vehicle.lastTripDay = dayCount
     this.boardOccupant(vehicle)
 
     vehicle.wrapper.visible = true
@@ -313,14 +311,15 @@ export class VehicleManager {
     vehicle.wrapper.visible = true
     vehicle.wrapper.position.set(home.x, ROAD_Y, home.z)
     vehicle.wrapper.rotation.y = Math.atan2(next.x - home.x, next.z - home.z) - Math.PI / 2
-    vehicle.label.visible = false
+    vehicle.label.scale.set(2.6, 0.68, 1)
+    vehicle.label.visible = true
+    this.setVehicleLabel(vehicle, route, 0, 'home')
     vehicle.headlight.intensity = 0
     vehicle.taillightMat.opacity = 0
   }
 
   private getHomeParkingPoint(route: VehicleRoute): RoadPoint {
-    const home = route.points[0]
-    return { x: home.x - 1.35, z: home.z + 0.75 }
+    return route.homeParking
   }
 
   private parkAtHome(vehicle: PooledVehicle) {
@@ -329,7 +328,6 @@ export class VehicleManager {
     vehicle.active = false
     vehicle.phase = 'parked'
     this.placeParkedAtHome(vehicle)
-    vehicle.label.visible = false
     vehicle.route = route
     vehicle.occupantNpcId = undefined
     vehicle.routePoints = []
@@ -340,7 +338,7 @@ export class VehicleManager {
   }
 
   private boardOccupant(vehicle: PooledVehicle): void {
-    const npcId = vehicle.route?.occupantNpcId
+    const npcId = vehicle.route?.ownerNpcId
     if (!npcId) return
     vehicle.occupantNpcId = npcId
     this.ridingNpcIds.add(npcId)
@@ -357,6 +355,7 @@ export class VehicleManager {
 
   update(gameClock: GameClock, delta: number) {
     const hour = gameClock.getGameHour()
+    const dayCount = gameClock.getState().dayCount
     const period = gameClock.getPeriod()
     const needLights = period === 'night' || period === 'dusk' || period === 'dawn'
     const time = performance.now() / 1000
@@ -364,7 +363,7 @@ export class VehicleManager {
     // Spawn timer
     this.spawnTimer -= delta
     if (this.spawnTimer <= 0) {
-      this.spawn(needLights)
+      this.spawn(needLights, hour, dayCount)
       this.spawnTimer = getSpawnInterval(hour)
     }
 
@@ -477,12 +476,13 @@ export class VehicleManager {
     }
   }
 
-  private setVehicleLabel(vehicle: PooledVehicle, route: VehicleRoute, minutes: number, state: 'driving' | 'returning' | 'parking' = 'driving'): void {
+  private setVehicleLabel(vehicle: PooledVehicle, route: VehicleRoute, minutes: number, state: 'driving' | 'returning' | 'parking' | 'home' = 'driving'): void {
     if (vehicle.labelTexture) {
       vehicle.labelTexture.dispose()
       vehicle.labelTexture = null
     }
     const canvas = document.createElement('canvas')
+    vehicle.label.scale.set(state === 'home' ? 2.6 : 3.4, state === 'home' ? 0.68 : 0.9, 1)
     canvas.width = 512
     canvas.height = 144
     const ctx = canvas.getContext('2d')!
@@ -497,7 +497,7 @@ export class VehicleManager {
     ctx.fillStyle = '#fff7dc'
     ctx.font = '700 28px "Segoe UI", Arial, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(`Xe của ${route.owner} · ${route.driver} lái`, 256, 52)
+    ctx.fillText(`Xe của ${route.owner} · ${route.owner} lái`, 256, 52)
     ctx.fillStyle = 'rgba(255,255,255,0.72)'
     ctx.font = '600 22px "Segoe UI", Arial, sans-serif'
     ctx.fillText(`${route.purpose}: ${route.from} → ${route.to} · ~${minutes} phút`, 256, 92)
@@ -506,15 +506,19 @@ export class VehicleManager {
     ctx.fillRect(18, 22, 476, 94)
     ctx.fillStyle = '#fff7dc'
     ctx.font = '700 28px "Segoe UI", Arial, sans-serif'
-    const title = state === 'parking' ? `Xe nha ${route.owner} dang do` : `Xe nha ${route.owner}`
+    const title = state === 'home'
+      ? `Xe của ${route.owner}`
+      : state === 'parking' ? `Xe nhà ${route.owner} đang đỗ` : `Xe nhà ${route.owner}`
     ctx.fillText(title, 256, 54)
     ctx.fillStyle = 'rgba(255,255,255,0.76)'
     ctx.font = '600 22px "Segoe UI", Arial, sans-serif'
-    const detail = state === 'returning'
-      ? `Dang quay ve nha cat xe - ~${minutes} phut`
+    const detail = state === 'home'
+      ? `${route.appearance} · đỗ cạnh ${route.from}`
+      : state === 'returning'
+      ? `Đang về nhà cất xe · ~${minutes} phút`
       : state === 'parking'
-        ? `Dang do tai diem den - lat nua quay ve`
-        : `Dang tren duong den diem hen - ~${minutes} phut`
+        ? 'Đang đỗ ở điểm đến · lát nữa quay về'
+        : `Đang trên đường · ~${minutes} phút`
     ctx.fillText(detail, 256, 94)
 
     const texture = new THREE.CanvasTexture(canvas)

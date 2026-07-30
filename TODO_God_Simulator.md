@@ -124,6 +124,8 @@
 
 ## Mở rộng xã hội đời thường
 
+- [x] Chuẩn hóa xe tư nhân: mỗi xe có đúng một chủ kiêm người lái, kiểu dáng cố định và chỗ đỗ sát đúng nhà; mỗi xe chỉ chạy một chuyến hợp lý trong khung giờ riêng mỗi ngày, khi quay về chủ xuống ở cửa còn xe về đúng vị trí đỗ.
+
 - [x] Cho chat steward dùng trực tiếp Qwen chung thay vì embedded agent không tương thích.
 - [x] Cho mọi cư dân trong chat tab đều nhắn được, kể cả chưa bật sub-agent riêng.
 - [x] Thêm fallback Qwen chung cho cư dân chưa có agent riêng, có ký ức ngắn theo phiên.
