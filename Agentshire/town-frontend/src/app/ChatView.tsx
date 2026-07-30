@@ -42,7 +42,9 @@ export function ChatView({ visible, selectedAgent, onAgentChange, onConnectedCha
   }, [])
 
   const isLive = useMemo(() => {
-    return new URLSearchParams(window.location.search).get('mock') !== 'true'
+    const params = new URLSearchParams(window.location.search)
+    const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+    return params.get('mock') !== 'true' && (params.has('ws') || isLocalHost)
   }, [])
 
   const townSessionId = useMemo(() => {

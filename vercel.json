@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm ci --prefix Agentshire/town-frontend",
+  "buildCommand": "npm run build --prefix Agentshire/town-frontend",
+  "outputDirectory": "Agentshire/town-frontend/dist",
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/town.html"
+    }
+  ]
+}

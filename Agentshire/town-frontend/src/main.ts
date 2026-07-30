@@ -102,7 +102,9 @@ async function main() {
   syncTownSessionLabel(initialTownSessionId)
 
   let dataSource: IWorldDataSource
-  const useMock = params.get('mock') === 'true'
+  const hasExplicitWs = params.has('ws')
+  const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+  const useMock = params.get('mock') === 'true' || (!hasExplicitWs && !isLocalHost)
 
   let bridgeModule: any = null
   let townWs: WebSocket | null = null
