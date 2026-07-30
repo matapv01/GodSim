@@ -586,6 +586,7 @@ export class DailyBehavior {
     this.currentBuilding = building.key
     getOccupancy(building.key).add(this.npc.id)
     this.placeInsideLocationZone(building.key)
+    this.npc.setVisible(false)
 
     this.journal?.record({
       location: building.key,
@@ -630,6 +631,11 @@ export class DailyBehavior {
 
   private leaveCurrentBuilding(): void {
     if (this.currentBuilding) {
+      const door = WAYPOINTS[this.currentBuilding]
+      if (door) {
+        this.npc.mesh.position.set(door.x, 0, door.z)
+      }
+      this.npc.setVisible(true)
       this.lastVisitedKey = this.currentBuilding
       this.journal?.record({
         location: this.currentBuilding,
@@ -661,17 +667,7 @@ export class DailyBehavior {
     }
 
     if (Math.random() < 0.3 && this.currentBuilding) {
-      const zone = LOCATION_ZONES[this.currentBuilding]
-      const wp = zone ?? WAYPOINTS[this.currentBuilding]
-      if (wp) {
-        const nudge = zone
-          ? this.randomPointInZone(this.currentBuilding, 0.65)
-          : { x: wp.x + (Math.random() - 0.5) * 1.5, z: wp.z + (Math.random() - 0.5) * 1.5 }
-        this.doWalk('at_building', nudge, 1, () => {
-          this.npc.playAnim(pick(IDLE_ANIMS) as any)
-          this.recordStaying()
-        })
-      }
+      this.recordStaying()
     }
   }
 
