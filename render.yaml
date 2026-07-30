@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: godsim-backend
+    runtime: node
+    plan: free
+    branch: deploy-full
+    buildCommand: |
+      npm ci --prefix Agentshire
+      npm ci --prefix Agentshire/town-frontend
+      npm run build --prefix Agentshire/town-frontend
+    startCommand: npm run start:standalone --prefix Agentshire
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 24.18.0
+      - key: AGENTSHIRE_STANDALONE
+        value: "1"
+      - key: AGENTSHIRE_STATE_DIR
+        value: /opt/render/project/src/.render-agentshire-state
+      - key: AGENTSHIRE_LLM_API_FORMAT
+        value: openai
+      - key: AGENTSHIRE_LLM_BODY_MODE
+        value: minimal
+      - key: AGENTSHIRE_LLM_THINKING
+        value: "false"
+      - key: AGENTSHIRE_LLM_MODEL
+        sync: false
+      - key: AGENTSHIRE_LLM_BASE_URL
+        sync: false
+      - key: AGENTSHIRE_LLM_API_KEY
+        sync: false
