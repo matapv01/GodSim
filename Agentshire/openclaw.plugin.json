@@ -1,0 +1,27 @@
+{
+  "id": "agentshire",
+  "name": "Agentshire",
+  "description": "OpenClaw plugin for building a living 3D town with social NPCs, a map editor, and a character workshop.",
+  "channels": ["agentshire"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "wsPort": {
+        "type": "number",
+        "default": 55211,
+        "description": "WebSocket port for town frontend connection"
+      },
+      "townPort": {
+        "type": "number",
+        "default": 55210,
+        "description": "HTTP port to serve the town frontend"
+      },
+      "autoLaunch": {
+        "type": "boolean",
+        "default": true,
+        "description": "Automatically open town in browser on start"
+      }
+    }
+  }
+}

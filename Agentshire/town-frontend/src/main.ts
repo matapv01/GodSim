@@ -1,0 +1,543 @@
+import './styles.css'
+import { initLocale } from './i18n'
+initLocale()
+
+import { t } from './i18n'
+import { Engine } from './engine'
+import { MainScene } from './game/MainScene'
+import { PlatformBridge } from './platform/Bridge'
+import { MockDataSource } from './data/MockDataSource'
+import { TownConfigStore } from './data/TownConfigStore'
+import type { IWorldDataSource } from './data/IWorldDataSource'
+import { InputBar, type TownMessage } from './ui/InputBar'
+
+interface WsHistoryMessage {
+  role?: 'user' | 'assistant'
+  text?: string
+  timestamp?: number
+  type?: 'text' | 'image' | 'video' | 'audio' | 'file'
+  fileName?: string
+}
+
+function summarizeHistoryMessage(msg: WsHistoryMessage): string {
+  if (typeof msg.text === 'string' && msg.text.trim()) return msg.text.trim()
+  switch (msg.type) {
+    case 'image':
+      return t('media.image')
+    case 'video':
+      return msg.fileName?.trim() || t('media.video')
+    case 'audio':
+      return msg.fileName?.trim() || t('media.audio')
+    case 'file':
+      return msg.fileName?.trim() || t('media.file')
+    default:
+      return ''
+  }
+}
+
+function createTownSessionId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `town-${crypto.randomUUID()}`
+  }
+  return `town-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function formatTownSessionLabel(townSessionId: string): string {
+  if (townSessionId.length <= 24) return townSessionId
+  return `${townSessionId.slice(0, 12)}...${townSessionId.slice(-8)}`
+}
+
+function applyHtmlLocale(): void {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n')!
+    const translated = t(key)
+    if (translated !== key) el.textContent = translated
+  })
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title')!
+    const translated = t(key)
+    if (translated !== key) el.setAttribute('title', translated)
+  })
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder')!
+    const translated = t(key)
+    if (translated !== key) (el as HTMLTextAreaElement).placeholder = translated
+  })
+  const backBtn = document.getElementById('back-btn')
+  if (backBtn) backBtn.textContent = t('back_to_town')
+  const moreBtn = document.getElementById('town-more-btn')
+  if (moreBtn) moreBtn.innerHTML = `${t('more_btn')} <span style="font-size:10px;">▾</span>`
+}
+
+async function main() {
+  const params = new URLSearchParams(location.search)
+
+  const container = document.getElementById('game-container')
+  if (!container) throw new Error('game-container not found')
+
+  const engine = new Engine(container)
+  await engine.init()
+
+  applyHtmlLocale()
+
+  const configStore = new TownConfigStore()
+  const initialTownSessionId =
+    params.get('townSessionId') || configStore.getSessionId() || createTownSessionId()
+  configStore.setSessionId(initialTownSessionId)
+
+  const syncTownSessionUrl = (townSessionId: string) => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('townSessionId', townSessionId)
+    history.replaceState({}, '', url.toString())
+  }
+
+  const syncTownSessionLabel = (townSessionId: string) => {
+    const el = document.getElementById('town-session-label')
+    if (!el) return
+    el.textContent = `${t('session_label')}: ${formatTownSessionLabel(townSessionId)}`
+    el.setAttribute('title', townSessionId)
+  }
+
+  syncTownSessionUrl(initialTownSessionId)
+  syncTownSessionLabel(initialTownSessionId)
+
+  let dataSource: IWorldDataSource
+  const useMock = params.get('mock') === 'true'
+
+  let bridgeModule: any = null
+  let townWs: WebSocket | null = null
+  const wsSend = (data: any) => {
+    if (townWs && townWs.readyState === WebSocket.OPEN) {
+      townWs.send(JSON.stringify(data))
+    }
+  }
+  const implicitChatPending = new Map<string, { resolve: (v: { text: string; usage?: { input: number; output: number }; error?: string }) => void; timer: ReturnType<typeof setTimeout> }>()
+  const seenCitizenMessageKeys = new Set<string>()
+  let implicitChatSeq = 0
+
+  if (!useMock) {
+    // @ts-ignore -- resolved by Vite alias at runtime
+    bridgeModule = await import('agentshire_bridge')
+    const wsUrl = params.get('ws') || 'ws://localhost:55211'
+
+    const { DirectorBridge } = bridgeModule
+    const director = new DirectorBridge()
+
+    const ws = new WebSocket(wsUrl)
+    townWs = ws
+    let wsReady = false
+    let wsEverConnected = false
+
+    const showWsError = () => {
+      if (document.getElementById('ws-error-banner')) return
+      const banner = document.createElement('div')
+      banner.id = 'ws-error-banner'
+      Object.assign(banner.style, {
+        position: 'fixed', top: '0', left: '0', right: '0', zIndex: '9999',
+        padding: '12px 16px', background: 'rgba(200,50,50,0.92)', color: '#fff',
+        fontSize: '13px', lineHeight: '1.6', textAlign: 'center', fontFamily: 'system-ui, sans-serif',
+      })
+      banner.textContent = t('ws.error', { url: wsUrl })
+      document.body.appendChild(banner)
+    }
+    const hideWsError = () => {
+      document.getElementById('ws-error-banner')?.remove()
+    }
+
+    const bindTownSession = (townSessionId: string) => {
+      if (ws.readyState !== WebSocket.OPEN) return
+      ws.send(JSON.stringify({ type: 'town_session_init', townSessionId }))
+    }
+
+    const forwardCitizenMessagesToScene = (
+      scene: MainScene | null,
+      payload: { npcId?: string; messages?: WsHistoryMessage[] },
+    ) => {
+      if (!scene || typeof payload.npcId !== 'string' || !payload.npcId) return
+      const assistantMessages = Array.isArray(payload.messages)
+        ? payload.messages.filter((msg) => msg?.role === 'assistant')
+        : []
+
+      for (const msg of assistantMessages) {
+        const text = summarizeHistoryMessage(msg)
+        if (!text) continue
+        const key = `${payload.npcId}:${msg.timestamp ?? 0}:${msg.type ?? 'text'}:${text}`
+        if (seenCitizenMessageKeys.has(key)) continue
+        seenCitizenMessageKeys.add(key)
+        scene.handleGameEvent({ type: 'npc_look_at', npcId: payload.npcId, targetNpcId: 'user' })
+        scene.handleGameEvent({ type: 'dialog_message', npcId: payload.npcId, text, isStreaming: false })
+      }
+    }
+
+    ws.onopen = () => {
+      wsReady = true
+      wsEverConnected = true
+      hideWsError()
+      console.log('[main] DirectorBridge WS connected')
+      bindTownSession(configStore.getSessionId() || initialTownSessionId)
+    }
+
+    ws.onmessage = (msg: MessageEvent) => {
+      try {
+        const data = JSON.parse(msg.data)
+        if (data.type === 'agent_event' && data.event) {
+          const evt = data.event
+          if (evt.type === 'deliverable_card' || evt.type === 'media_preview') {
+            if (sceneRef) sceneRef.handleGameEvent(evt)
+          } else if (evt.npcId && evt.npcId !== 'steward') {
+            director.processCitizenEvent(evt.npcId, evt)
+          } else {
+            director.processAgentEvent(evt)
+          }
+        } else if (data.type === 'chat_new_messages' && data.npcId) {
+          forwardCitizenMessagesToScene(sceneRef, data)
+        } else if (data.type === 'work_snapshot' && data.snapshot?.agents) {
+          director.restoreWorkState(data.snapshot)
+        } else if (data.type === 'town_session_bound' && data.townSessionId) {
+          console.log(`[main] Bound to town session ${data.townSessionId}`)
+          syncTownSessionLabel(data.townSessionId)
+          if (typeof data.model === 'string' && data.model) {
+            const el = document.querySelector('.tas-model')
+            if (el) el.textContent = data.model
+          }
+        } else if (data.type === 'implicit_chat_response' && typeof data.id === 'string') {
+          const pending = implicitChatPending.get(data.id)
+          if (pending) {
+            implicitChatPending.delete(data.id)
+            clearTimeout(pending.timer)
+            if (data.error) {
+              console.warn(`[main] implicit_chat_response error id=${data.id}: ${data.error}`)
+            }
+            pending.resolve({ text: data.text ?? '', usage: data.usage, error: data.error })
+          }
+        }
+      } catch { /* ignore malformed */ }
+    }
+
+    ws.onclose = () => {
+      wsReady = false
+      console.log('[main] DirectorBridge WS closed')
+      if (!wsEverConnected) showWsError()
+    }
+
+    let sceneRef: MainScene | null = null
+
+    const directorDataSource: IWorldDataSource = {
+      async connect(config: any) {
+        let hasWorkRestore = false
+        if (sceneRef) {
+          director.onEmit((events: any[]) => {
+            for (const e of events) sceneRef!.handleGameEvent(e)
+          })
+          hasWorkRestore = director.setTownConfig(config)
+        }
+        return { hasWorkRestore }
+      },
+      disconnect() { ws.close() },
+      get connected() { return wsReady },
+      onGameEvent(_handler: (e: any) => void) {},
+      sendAction(action: any) {
+        if (action.type === 'user_message') {
+          director.onUserMessage(action.text)
+          const targetId = action.targetNpcId ?? 'steward'
+          if (targetId !== 'steward') {
+            wsSend({ type: 'citizen_chat', npcId: targetId, message: action.text })
+          } else {
+            const wsMsg = director.processWorldAction(action)
+            if (wsMsg) wsSend(wsMsg)
+            else wsSend({ type: 'chat', body: [{ kind: 'text', text: action.text }] })
+          }
+        } else if (action.type === 'abort_requested') {
+          wsSend({ type: 'abort' })
+        } else {
+          const wsMsg = director.processWorldAction(action)
+          if (wsMsg) wsSend(wsMsg)
+        }
+      },
+      getSnapshot() { return null },
+    }
+    dataSource = directorDataSource
+
+    ;(dataSource as any)._setScene = (s: MainScene) => { sceneRef = s }
+    ;(dataSource as any)._executeRestore = () => { director.executePendingRestore() }
+  } else {
+    dataSource = new MockDataSource()
+  }
+
+  const scene = new MainScene(engine, dataSource, configStore)
+
+  // Set scene reference for DirectorBridge (must be before loadScene which triggers init → startFlow → connect)
+  if ((dataSource as any)._setScene) {
+    (dataSource as any)._setScene(scene)
+  }
+
+  await engine.loadScene(scene)
+
+  let implicitChatFnRef: ((req: {
+    scene: string; system: string; user: string; maxTokens?: number; extraStop?: string[]
+  }) => Promise<{ text: string; fallback: boolean }>) | null = null
+
+  if (bridgeModule && townWs) {
+    const IMPLICIT_CHAT_TIMEOUT_MS = 12000
+    const _ws = townWs
+    implicitChatFnRef = async (req: {
+      scene: string; system: string; user: string; maxTokens?: number; extraStop?: string[]
+    }) => {
+      if (_ws.readyState !== WebSocket.OPEN) {
+        const result = await bridgeModule.implicitChat({
+          scene: req.scene, system: req.system, user: req.user,
+          maxTokens: req.maxTokens, extraStop: req.extraStop,
+        })
+        return { text: result.text, fallback: result.fallback }
+      }
+      const id = `ic-${++implicitChatSeq}-${Date.now().toString(36)}`
+      return new Promise<{ text: string; fallback: boolean }>((resolve) => {
+        const timer = setTimeout(() => {
+          implicitChatPending.delete(id)
+          console.warn(`[main] implicit_chat timeout id=${id} scene=${req.scene}`)
+          resolve({ text: '', fallback: true })
+        }, IMPLICIT_CHAT_TIMEOUT_MS)
+        implicitChatPending.set(id, {
+          resolve: (r) => resolve({ text: r.text, fallback: !!r.error || !r.text }),
+          timer,
+        })
+        _ws.send(JSON.stringify({
+          type: 'implicit_chat_request',
+          id,
+          system: req.system,
+          user: req.user,
+          maxTokens: req.maxTokens ?? 200,
+          temperature: 0.85,
+          stop: ['\n\n', ...(req.extraStop ?? [])],
+        }))
+      })
+    }
+  }
+
+  scene.setImplicitChatFn(implicitChatFnRef)
+
+  // ── Send function for InputBar — routes messages via dataSource ──
+
+  const startNewTownSession = () => {
+    const currentConfig = configStore.load()
+    const nextTownSessionId = createTownSessionId()
+    configStore.setSessionId(nextTownSessionId)
+    if (currentConfig) {
+      configStore.save(currentConfig)
+    }
+    syncTownSessionUrl(nextTownSessionId)
+    syncTownSessionLabel(nextTownSessionId)
+
+    if (window.parent !== window) {
+      const parentUrl = new URL(window.parent.location.href)
+      parentUrl.searchParams.set('townSessionId', nextTownSessionId)
+      window.parent.location.href = parentUrl.toString()
+    } else {
+      window.location.reload()
+    }
+  }
+
+  const sendToBackend = (msg: TownMessage): void => {
+    if (msg.type === 'chat') {
+      const routed = parseMentionTarget(msg.message)
+      const targetNpcId = routed?.targetNpcId ?? scene.getDialogTarget()
+      dataSource.sendAction({ type: 'user_message', targetNpcId, text: routed?.text ?? msg.message })
+    } else if (msg.type === 'multimodal') {
+      const textPart = msg.parts.find(p => p.kind === 'text')
+      const text = textPart && 'text' in textPart ? textPart.text : '[image]'
+      const routed = parseMentionTarget(text)
+      const targetNpcId = routed?.targetNpcId ?? scene.getDialogTarget()
+      dataSource.sendAction({ type: 'user_message', targetNpcId, text: routed?.text ?? text })
+    }
+  }
+
+  function parseMentionTarget(raw: string): { targetNpcId: string; text: string } | null {
+    const config = configStore.load()
+    if (!config) return null
+    const colonMatch = raw.match(/^@([^:]{1,48}):\s*(.+)$/)
+    const tokenMatch = raw.match(/^@(\S{1,48})\s+(.+)$/)
+    const match = colonMatch ?? tokenMatch
+    if (!match) return null
+    const query = match[1].trim().toLowerCase()
+    const text = match[2].trim()
+    if (!query || !text) return null
+    const normalize = (value: string) => value.trim().toLowerCase()
+    const citizen = config.citizens.find(c => {
+      const id = normalize(c.id)
+      const name = normalize(c.name)
+      const label = normalize((c as any).label ?? '')
+      return id === query || name === query || label === query || name.startsWith(query) || label.startsWith(query)
+    })
+    if (!citizen) return null
+    return { targetNpcId: citizen.id, text }
+  }
+
+  // ── InputBar ──
+
+  document.body.classList.add('has-town-panel')
+
+  // ── Topic mode state ──
+  interface TopicState {
+    npcIds: string[]
+    phase: 'gathering' | 'active'
+  }
+  let topicState: TopicState | null = null
+
+  const inputBar = new InputBar({
+    send: (msg) => {
+      if (topicState?.phase === 'active' && msg.type === 'chat') {
+        wsSend({ type: 'topic_message', npcIds: topicState.npcIds, message: msg.message })
+      } else {
+        sendToBackend(msg)
+      }
+    },
+    onUserMessage: (text) => {
+      scene.showUserBubble(text)
+    },
+    onNewSession: startNewTownSession,
+  })
+
+  const endTopicAndSwitch = () => {
+    if (!topicState) return
+    wsSend({ type: 'topic_end' })
+    scene.dismissTopic()
+    topicState = null
+    scene.getUIManager().clearTopicIndicator()
+    hideEndTopicBtn()
+    inputBar.setBusy(false)
+    const textarea = document.getElementById('town-input-text') as HTMLTextAreaElement
+    if (textarea) textarea.placeholder = t('input.idle')
+  }
+
+  scene.getUIManager().initTopicCallbacks({ onEndTopic: endTopicAndSwitch })
+
+  // ── "End topic" button ──
+  const endTopicBtn = document.getElementById('town-end-topic-btn')
+
+  const showEndTopicBtn = () => { if (endTopicBtn) endTopicBtn.style.display = '' }
+  const hideEndTopicBtn = () => { if (endTopicBtn) endTopicBtn.style.display = 'none' }
+
+  endTopicBtn?.addEventListener('click', () => {
+    scene.getUIManager().showEndTopicConfirm()
+  })
+
+  // ── "More" dropdown ──
+  const moreBtn = document.getElementById('town-more-btn')
+  const actionDropdown = document.getElementById('town-action-dropdown')
+  let dropdownOpen = false
+
+  const closeActionDropdown = () => {
+    if (actionDropdown) actionDropdown.style.display = 'none'
+    dropdownOpen = false
+  }
+
+  const openActionDropdown = () => {
+    if (!actionDropdown) return
+    actionDropdown.innerHTML = ''
+
+    const isWork = scene.getModeManager()?.getMode() === 'work'
+    const isTopic = !!topicState
+
+    const newTaskItem = document.createElement('div')
+    newTaskItem.className = 'town-action-item' + (isTopic ? ' disabled' : '')
+    newTaskItem.textContent = t('menu.new_task')
+    newTaskItem.addEventListener('click', () => {
+      closeActionDropdown()
+      if (!isTopic) startNewTownSession()
+    })
+    actionDropdown.appendChild(newTaskItem)
+
+    const topicItem = document.createElement('div')
+    topicItem.className = 'town-action-item' + (isWork || isTopic ? ' disabled' : '')
+    topicItem.textContent = t('menu.start_topic')
+    topicItem.addEventListener('click', async () => {
+      closeActionDropdown()
+      if (isWork || isTopic) return
+
+      const { showTopicSetupPanel } = await import('./ui/TopicSetupPanel')
+
+      const citizens = scene.getAgentEnabledCitizens()
+      if (citizens.length < 2) {
+        scene.getUIManager().showToast('至少需要2位已开启 Agent 的居民')
+        return
+      }
+
+      const result = await showTopicSetupPanel(citizens, (id) => !!scene.isNpcVisible(id))
+      if (!result || result.citizens.length < 2) return
+
+      const npcIds = result.citizens.map(c => c.id)
+      topicState = { npcIds, phase: 'gathering' }
+
+      const npcConfigs = result.citizens.map(c => ({
+        id: c.id, name: c.name, color: c.color,
+        spawn: { x: 0, y: 0, z: 0 }, role: 'worker' as const,
+        characterKey: c.characterKey, avatarUrl: c.avatarUrl,
+      }))
+      scene.getUIManager().updateTopicIndicator(npcConfigs)
+
+      inputBar.setBusy(true)
+      const textarea = document.getElementById('town-input-text') as HTMLTextAreaElement
+      if (textarea) textarea.placeholder = t('input.gathering')
+
+      wsSend({ type: 'topic_start', npcIds })
+
+      await scene.gatherForTopic(npcIds)
+
+      if (!topicState) return
+      topicState.phase = 'active'
+      inputBar.setBusy(false)
+      if (textarea) textarea.placeholder = t('input.topic')
+      showEndTopicBtn()
+    })
+    actionDropdown.appendChild(topicItem)
+
+    actionDropdown.style.display = 'block'
+    dropdownOpen = true
+  }
+
+  moreBtn?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (dropdownOpen) closeActionDropdown()
+    else openActionDropdown()
+  })
+
+  document.addEventListener('click', () => closeActionDropdown())
+
+  // ── Platform Bridge ──
+
+  const bridge = new PlatformBridge()
+  bridge.onMessage((msg) => {
+    switch (msg.type) {
+      case 'play':
+        engine.play()
+        bridge.sendStateChange({ status: 'running' })
+        break
+      case 'pause':
+        engine.pause()
+        bridge.sendStateChange({ status: 'paused' })
+        break
+      case 'reset':
+        engine.reset()
+        bridge.sendStateChange({ status: 'running', tick: 0 })
+        break
+    }
+  })
+
+  bridge.sendReady()
+  bridge.sendStateChange({ status: 'running', tick: 0, fps: 60, objectCount: 0 })
+
+  engine.start()
+
+  document.addEventListener('agentshire:music', (e: Event) => {
+    const { enabled } = (e as CustomEvent).detail
+    scene.setMusicEnabled(enabled)
+  })
+  document.addEventListener('agentshire:soulmode', (e: Event) => {
+    const { enabled } = (e as CustomEvent).detail
+    scene.setSoulModeEnabled(enabled)
+  })
+
+  ;(window as any).engine = engine
+}
+
+main().catch(console.error)

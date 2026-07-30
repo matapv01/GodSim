@@ -1,0 +1,46 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea? We'd love to hear it.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      placeholder: Describe the use case or frustration that motivates this request.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would the solution look like?
+      placeholder: Describe the feature, behavior, or UI you're imagining.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area does this relate to?
+      options:
+        - Town (3D scene, NPC behavior, weather, day/night)
+        - Chat (messaging, commands, UI)
+        - Workflow (multi-agent orchestration, plan system)
+        - Citizen Workshop (character creation, soul editor, model upload)
+        - Town Editor (map editing, assets, preview)
+        - Mini-game (Banwei Buster or new games)
+        - Plugin / Backend (hooks, tools, WebSocket, API)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      placeholder: Any workarounds or other approaches you've thought about.

@@ -1,0 +1,36 @@
+{
+  "citizenDestinationPoints": [
+    { "id": "house_a_door", "x": 5.5, "z": 7.2 },
+    { "id": "house_b_door", "x": 5.4, "z": 12.3 },
+    { "id": "house_c_door", "x": 5.5, "z": 17.1 },
+    { "id": "market_door", "x": 29.2, "z": 6.2 },
+    { "id": "cafe_door", "x": 29.1, "z": 12.0 },
+    { "id": "museum_door", "x": 29.0, "z": 18.0 },
+    { "id": "user_home_door", "x": 10.2, "z": 18.2 }
+  ],
+  "routeGraphs": {
+    "town": {
+      "plaza_n": { "x": 18, "z": 17, "neighbors": ["plaza_c", "west_n", "east_n"] },
+      "plaza_c": { "x": 18, "z": 13, "neighbors": ["plaza_n", "plaza_s", "west_c", "east_c"] },
+      "plaza_s": { "x": 18, "z": 9, "neighbors": ["plaza_c", "west_s", "east_s"] },
+      "west_n": { "x": 12, "z": 17, "neighbors": ["plaza_n", "west_c", "west_far_n"] },
+      "west_c": { "x": 12, "z": 13, "neighbors": ["west_n", "plaza_c", "west_s", "west_far_c"] },
+      "west_s": { "x": 12, "z": 9, "neighbors": ["west_c", "plaza_s", "west_far_s"] },
+      "east_n": { "x": 24, "z": 17, "neighbors": ["plaza_n", "east_c", "east_far_n"] },
+      "east_c": { "x": 24, "z": 13, "neighbors": ["east_n", "plaza_c", "east_s", "east_far_c"] },
+      "east_s": { "x": 24, "z": 9, "neighbors": ["east_c", "plaza_s", "east_far_s"] },
+      "west_far_n": { "x": 8, "z": 17, "neighbors": ["west_n", "west_far_c"] },
+      "west_far_c": { "x": 8, "z": 13, "neighbors": ["west_far_n", "west_c", "west_far_s"] },
+      "west_far_s": { "x": 8, "z": 9, "neighbors": ["west_far_c", "west_s"] },
+      "east_far_n": { "x": 28, "z": 17, "neighbors": ["east_n", "east_far_c"] },
+      "east_far_c": { "x": 28, "z": 13, "neighbors": ["east_far_n", "east_c", "east_far_s"] },
+      "east_far_s": { "x": 28, "z": 9, "neighbors": ["east_far_c", "east_s"] }
+    },
+    "office": {
+      "office_entry_l": { "x": 14, "z": 5, "neighbors": ["office_center"] },
+      "office_entry_c": { "x": 17, "z": 5, "neighbors": ["office_center"] },
+      "office_entry_r": { "x": 20, "z": 5, "neighbors": ["office_center"] },
+      "office_center": { "x": 17, "z": 12, "neighbors": ["office_entry_l", "office_entry_c", "office_entry_r"] }
+    }
+  }
+}

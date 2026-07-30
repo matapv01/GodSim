@@ -1,0 +1,39 @@
+node_modules/
+town-frontend/node_modules/
+/dist/
+town-frontend/dist/**/*.map
+.DS_Store
+.cursor/
+/assets/
+
+
+# dev-only scripts
+retarget-batch.py
+retargeting.js
+
+# local test & docs (not part of the open-source repo)
+test/
+docs/
+
+# debug pages
+town-frontend/npc-anim-preview.html
+
+# internal design docs
+town-frontend/design-system/
+
+# environment & secrets
+.env
+.env.*
+LLM_Env.ps1
+*.pem
+
+# build artifacts
+*.tsbuildinfo
+coverage/
+*.log
+town-frontend/agentshire-*-runtime-*.png
+
+# local user data
+town-data/custom-assets/characters/
+town-data/custom-assets/thumbnails/
+town-data/souls/

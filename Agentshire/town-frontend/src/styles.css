@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@import "./styles/layout.css";
+@import "./styles/chat.css";
+@import "./styles/npc-card.css";
+@import "./styles/hud.css";
+@import "./styles/popups.css";
+@import "./ui/cover-templates.css";
+@import "./ui/town-panel.css";
+@import "./game/minigame/banwei.css";

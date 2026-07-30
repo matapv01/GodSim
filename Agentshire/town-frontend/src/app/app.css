@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* Trap — self-hosted (free for commercial use, by Aayush Mayank) */
+@font-face {
+  font-family: 'Trap';
+  src: url('../assets/fonts/Trap-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Trap';
+  src: url('../assets/fonts/Trap-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Styled scrollbar for dark theme */
+.styled-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+.styled-scrollbar::-webkit-scrollbar { width: 4px; }
+.styled-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.styled-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+.styled-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+@theme {
+  /* Background hierarchy — premium neutral grays */
+  --color-bg-base: #121212;
+  --color-bg-canvas: #181818;
+  --color-bg-surface: #1e1e1e;
+  --color-bg-elevated: #252525;
+  --color-bg-overlay: #2c2c2c;
+  --color-bg-hover: #333333;
+
+  /* Text — Apple HIG dark mode */
+  --color-text-primary: #f5f5f7;
+  --color-text-secondary: #a1a1a6;
+  --color-text-tertiary: #6e6e73;
+  --color-text-quaternary: #48484a;
+
+  /* Brand */
+  --color-brand-primary: #D4A574;
+  --color-brand-secondary: #E7DDCC;
+
+  /* Accents */
+  --color-accent-green: #45E796;
+  --color-accent-cyan: #00d4ff;
+
+  /* Status */
+  --color-status-success: #34D399;
+  --color-status-error: #F87171;
+  --color-status-loading: #60A5FA;
+  --color-status-warning: #FBBF24;
+
+  /* Border */
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.15);
+}

@@ -1,0 +1,25 @@
+/* @desc HUD elements — progress bar/label, back button, time display, mode indicator */
+
+#progress-bar {
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  z-index: 101; display: none;
+}
+#progress-bar .fill {
+  height: 100%; background: linear-gradient(90deg, #64ffda, #38bdf8); transition: width 0.5s ease;
+  box-shadow: 0 0 8px rgba(100, 255, 218, 0.5);
+}
+#progress-label {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 101;
+  color: rgba(255,255,255,0.9); font-size: 13px; display: none; font-weight: 500;
+  background: rgba(20,20,40,0.85); padding: 7px 16px; border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+}
+
+#back-btn {
+  position: absolute; top: 8px; left: 8px; z-index: 95;
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 13px; padding: 6px 14px;
+  border-radius: 20px; cursor: pointer; display: none;
+  backdrop-filter: blur(4px);
+}
+#back-btn:active { background: rgba(255,255,255,0.1); }

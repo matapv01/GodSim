@@ -1,0 +1,18 @@
+# Local runtime secrets
+LLM_Env.ps1
+.env
+.env.*
+
+# Local runtime output
+.runtime/
+*.log
+
+# Local browsers/tools/cache
+.browser-profile/
+.browsers/
+.tools/
+*.lnk
+
+# Old nested repo metadata backup
+.agentshire-git-backup/
+Agentshire/.git/

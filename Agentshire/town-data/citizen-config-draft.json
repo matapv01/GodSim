@@ -1,0 +1,94 @@
+{
+    "version":  1,
+    "user":  {
+                 "name":  "Người quan sát",
+                 "avatarId":  "char-male-c",
+                 "modelSource":  "builtin"
+             },
+    "steward":  {
+                    "name":  "Quản gia",
+                    "avatarId":  "char-female-b",
+                    "modelSource":  "builtin",
+                    "bio":  "Người điều phối sắc bén, quyết đoán, quan sát thị trấn và hỗ trợ cư dân khi cần",
+                    "persona":  "SOUL"
+                },
+    "citizens":  [
+                     {
+                         "id":  "citizen_1",
+                         "name":  "Minh",
+                         "avatarId":  "char-male-b",
+                         "modelSource":  "builtin",
+                         "bio":  "Trầm tĩnh, logic, thích quan sát cấu trúc của mọi thứ",
+                         "industry":  "Công nghệ",
+                         "specialty":  "Kiến trúc hệ thống",
+                         "persona":  "YAN",
+                         "homeId":  "house_a"
+                     },
+                     {
+                         "id":  "citizen_2",
+                         "name":  "Lan",
+                         "avatarId":  "char-female-c",
+                         "modelSource":  "builtin",
+                         "bio":  "Nhanh nhạy, nhiều ý tưởng, hay để ý cảm xúc của người khác",
+                         "industry":  "Thiết kế",
+                         "specialty":  "Quản lý sản phẩm",
+                         "persona":  "CHENGZI",
+                         "homeId":  "house_b"
+                     },
+                     {
+                         "id":  "citizen_3",
+                         "name":  "Hà",
+                         "avatarId":  "char-female-e",
+                         "modelSource":  "builtin",
+                         "bio":  "Nhẹ nhàng, tinh tế, rất nhạy với màu sắc và không gian",
+                         "industry":  "Thiết kế",
+                         "specialty":  "Thiết kế UI",
+                         "persona":  "HAITANG",
+                         "homeId":  "house_c"
+                     },
+                     {
+                         "id":  "citizen_4",
+                         "name":  "An",
+                         "avatarId":  "char-female-f",
+                         "modelSource":  "builtin",
+                         "bio":  "Ấm áp, vui vẻ, thường làm bầu không khí nhẹ đi",
+                         "industry":  "Công nghệ",
+                         "specialty":  "Frontend",
+                         "persona":  "DIANDIAN",
+                         "homeId":  "house_a"
+                     },
+                     {
+                         "id":  "citizen_5",
+                         "name":  "Khôi",
+                         "avatarId":  "char-male-e",
+                         "modelSource":  "builtin",
+                         "bio":  "Thích hành động nhanh, không ngại việc khó, hơi nóng tính nhưng tốt bụng",
+                         "industry":  "Công nghệ",
+                         "specialty":  "Backend",
+                         "persona":  "XIAOLIE",
+                         "homeId":  "house_b"
+                     },
+                     {
+                         "id":  "citizen_6",
+                         "name":  "Vy",
+                         "avatarId":  "char-female-d",
+                         "modelSource":  "builtin",
+                         "bio":  "Giàu trí tưởng tượng, thích kể chuyện và bắt nhịp xu hướng",
+                         "industry":  "Nội dung",
+                         "specialty":  "Vận hành nội dung",
+                         "persona":  "QIQI",
+                         "homeId":  "house_c"
+                     },
+                     {
+                         "id":  "citizen_7",
+                         "name":  "Bảo",
+                         "avatarId":  "char-male-d",
+                         "modelSource":  "builtin",
+                         "bio":  "Điềm tĩnh, nói ít, thường nhìn vấn đề qua dữ kiện",
+                         "industry":  "Dữ liệu",
+                         "specialty":  "Phân tích dữ liệu",
+                         "persona":  "CHEN",
+                         "homeId":  "house_a"
+                     }
+                 ]
+}

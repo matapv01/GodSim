@@ -1,0 +1,241 @@
+import * as THREE from 'three'
+
+export class CameraController {
+  private camera: THREE.PerspectiveCamera
+  private container: HTMLElement
+
+  private targetLookAt = new THREE.Vector3(28, 0, 17)
+  private currentLookAt = new THREE.Vector3(28, 0, 17)
+  private cameraOffset = new THREE.Vector3(0, 24, 19)
+  private baseOffset = new THREE.Vector3(0, 24, 19)
+
+  private dragStartLookAt = new THREE.Vector3()
+  private isDragging = false
+
+  private autoPilotEnabled = false
+  private lastInteractionTime = 0
+  private autoPilotTarget: THREE.Vector3 | null = null
+  private autoIdleDelay = 5000
+
+  private followTarget: THREE.Object3D | null = null
+  private lerpSpeed = 0.04
+
+  private officeMode = false
+  private officeBaseOffset = new THREE.Vector3(0, 20, 16)
+  private static readonly OFFICE_LOOK_AT = new THREE.Vector3(14, 0, 12)
+  private static readonly OFFICE_PAN_BOUNDS = { minX: 3, maxX: 26, minZ: 5, maxZ: 22 }
+
+  private static readonly DRAG_SCALE = 0.06
+  private static readonly AUTO_PILOT_LERP = 0.01
+  private static readonly ZOOM_MIN = 0.5
+  private static readonly ZOOM_MAX = 1.6
+  private zoomLevel = 1.0
+  private static readonly PATROL_POINTS = [
+    { x: 25.6, z: 19.25 },
+    { x: 24.4, z: 9.25 },
+    { x: 7.6, z: 15.5 },
+    { x: 42.4, z: 14.25 },
+    { x: 18.4, z: 28.0 },
+    { x: 42.4, z: 21.75 },
+    { x: 11.2, z: 24.25 },
+  ]
+
+  constructor(camera: THREE.PerspectiveCamera, container: HTMLElement) {
+    this.camera = camera
+    this.container = container
+  }
+
+  init(): void {
+    this.camera.fov = 42
+    this.camera.updateProjectionMatrix()
+    this.updateCameraPosition(true)
+    this.container.addEventListener('wheel', this.onWheel, { passive: false })
+    this.lastInteractionTime = performance.now()
+  }
+
+  follow(target: THREE.Object3D | null): void {
+    this.followTarget = target
+    if (target) {
+      this.autoPilotEnabled = false
+      this.autoPilotTarget = null
+      this.targetLookAt.set(target.position.x, 0, target.position.z)
+    }
+  }
+
+  moveTo(target: { x: number; z: number }, immediate?: boolean): void {
+    this.targetLookAt.set(target.x, 0, target.z)
+    this.clampBounds(this.targetLookAt)
+    if (immediate) {
+      this.currentLookAt.copy(this.targetLookAt)
+      this.updateCameraPosition(true)
+    }
+  }
+
+  setAutoPilot(enabled: boolean): void {
+    this.autoPilotEnabled = enabled
+    if (!enabled) {
+      this.autoPilotTarget = null
+    }
+  }
+
+  /** Called by Input system's drag gesture */
+  onDrag(phase: 'start' | 'move' | 'end', delta: { x: number; y: number }, totalDelta: { x: number; y: number }): void {
+    if (phase === 'start') {
+      this.isDragging = true
+      this.dragStartLookAt.copy(this.targetLookAt)
+      this.followTarget = null
+      this.autoPilotEnabled = false
+      this.autoPilotTarget = null
+      this.lastInteractionTime = performance.now()
+    } else if (phase === 'move' && this.isDragging) {
+      this.targetLookAt.set(
+        this.dragStartLookAt.x - totalDelta.x * CameraController.DRAG_SCALE,
+        0,
+        this.dragStartLookAt.z - totalDelta.y * CameraController.DRAG_SCALE,
+      )
+      if (this.officeMode) {
+        this.clampOfficeBounds(this.targetLookAt)
+      } else {
+        this.clampBounds(this.targetLookAt)
+      }
+    } else if (phase === 'end') {
+      this.isDragging = false
+      this.lastInteractionTime = performance.now()
+    }
+  }
+
+  /** Called by Input system's pinch gesture */
+  onPinch(deltaScale: number): void {
+    this.applyZoom(deltaScale > 1 ? 0.96 : 1.04)
+    this.lastInteractionTime = performance.now()
+  }
+
+  private onWheel = (e: WheelEvent): void => {
+    e.preventDefault()
+    this.applyZoom(e.deltaY > 0 ? 1.06 : 0.94)
+    this.lastInteractionTime = performance.now()
+    this.followTarget = null
+    this.autoPilotEnabled = false
+    this.autoPilotTarget = null
+  }
+
+  private applyZoom(factor: number): void {
+    this.zoomLevel = Math.max(
+      CameraController.ZOOM_MIN,
+      Math.min(CameraController.ZOOM_MAX, this.zoomLevel * factor),
+    )
+    this.cameraOffset.copy(this.baseOffset).multiplyScalar(this.zoomLevel)
+  }
+
+  update(_deltaTime: number): void {
+    if (this.followTarget) {
+      this.targetLookAt.set(
+        this.followTarget.position.x,
+        0,
+        this.followTarget.position.z,
+      )
+      this.clampBounds(this.targetLookAt)
+    } else if (this.autoPilotEnabled) {
+      const elapsed = performance.now() - this.lastInteractionTime
+      if (elapsed > this.autoIdleDelay) {
+        if (!this.autoPilotTarget) {
+          this.updateAutoPilot()
+        }
+        if (this.autoPilotTarget) {
+          this.targetLookAt.lerp(this.autoPilotTarget, CameraController.AUTO_PILOT_LERP)
+          const dist = this.targetLookAt.distanceTo(this.autoPilotTarget)
+          if (dist < 0.3) {
+            this.autoPilotTarget = null
+          }
+        }
+      }
+    }
+
+    this.currentLookAt.lerp(this.targetLookAt, this.lerpSpeed)
+    this.updateCameraPosition(false)
+  }
+
+  private updateAutoPilot(): void {
+    const points = CameraController.PATROL_POINTS
+    const idx = Math.floor(Math.random() * points.length)
+    this.autoPilotTarget = new THREE.Vector3(points[idx].x, 0, points[idx].z)
+  }
+
+  private updateCameraPosition(immediate?: boolean): void {
+    const pos = this.currentLookAt.clone().add(this.cameraOffset)
+    if (immediate) {
+      this.camera.position.copy(pos)
+    } else {
+      this.camera.position.lerp(pos, this.lerpSpeed)
+    }
+    this.camera.lookAt(this.currentLookAt)
+  }
+
+  enterOfficeMode(): void {
+    this.officeMode = true
+    this.followTarget = null
+    this.autoPilotEnabled = false
+    this.autoPilotTarget = null
+    this.zoomLevel = 1.0
+    this.targetLookAt.copy(CameraController.OFFICE_LOOK_AT)
+    this.currentLookAt.copy(CameraController.OFFICE_LOOK_AT)
+    const pos = CameraController.OFFICE_LOOK_AT.clone().add(this.officeBaseOffset)
+    this.camera.position.copy(pos)
+    this.camera.lookAt(this.currentLookAt)
+  }
+
+  leaveOfficeMode(): void {
+    this.officeMode = false
+  }
+
+  updateOfficePan(_deltaTime: number): void {
+    this.currentLookAt.lerp(this.targetLookAt, this.lerpSpeed)
+    const offset = this.officeBaseOffset.clone().multiplyScalar(this.zoomLevel)
+    const pos = this.currentLookAt.clone().add(offset)
+    this.camera.position.lerp(pos, this.lerpSpeed)
+    this.camera.lookAt(this.currentLookAt)
+  }
+
+  animateTo(target: { x: number; z: number }, durationMs = 2000): Promise<void> {
+    this.followTarget = null
+    this.autoPilotEnabled = false
+    this.autoPilotTarget = null
+    const start = this.targetLookAt.clone()
+    const end = new THREE.Vector3(target.x, 0, target.z)
+    this.clampBounds(end)
+    const startTime = performance.now()
+
+    return new Promise(resolve => {
+      const tick = () => {
+        const t = Math.min((performance.now() - startTime) / durationMs, 1)
+        const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+        this.targetLookAt.lerpVectors(start, end, ease)
+        if (t < 1) {
+          requestAnimationFrame(tick)
+        } else {
+          resolve()
+        }
+      }
+      requestAnimationFrame(tick)
+    })
+  }
+
+  private clampBounds(p: THREE.Vector3): THREE.Vector3 {
+    p.x = Math.max(4, Math.min(52, p.x))
+    p.z = Math.max(4, Math.min(31, p.z))
+    return p
+  }
+
+  private clampOfficeBounds(p: THREE.Vector3): THREE.Vector3 {
+    const b = CameraController.OFFICE_PAN_BOUNDS
+    p.x = Math.max(b.minX, Math.min(b.maxX, p.x))
+    p.z = Math.max(b.minZ, Math.min(b.maxZ, p.z))
+    return p
+  }
+
+  destroy(): void {
+    this.container.removeEventListener('wheel', this.onWheel)
+    this.followTarget = null
+    this.autoPilotTarget = null
+  }
+}

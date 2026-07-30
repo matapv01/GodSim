@@ -1,0 +1,700 @@
+/* ── 班味小游戏 — 游戏资产样式 ── */
+
+:root {
+  --bw-size: 80px;
+  --float-delay: 0s;
+  /* 淡班味：朦胧灰紫 */
+  --bw-light-bg: radial-gradient(circle at 30% 30%, rgba(149, 136, 179, 0.85), rgba(120, 110, 150, 0.65));
+  --bw-light-border: rgba(149, 136, 179, 0.5);
+  --bw-light-eye: rgba(40, 30, 60, 0.85);
+  --bw-light-cheek: rgba(180, 160, 200, 0.3);
+  --bw-light-glow: rgba(149, 136, 179, 0.3);
+  /* 浓班味：纯正怨气紫 */
+  --bw-medium-bg: radial-gradient(circle at 30% 30%, rgba(106, 59, 140, 0.9), rgba(70, 35, 100, 0.75));
+  --bw-medium-border: rgba(106, 59, 140, 0.6);
+  --bw-medium-eye: rgba(20, 10, 40, 0.9);
+  --bw-medium-glow: rgba(106, 59, 140, 0.4);
+  /* 焦班味：暗沉的深红 (Blood Moon / Crimson) */
+  --bw-heavy-bg: radial-gradient(circle at 30% 30%, rgba(160, 40, 55, 0.75), rgba(90, 20, 30, 0.6));
+  --bw-heavy-border: rgba(140, 30, 40, 0.4);
+  --bw-heavy-eye: rgba(40, 10, 15, 0.9);
+  --bw-heavy-glow: rgba(140, 30, 40, 0.35);
+  /* Boss */
+  --bw-boss-size: 80px;
+  --bw-boss-bg: rgba(90, 85, 110, 0.7);
+  --bw-boss-border: rgba(60, 55, 80, 0.5);
+  --bw-boss-eye-socket: rgba(30, 25, 50, 0.85);
+  --bw-boss-pupil: rgba(210, 210, 225, 0.9);
+  --bw-boss-mouth: rgba(50, 45, 70, 0.6);
+  --bw-boss-glow: rgba(100, 90, 140, 0.25);
+}
+
+/* ── 团子基础 ── */
+
+.banwei {
+  --s: var(--bw-size, 80px);
+  position: relative;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 45% 45% 40% 40%;
+  cursor: pointer;
+  pointer-events: auto;
+  animation: banwei-float 3.5s ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.banwei:hover {
+  animation: banwei-shake 0.3s ease-in-out infinite;
+  transform: scale(1.15);
+  opacity: 1 !important;
+  z-index: 20;
+}
+
+/* ── 淡班味「小困」── */
+
+.banwei-light {
+  background: var(--bw-light-bg);
+  border: calc(var(--s) * 0.03) solid var(--bw-light-border);
+  box-shadow: 0 0 calc(var(--s) * 0.3) var(--bw-light-glow);
+}
+
+.banwei-light::before {
+  content: '';
+  position: absolute;
+  top: 30%;
+  left: 30%;
+  width: calc(var(--s) * 0.07);
+  height: calc(var(--s) * 0.22);
+  background: var(--bw-light-eye);
+  border-radius: calc(var(--s) * 0.03);
+  box-shadow: calc(var(--s) * 0.33) 0 0 0 var(--bw-light-eye);
+  transform-origin: center bottom;
+  animation: banwei-blink 4s infinite;
+}
+
+.banwei-light::after {
+  content: '';
+  position: absolute;
+  top: 55%;
+  left: 20%;
+  width: calc(var(--s) * 0.12);
+  height: calc(var(--s) * 0.08);
+  background: var(--bw-light-cheek);
+  border-radius: 50%;
+  box-shadow: calc(var(--s) * 0.48) 0 0 0 var(--bw-light-cheek);
+}
+
+/* ── 浓班味「小丧」── */
+
+.banwei-medium {
+  background: var(--bw-medium-bg);
+  border: calc(var(--s) * 0.03) solid var(--bw-medium-border);
+  box-shadow: 0 0 calc(var(--s) * 0.3) var(--bw-medium-glow);
+}
+
+.banwei-medium::before {
+  content: '';
+  position: absolute;
+  top: 30%;
+  left: 26%;
+  width: calc(var(--s) * 0.07);
+  height: calc(var(--s) * 0.22);
+  background: var(--bw-medium-eye);
+  border-radius: calc(var(--s) * 0.03);
+  transform: rotate(15deg);
+  transform-origin: center bottom;
+  animation: banwei-blink-left 5s infinite;
+}
+
+.banwei-medium::after {
+  content: '';
+  position: absolute;
+  top: 30%;
+  right: 26%;
+  width: calc(var(--s) * 0.07);
+  height: calc(var(--s) * 0.22);
+  background: var(--bw-medium-eye);
+  border-radius: calc(var(--s) * 0.03);
+  transform: rotate(-15deg);
+  transform-origin: center bottom;
+  animation: banwei-blink-right 5s infinite;
+}
+
+/* ── 焦班味「小怒」── */
+
+.banwei-heavy {
+  background: var(--bw-heavy-bg);
+  border: calc(var(--s) * 0.03) solid var(--bw-heavy-border);
+  box-shadow: 0 0 calc(var(--s) * 0.4) var(--bw-heavy-glow);
+  animation: banwei-angry-float 2s ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+}
+
+.banwei-heavy::before {
+  content: '';
+  position: absolute;
+  top: 30%;
+  left: 26%;
+  width: calc(var(--s) * 0.07);
+  height: calc(var(--s) * 0.22);
+  background: var(--bw-heavy-eye);
+  border-radius: calc(var(--s) * 0.03);
+  transform: rotate(-15deg);
+  transform-origin: center bottom;
+  animation: banwei-blink-right 3.5s infinite;
+}
+
+.banwei-heavy::after {
+  content: '';
+  position: absolute;
+  top: 30%;
+  right: 26%;
+  width: calc(var(--s) * 0.07);
+  height: calc(var(--s) * 0.22);
+  background: var(--bw-heavy-eye);
+  border-radius: calc(var(--s) * 0.03);
+  transform: rotate(15deg);
+  transform-origin: center bottom;
+  animation: banwei-blink-left 3.5s infinite;
+}
+
+.banwei-heavy:hover {
+  animation: banwei-shake 0.2s ease-in-out infinite;
+}
+
+/* ── 消除动画 ── */
+
+.banwei.popping {
+  animation: banwei-pop 0.25s ease-out forwards !important;
+  pointer-events: none;
+}
+
+/* ── Boss「班味大王」── */
+
+.boss-goo-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 15px var(--bw-boss-glow, rgba(0,0,0,0)));
+  width: calc(var(--bw-boss-size, 80px) * 1.5);
+  height: calc(var(--bw-boss-size, 80px) * 1.5);
+  z-index: 5;
+}
+
+.banwei-boss {
+  --bs: var(--bw-boss-size, 80px);
+  position: relative;
+  width: var(--bs);
+  height: var(--bs);
+  border-radius: 45% 45% 40% 40%;
+  background: var(--bw-boss-bg);
+  box-shadow:
+    inset 0 calc(var(--bs) * 0.15) calc(var(--bs) * 0.2) rgba(255, 255, 255, 0.3),
+    inset 0 calc(var(--bs) * -0.15) calc(var(--bs) * 0.25) rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  pointer-events: auto;
+  animation: blob-breathe 2.5s ease-in-out infinite alternate, boss-float 5s ease-in-out infinite;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease;
+  flex-shrink: 0;
+}
+
+@keyframes blob-breathe {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.03); }
+}
+
+.boss-stage-3 {
+  --bw-boss-bg: linear-gradient(135deg, rgba(220, 130, 130, 0.9), rgba(200, 100, 100, 0.9));
+  --bw-boss-glow: rgba(220, 130, 130, 0.5);
+  --bw-boss-eye-socket: rgba(80, 30, 30, 0.9);
+}
+.boss-stage-2 {
+  --bw-boss-bg: linear-gradient(135deg, rgba(160, 160, 165, 0.9), rgba(140, 140, 145, 0.9));
+  --bw-boss-glow: rgba(160, 160, 165, 0.5);
+  --bw-boss-eye-socket: rgba(40, 40, 50, 0.85);
+}
+.boss-stage-1 {
+  --bw-boss-bg: linear-gradient(135deg, rgba(180, 170, 210, 0.9), rgba(150, 140, 180, 0.9));
+  --bw-boss-glow: rgba(180, 170, 210, 0.5);
+  --bw-boss-eye-socket: rgba(50, 40, 80, 0.85);
+}
+
+.banwei-boss span { display: block; position: absolute; pointer-events: none; }
+
+.boss-eye {
+  width: calc(var(--bs) * 0.08);
+  height: calc(var(--bs) * 0.22);
+  background: var(--bw-boss-eye-socket);
+  border-radius: 10px;
+  top: 35%;
+  z-index: 2;
+  transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.boss-stage-3 .boss-eye-left { left: 26%; transform: rotate(-15deg); animation: boss-blink-right 3.5s infinite; }
+.boss-stage-3 .boss-eye-right { right: 26%; transform: rotate(15deg); animation: boss-blink-left 3.5s infinite; }
+.boss-stage-2 .boss-eye-left { left: 26%; transform: rotate(15deg); animation: boss-blink-left 5s infinite; }
+.boss-stage-2 .boss-eye-right { right: 26%; transform: rotate(-15deg); animation: boss-blink-right 5s infinite; }
+.boss-stage-1 .boss-eye-left { left: 28%; transform: rotate(0deg); animation: boss-blink-straight 4s infinite; }
+.boss-stage-1 .boss-eye-right { right: 28%; transform: rotate(0deg); animation: boss-blink-straight 4s infinite; }
+
+.boss-eye i { display: none; }
+.boss-eye::before { display: none; }
+
+.boss-mouth {
+  width: calc(var(--bs) * 0.2);
+  height: calc(var(--bs) * 0.2);
+  background: var(--bw-boss-eye-socket);
+  bottom: 25%;
+  left: 50%;
+  transform: translateX(-50%) scale(0);
+  z-index: 3;
+  border-radius: 50%;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.banwei-boss:hover {
+  transform: scale(1.05);
+  box-shadow:
+    inset 0 calc(var(--bs) * 0.15) calc(var(--bs) * 0.2) rgba(255, 255, 255, 0.4),
+    inset 0 calc(var(--bs) * -0.15) calc(var(--bs) * 0.25) rgba(0, 0, 0, 0.3);
+}
+
+.banwei-boss.hit {
+  transform: scale(0.9) translateY(calc(var(--bs) * 0.1));
+}
+
+.banwei-boss.hit .boss-eye {
+  animation: none !important;
+  background: transparent;
+  width: calc(var(--bs) * 0.15) !important;
+  height: calc(var(--bs) * 0.15) !important;
+  border-top: calc(var(--bs) * 0.05) solid var(--bw-boss-eye-socket);
+  border-radius: 3px;
+  top: 38% !important;
+}
+
+.banwei-boss.hit .boss-eye-left {
+  border-right: calc(var(--bs) * 0.05) solid var(--bw-boss-eye-socket);
+  border-left: none;
+  transform: rotate(45deg) !important;
+  left: 22% !important;
+}
+.banwei-boss.hit .boss-eye-right {
+  border-left: calc(var(--bs) * 0.05) solid var(--bw-boss-eye-socket);
+  border-right: none;
+  transform: rotate(-45deg) !important;
+  right: 22% !important;
+}
+
+.banwei-boss.hit .boss-mouth {
+  transform: translateX(-50%) scale(0);
+}
+
+.banwei-boss.boss-flash {
+  opacity: 0.4;
+  transition: opacity 0.06s;
+}
+
+.banwei-boss.boss-cracked::before {
+  box-shadow:
+    calc(var(--bs) * 0.34) 0 0 0 var(--bw-boss-bg),
+    inset 0 0 0 2px rgba(255,100,100,0.4) !important;
+}
+
+.banwei-boss.exploding {
+  animation: boss-explode 0.4s ease-out forwards;
+  pointer-events: none;
+}
+
+/* ── Boss HP Bar ── */
+
+.boss-hp-bar {
+  position: absolute;
+  top: calc(var(--bs, 80px) * -0.22);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(var(--bs, 80px) * 1.1);
+  height: 8px;
+  background: rgba(10, 10, 15, 0.35);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 10;
+  opacity: 0.7;
+  transition: opacity 0.3s, transform 0.1s ease-out;
+}
+
+.boss-hp-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #4ade80, #22c55e);
+  border-radius: 6px;
+  transition: width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.boss-hp-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 40%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 100%);
+  border-radius: inherit;
+}
+
+.banwei-boss.hit .boss-hp-bar {
+  transform: translateX(-50%) scale(1.1) translateY(-2px);
+}
+
+/* ── 点击粒子 ── */
+
+.boss-hit-particle {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 30;
+  animation: particle-burst 0.45s ease-out forwards;
+}
+
+/* ── 闪屏 overlay ── */
+
+.boss-flash-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 20;
+  animation: flash-overlay 0.3s ease-out forwards;
+}
+
+/* ── 屏幕震动 ── */
+
+.screen-shake { animation: screen-shake 0.25s ease-out; }
+.screen-shake-strong { animation: screen-shake-strong 0.35s ease-out; }
+
+/* ── NPC 烟雾 — 怨气粒子 ── */
+
+.npc-smoke-container {
+  position: fixed;
+  top: 0; left: 0;
+  width: 0; height: 0;
+  pointer-events: none;
+  z-index: 7;
+  --smoke-alpha: 0.25;
+}
+
+.npc-smoke-puff {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform-origin: bottom center;
+  width: 14px;
+  height: 28px;
+  border-radius: 50% 50% 30% 30%;
+  background: radial-gradient(circle at 50% 40%, rgba(132, 98, 168, var(--smoke-alpha)), rgba(92, 64, 126, calc(var(--smoke-alpha) * 0.6)));
+  box-shadow: 0 0 10px rgba(118, 88, 156, calc(var(--smoke-alpha) * 0.5));
+  filter: blur(3px);
+  opacity: 0;
+  animation: smoke-puff-rise 3s ease-in infinite;
+}
+
+.npc-smoke-puff:nth-child(odd) { --drift: -10px; --rot: -12deg; }
+.npc-smoke-puff:nth-child(even) { --drift: 10px; --rot: 12deg; }
+.npc-smoke-puff:nth-child(3n) { width: 18px; height: 36px; --drift: -5px; filter: blur(5px); --rot: -5deg; }
+.npc-smoke-puff:nth-child(3n+1) { width: 10px; height: 20px; filter: blur(2px); --drift: 8px; --rot: 15deg; }
+.npc-smoke-puff:nth-child(5n) { --drift: -12px; --rot: -18deg; }
+.npc-smoke-puff:nth-child(4n) { --drift: 12px; --rot: 18deg; }
+
+/* ── HUD 容器 ── */
+
+.bw-hud {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 25;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.bw-hud.fading { opacity: 0; }
+
+/* ── Combo 评价文字 ── */
+
+.bw-hud-combo {
+  font-family: 'Noto Sans SC', system-ui, sans-serif;
+  font-weight: 900;
+  white-space: nowrap;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: none;
+  font-style: italic;
+  padding-bottom: 6px;
+  letter-spacing: 0.05em;
+}
+
+.bw-hud-combo.show {
+  animation: combo-slam 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.bw-combo-2 {
+  font-size: 26px;
+  color: #5eead4;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.7), 0 4px 0 rgba(0,0,0,0.4), 0 0 20px rgba(20, 184, 166, 0.6), 0 0 40px rgba(20, 184, 166, 0.25);
+}
+
+.bw-combo-4 {
+  font-size: 30px;
+  color: #fde047;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.7), 0 5px 0 rgba(0,0,0,0.4), 0 0 22px rgba(202, 138, 4, 0.7), 0 0 45px rgba(202, 138, 4, 0.3);
+}
+
+.bw-combo-7 {
+  font-size: 36px;
+  color: #fb923c;
+  text-shadow: 0 3px 0 rgba(0,0,0,0.8), 0 6px 0 rgba(0,0,0,0.5), 0 0 28px rgba(234, 88, 12, 0.7), 0 0 55px rgba(234, 88, 12, 0.35);
+}
+
+.bw-combo-10 {
+  font-size: 44px;
+  background: linear-gradient(180deg, #fde047 0%, #ef4444 100%);
+  -webkit-background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 0 rgba(0,0,0,0.8)) drop-shadow(0 6px 0 rgba(0,0,0,0.5)) drop-shadow(0 0 30px rgba(239, 68, 68, 0.7)) drop-shadow(0 0 60px rgba(234, 179, 8, 0.4));
+}
+
+.bw-combo-10.show {
+  animation: combo-slam-mega 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ── NPC 心声 / 管家警告 ── */
+
+.bw-hud-voice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(20, 20, 35, 0.9) 0%, rgba(10, 10, 20, 0.7) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 6px 18px 6px 8px;
+  border-radius: 4px 16px 16px 4px;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-left: 4px solid var(--voice-accent, #4de8c2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 2px 0 10px var(--voice-glow, rgba(77,232,194,0.2));
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+  transition: none;
+}
+
+.bw-hud-voice.show {
+  animation: voice-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.bw-voice-warn {
+  --voice-accent: #ef4444;
+  --voice-glow: rgba(239, 68, 68, 0.3);
+  background: linear-gradient(135deg, rgba(40, 10, 15, 0.9) 0%, rgba(20, 5, 10, 0.8) 100%);
+  animation: voice-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, warning-pulse 1.5s ease-in-out infinite alternate 0.35s !important;
+}
+
+.bw-voice-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.3), transparent), var(--avatar-color, #5a8fd4);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 8px var(--avatar-color, #5a8fd4);
+  text-shadow: 0 2px 2px rgba(0,0,0,0.5);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.bw-voice-avatar::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 6px; height: 6px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 50%;
+  filter: blur(1px);
+}
+
+.bw-voice-text {
+  font: 700 14px/1.2 'SF Pro Rounded', system-ui, sans-serif;
+  color: #f8fafc;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  letter-spacing: 0.03em;
+}
+
+.bw-voice-warn .bw-voice-text {
+  color: #fecaca;
+}
+
+/* ── Keyframes ── */
+
+@keyframes banwei-float {
+  0%, 100% { transform: translateY(0px) rotate(-2deg); }
+  33%      { transform: translateY(-7px) rotate(1.5deg); }
+  66%      { transform: translateY(-3px) rotate(-1deg); }
+}
+
+@keyframes banwei-angry-float {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  25%      { transform: translateY(-8px) rotate(3deg); }
+  50%      { transform: translateY(-2px) rotate(-3deg); }
+  75%      { transform: translateY(-9px) rotate(2deg); }
+}
+
+@keyframes banwei-shake {
+  0%, 100% { transform: scale(1.15) rotate(0deg); }
+  20%      { transform: scale(1.15) rotate(-10deg); }
+  40%      { transform: scale(1.2) rotate(8deg); }
+  60%      { transform: scale(1.15) rotate(-6deg); }
+  80%      { transform: scale(1.18) rotate(5deg); }
+}
+
+@keyframes banwei-pop {
+  0%   { transform: scale(1); opacity: 1; }
+  30%  { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(0); opacity: 0; filter: blur(4px); }
+}
+
+@keyframes boss-float {
+  0%, 100% { transform: translate(0, 0); }
+  25%      { transform: translate(8px, -5px); }
+  50%      { transform: translate(-4px, -10px); }
+  75%      { transform: translate(-8px, -3px); }
+}
+
+@keyframes boss-explode {
+  0%   { transform: scale(1); opacity: 1; }
+  30%  { transform: scale(1.3); opacity: 0.8; }
+  60%  { transform: scale(1.5); opacity: 0.4; filter: blur(3px); }
+  100% { transform: scale(0.3); opacity: 0; filter: blur(8px); }
+}
+
+@keyframes banwei-blink {
+  0%, 15%, 100% { height: calc(var(--s) * 0.22); width: calc(var(--s) * 0.07); top: 30%; left: 30%; }
+  8% { height: calc(var(--s) * 0.04); width: calc(var(--s) * 0.14); top: 42%; left: 27%; }
+}
+
+@keyframes banwei-blink-left {
+  0%, 15%, 100% { height: calc(var(--s) * 0.22); width: calc(var(--s) * 0.07); }
+  8% { height: calc(var(--s) * 0.04); width: calc(var(--s) * 0.14); }
+}
+
+@keyframes banwei-blink-right {
+  0%, 15%, 100% { height: calc(var(--s) * 0.22); width: calc(var(--s) * 0.07); }
+  8% { height: calc(var(--s) * 0.04); width: calc(var(--s) * 0.14); }
+}
+
+@keyframes boss-blink-straight {
+  0%, 15%, 100% { height: calc(var(--bs) * 0.22); width: calc(var(--bs) * 0.08); }
+  8% { height: calc(var(--bs) * 0.04); width: calc(var(--bs) * 0.14); }
+}
+
+@keyframes boss-blink-left {
+  0%, 15%, 100% { height: calc(var(--bs) * 0.22); width: calc(var(--bs) * 0.08); }
+  8% { height: calc(var(--bs) * 0.04); width: calc(var(--bs) * 0.14); }
+}
+
+@keyframes boss-blink-right {
+  0%, 15%, 100% { height: calc(var(--bs) * 0.22); width: calc(var(--bs) * 0.08); }
+  8% { height: calc(var(--bs) * 0.04); width: calc(var(--bs) * 0.14); }
+}
+
+@keyframes particle-burst {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--px), var(--py)) scale(0.3); }
+}
+
+@keyframes flash-overlay {
+  0%   { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-3px, 1px); }
+  20% { transform: translate(3px, -2px); }
+  30% { transform: translate(-2px, 3px); }
+  40% { transform: translate(2px, -1px); }
+  50% { transform: translate(-1px, 2px); }
+  60% { transform: translate(1px, -1px); }
+}
+
+@keyframes screen-shake-strong {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-5px, 2px); }
+  20% { transform: translate(5px, -4px); }
+  30% { transform: translate(-4px, 5px); }
+  40% { transform: translate(4px, -2px); }
+  50% { transform: translate(-3px, 3px); }
+  60% { transform: translate(2px, -3px); }
+  70% { transform: translate(-1px, 1px); }
+}
+
+@keyframes smoke-puff-rise {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(0) scale(0.6) rotate(0deg); }
+  15%  { opacity: 0.9; transform: translateX(-50%) translateY(-10px) scale(1) rotate(var(--rot, 10deg)); }
+  60%  { opacity: 0.6; transform: translateX(calc(-50% + var(--drift, 8px))) translateY(-50px) scale(1.3) rotate(calc(var(--rot, 10deg) * -0.5)); }
+  100% { opacity: 0; transform: translateX(calc(-50% + var(--drift, 8px) * 1.5)) translateY(-90px) scale(0.8) rotate(var(--rot, 10deg)); }
+}
+
+@keyframes combo-slam {
+  0%   { opacity: 0; transform: scale(3) translateY(10px); filter: blur(8px); }
+  25%  { opacity: 1; transform: scale(0.9) translateY(-4px); filter: blur(0); }
+  40%  { transform: scale(1.08) translateY(2px); }
+  55%  { transform: scale(0.97); }
+  65%  { transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes combo-slam-mega {
+  0%   { opacity: 0; transform: scale(4) translateY(15px); filter: blur(12px); }
+  20%  { opacity: 1; transform: scale(0.85) translateY(-6px); filter: blur(0); }
+  35%  { transform: scale(1.15) translateY(4px); }
+  50%  { transform: scale(0.92); }
+  65%  { transform: scale(1.06); }
+  80%  { transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes voice-in {
+  0%   { opacity: 0; transform: translateY(15px) scale(0.95); }
+  60%  { opacity: 1; transform: translateY(-3px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes warning-pulse {
+  0% { box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 2px 0 10px rgba(239, 68, 68, 0.1); }
+  100% { box-shadow: 0 8px 32px rgba(239,68,68,0.2), inset 2px 0 20px rgba(239, 68, 68, 0.4); border-left-color: #ff7070; }
+}
+
+@keyframes organic-fade {
+  0% { transform: scale(1) translate(0, 0); opacity: 0.7; }
+  100% { transform: scale(0.1) translate(var(--tx), var(--ty)); opacity: 0; }
+}
+
+@keyframes boss-trail {
+  0%   { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(0.3); opacity: 0; }
+}

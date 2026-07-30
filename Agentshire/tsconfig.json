@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "declaration": true,
+    "paths": {
+      "openclaw/plugin-sdk/*": ["../../src/plugin-sdk/*"]
+    }
+  },
+  "include": ["index.ts", "src/**/*.ts"],
+  "exclude": ["town-frontend", "node_modules", "dist"]
+}

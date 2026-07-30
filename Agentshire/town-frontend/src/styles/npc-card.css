@@ -1,0 +1,337 @@
+/* @desc NPC card panel styles — #npc-card, .card-header, .card-avatar, .card-log-*, .log-todo-* */
+
+#npc-card {
+  position: absolute; bottom: 18%; left: 16px; right: 16px;
+  max-height: 42%;
+  max-width: 768px;
+  margin-left: auto; margin-right: auto;
+  display: none; flex-direction: column;
+  background: rgba(30, 30, 30, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px; padding: 16px; z-index: 50;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.25s ease;
+}
+#npc-card.has-logs {
+  top: 20%; bottom: 18%; max-height: none;
+}
+body.embedded-mode #npc-card { bottom: 20%; }
+body.embedded-mode #npc-card.has-logs { top: 10%; bottom: 20%; }
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+#npc-card .card-header { display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0; }
+#npc-card .card-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: #fff; font-weight: bold;
+  overflow: hidden; flex-shrink: 0; object-fit: cover;
+  border: 2px solid rgba(255,255,255,0.15);
+}
+#npc-card img.card-avatar { display: block; }
+#npc-card .card-info { flex: 1; min-width: 0; padding-top: 1px; }
+#npc-card .card-name { color: #fff; font-size: 17px; font-weight: 700; line-height: 1.3; display: flex; align-items: center; gap: 6px; }
+#npc-card .card-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+#npc-card .card-status-dot.online {
+  background: #34d399; box-shadow: 0 0 6px rgba(52, 211, 153, 0.6);
+}
+#npc-card .card-status-dot.offline {
+  background: rgba(255,255,255,0.25);
+}
+#npc-card .card-meta { color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 2px; }
+#npc-card .card-profession-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.62);
+  font-size: 12px;
+}
+#npc-card .card-profession-select {
+  min-width: 0;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(12,18,28,0.92);
+  color: rgba(255,255,255,0.9);
+  padding: 0 8px;
+  font: inherit;
+}
+#npc-card .card-bio {
+  color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.6;
+  margin-top: 12px; padding-top: 12px; flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+#npc-card .card-section-title {
+  font-size: 11px; color: rgba(255,255,255,0.42); font-weight: 700;
+  letter-spacing: 0; margin-bottom: 7px;
+}
+#npc-card .card-metrics {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px; margin-top: 12px; flex-shrink: 0;
+}
+#npc-card .card-metric-group {
+  min-width: 0; padding: 10px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.055);
+  border-radius: 8px;
+}
+#npc-card .card-metric-row {
+  display: grid; grid-template-columns: minmax(72px, 0.95fr) minmax(56px, 1fr) 24px;
+  align-items: center; gap: 7px; min-height: 20px;
+}
+#npc-card .card-metric-label {
+  color: rgba(255,255,255,0.68); font-size: 12px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#npc-card .card-metric-track {
+  height: 5px; border-radius: 999px; background: rgba(255,255,255,0.1);
+  overflow: hidden; min-width: 0;
+}
+#npc-card .card-metric-fill {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, #7dd3fc, #fbbf24);
+}
+#npc-card .card-metric-value {
+  color: rgba(255,255,255,0.48); font-size: 11px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#npc-card .card-recent {
+  margin-top: 12px; padding: 10px; flex-shrink: 0;
+  background: rgba(0,0,0,0.16);
+  border: 1px solid rgba(255,255,255,0.045);
+  border-radius: 8px;
+}
+#npc-card .card-recent-row {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 3px 0; min-width: 0;
+}
+#npc-card .card-recent-time {
+  flex-shrink: 0; min-width: 34px;
+  color: rgba(255,255,255,0.32); font-size: 10px;
+  font-family: monospace; padding-top: 2px;
+}
+#npc-card .card-recent-text {
+  color: rgba(255,255,255,0.64); font-size: 12px; line-height: 1.45;
+  min-width: 0; overflow-wrap: anywhere;
+}
+#npc-card .card-relations {
+  margin-top: 12px; padding: 10px; flex-shrink: 0;
+  background: rgba(0,0,0,0.16);
+  border: 1px solid rgba(255,255,255,0.045);
+  border-radius: 8px;
+}
+#npc-card .card-relation-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 3px 0; font-size: 12px;
+}
+#npc-card .card-relation-name {
+  min-width: 0; color: rgba(255,255,255,0.7);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#npc-card .card-relation-label {
+  flex-shrink: 0; color: rgba(255,185,205,0.84); font-weight: 700;
+}
+
+/* Log area */
+#npc-card .card-log-area {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  margin-top: 12px; padding: 12px;
+  background: rgba(0, 0, 0, 0.2); border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+#npc-card .card-log-area-title {
+  font-size: 12px; color: rgba(255,255,255,0.4); font-weight: 600;
+  margin-bottom: 8px; flex-shrink: 0;
+}
+#npc-card .card-log-list {
+  flex: 1; overflow-x: hidden; overflow-y: auto; min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+#npc-card .card-log-list::-webkit-scrollbar { width: 4px; }
+#npc-card .card-log-list::-webkit-scrollbar-track { background: transparent; }
+#npc-card .card-log-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12); border-radius: 2px;
+  transition: background 0.2s;
+}
+#npc-card .card-log-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+/* Log entries */
+#npc-card .card-log-entry {
+  display: flex; gap: 8px; padding: 6px 0;
+  font-size: 13px; line-height: 1.5; align-items: flex-start;
+}
+#npc-card .card-log-entry.thinking-active {
+  background: rgba(255,255,255,0.03); border-radius: 8px;
+  padding: 6px 10px; margin: 2px -6px;
+  border-left: 2px solid rgba(255,255,255,0.1);
+}
+#npc-card .card-log-entry.thinking-active .log-icon svg {
+  opacity: 0.5;
+}
+#npc-card .card-log-entry.thinking-done {
+  opacity: 0.5;
+  border-left: 2px solid rgba(255,255,255,0.06);
+}
+#npc-card .card-log-entry.thinking-placeholder {
+  opacity: 0.6;
+}
+#npc-card .card-log-entry.thinking-placeholder .log-icon svg {
+  animation: breathe 2s ease-in-out infinite;
+}
+#npc-card .card-log-entry.thinking-placeholder .log-msg {
+  color: rgba(255,255,255,0.4); font-style: italic;
+}
+#npc-card .card-log-entry.thinking-placeholder .log-msg::after {
+  content: '.';
+  animation: dotCycle 1.5s steps(1) infinite;
+}
+@keyframes breathe { 0%,100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+@keyframes dotCycle {
+  0% { content: '.'; }
+  33% { content: '..'; }
+  66% { content: '...'; }
+}
+
+#npc-card .log-time {
+  flex-shrink: 0; font-size: 10px; color: rgba(255,255,255,0.25);
+  font-family: monospace; margin-right: 6px; margin-top: 3px;
+  min-width: 36px;
+}
+#npc-card .log-icon {
+  flex-shrink: 0; width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 2px;
+}
+#npc-card .log-msg {
+  color: rgba(255,255,255,0.72); flex: 1; min-width: 0;
+  word-break: break-word; white-space: pre-wrap;
+  font-size: 12.5px; line-height: 1.6;
+}
+#npc-card .log-msg-wrap {
+  flex: 1; min-width: 0;
+}
+#npc-card .log-msg-wrap .log-msg {
+  display: block;
+}
+#npc-card .log-detail {
+  color: rgba(255,255,255,0.4); font-size: 12px; line-height: 1.5;
+  margin-top: 4px; word-break: break-word; white-space: pre-wrap;
+}
+#npc-card .log-detail.collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+#npc-card .log-detail-toggle {
+  cursor: pointer; opacity: 0.5;
+}
+#npc-card .log-detail-toggle:hover {
+  opacity: 0.8;
+}
+#npc-card .card-log-entry.thinking-active .log-msg {
+  color: rgba(255,255,255,0.45); max-height: 80px; overflow-y: auto;
+  font-size: 12px; font-style: italic;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+#npc-card .card-log-entry.thinking-active .log-msg::-webkit-scrollbar { width: 3px; }
+#npc-card .card-log-entry.thinking-active .log-msg::-webkit-scrollbar-track { background: transparent; }
+#npc-card .card-log-entry.thinking-active .log-msg::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08); border-radius: 2px;
+}
+#npc-card .card-log-entry.thinking-active .log-msg::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.18);
+}
+#npc-card .log-status {
+  flex-shrink: 0; width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 2px; margin-left: auto;
+}
+#npc-card .log-status-pending svg {
+  animation: spin 1.2s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Todo blocks inside log */
+#npc-card .log-todo-block { display: block; padding: 6px 0; }
+#npc-card .log-todo-header {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: rgba(255,255,255,0.55); font-weight: 600;
+  margin-bottom: 6px;
+}
+#npc-card .log-todo-list { padding-left: 22px; }
+#npc-card .log-todo-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 0; font-size: 13px; color: rgba(255,255,255,0.7);
+}
+#npc-card .log-todo-text { flex: 1; min-width: 0; }
+#npc-card .log-todo-status {
+  flex-shrink: 0; width: 14px; height: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+#npc-card .log-todo-status .todo-spin {
+  animation: spin 1.2s linear infinite;
+}
+
+/* Header actions (chat btn) */
+#npc-card .card-header-actions {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; padding-right: 24px;
+  align-self: flex-start; margin-top: 1px;
+}
+
+#npc-card .card-chat-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 28px; padding: 0 12px;
+  border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px; font-weight: 500; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+#npc-card .card-chat-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+#npc-card .card-chat-btn svg { flex-shrink: 0; }
+#npc-card .card-chat-btn:disabled {
+  opacity: 0.35; cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+#npc-card .card-chat-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* Close button */
+#npc-card .card-close {
+  position: absolute; top: 6px; right: 6px; background: none; border: none;
+  color: rgba(255,255,255,0.35); cursor: pointer;
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; transition: background 0.15s, color 0.15s; flex-shrink: 0; z-index: 1;
+}
+#npc-card .card-close:hover { color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.08); }
+
+@media (max-width: 560px) {
+  #npc-card .card-metrics { grid-template-columns: 1fr; gap: 8px; }
+  #npc-card .card-metric-row {
+    grid-template-columns: minmax(74px, 0.85fr) minmax(52px, 1fr) 24px;
+  }
+}

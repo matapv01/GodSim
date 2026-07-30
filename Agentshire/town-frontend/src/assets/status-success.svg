@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <style>
+    .ss-bg { animation: ss-pop-in 0.5s ease-out forwards; }
+    .ss-check { animation: ss-draw 0.6s ease-in-out 0.3s forwards; }
+    @keyframes ss-pop-in {
+      0% { transform: scale(0); }
+      80% { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+    @keyframes ss-draw {
+      to { stroke-dashoffset: 0; }
+    }
+  </style>
+  <rect class="ss-bg" x="8" y="8" width="104" height="104" rx="24" fill="#22c55e"
+        style="transform-origin:60px 60px; transform:scale(0)"/>
+  <path class="ss-check" d="M36 62 L52 78 L84 42"
+        fill="none" stroke="#fff" stroke-width="8"
+        stroke-linecap="round" stroke-linejoin="round"
+        stroke-dasharray="90" stroke-dashoffset="90"/>
+</svg>

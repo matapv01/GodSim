@@ -1,0 +1,100 @@
+{
+  "name": "agentshire",
+  "version": "2026.4.15",
+  "description": "OpenClaw/QClaw plugin for building a living 3D town with social NPCs, a map editor, and a character workshop.",
+  "main": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "index.ts",
+    ".npmrc",
+    "src/",
+    "town-frontend/dist/",
+    "town-souls/",
+    "town-workspace/",
+    "openclaw.plugin.json",
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "THIRD_PARTY_NOTICES.md",
+    "VISION.md",
+    "ROADMAP.md",
+    "LICENSE",
+    "!**/*.map"
+  ],
+  "author": "Agentshire Contributors",
+  "homepage": "https://github.com/Agentshire/Agentshire#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Agentshire/Agentshire.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Agentshire/Agentshire/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "ai-agents",
+    "multi-agent",
+    "generative-agents",
+    "npc",
+    "threejs",
+    "3d",
+    "simulation",
+    "game",
+    "visualization",
+    "low-poly",
+    "typescript",
+    "open-source",
+    "level-editor",
+    "character-creator"
+  ],
+  "scripts": {
+    "build:town": "cd town-frontend && npm install && npm run build",
+    "build": "npm run build:town",
+    "dev:town": "cd town-frontend && npm run dev",
+    "postinstall": "echo '' && echo '  🏘️  Agentshire installed successfully!' && echo '' && echo '  Next: (re)start the OpenClaw Gateway to activate the plugin.' && echo '        The town will open automatically in your browser.' && echo ''",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.3.0",
+    "@gltf-transform/extensions": "^4.3.0",
+    "@gltf-transform/functions": "^4.3.0",
+    "jsonrepair": "^3.13.3",
+    "ws": "^8.16.0"
+  },
+  "peerDependencies": {
+    "openclaw": ">= 2026.3.7"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "channel": {
+      "id": "agentshire",
+      "label": "Agentshire",
+      "selectionLabel": "Agentshire (3D Visualization)",
+      "docsPath": "/channels/agentshire",
+      "docsLabel": "agentshire",
+      "blurb": "Visualize your AI agents as NPCs in an interactive 3D low-poly town. Watch them work, chat, and collaborate in real-time.",
+      "order": 100
+    },
+    "install": {
+      "npmSpec": "agentshire",
+      "localPath": "extensions/agentshire",
+      "defaultChoice": "npm"
+    }
+  }
+}

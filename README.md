@@ -1,0 +1,248 @@
+# God Simulator 3D - Hướng dẫn chạy local
+
+Repo này đang dùng Agentshire làm nền cho MVP God Observation Simulator.
+
+Mục tiêu hiện tại:
+
+- Giữ nguyên Agentshire nhiều nhất có thể.
+- Chạy được thị trấn 3D gốc.
+- Mở bằng Chromium riêng trong thư mục dự án để tránh IDM hoặc extension trình duyệt bắt nhầm asset.
+- Sau đó mới bắt đầu chỉnh dần theo `TODO_God_Simulator.md`.
+
+## Cấu trúc hiện tại
+
+```text
+E:\God_Simulator
+|-- Agentshire\                         Source Agentshire
+|-- .tools\                             Node.js portable
+|-- .browsers\                          Chromium local do Playwright tải
+|-- .browser-profile\                   Profile riêng cho Chromium local
+|-- Ke_hoach_God_Simulator_3D_Agentshire_VN.md
+|-- TODO_God_Simulator.md
+|-- Open_Agentshire_Browser.ps1
+`-- README.md
+```
+
+## Cách chạy nhanh
+
+Từ giờ có thể dùng 2 file này:
+
+```text
+Start_Game.bat - bật Gateway và mở game bằng Chromium local
+Stop_Game.bat  - tắt Chromium local và Gateway
+```
+
+Cách dùng đơn giản:
+
+1. Double-click `Start_Game.bat`.
+2. Chơi game trong Chromium local vừa mở.
+3. Khi chơi xong, double-click `Stop_Game.bat`.
+
+`Start_Game.bat` sẽ tự đóng cửa sổ sau khi mở game thành công. Nếu OpenClaw đã có trong cache, script sẽ dùng cache để mở nhanh hơn; chỉ khi cache mất thì lần đó mới phải fallback qua `npx` và có thể lâu.
+
+Browser được mở từ Chromium local trong thư mục dự án: `E:\God_Simulator\.browsers\chromium-1234\chrome-win64\chrome.exe`. Trong Task Manager nó vẫn có thể hiện tên `chrome.exe`, nhưng profile riêng nằm ở `E:\God_Simulator\.browser-profile` và không dùng extension/browser chính của bạn.
+
+## Cách quan sát trong game
+
+- Click NPC để chọn, mở thẻ thông tin và cho camera theo dõi NPC đó.
+- Click xuống đất để nhân vật của bạn đi tới vị trí đó; camera sẽ theo nhân vật.
+- Dùng `WASD` hoặc phím mũi tên để điều khiển nhân vật trực tiếp. Khi đang gõ trong ô chat, các phím này vẫn nhập chữ bình thường.
+- Góc trên bên phải có nút tạm dừng và tốc độ `1x`, `5x`, `20x`.
+- Khung `Nhật ký thị trấn` ở góc phải ghi sự kiện và hội thoại gần đây; click tiêu đề để thu gọn/mở lại.
+- Nút `Xã hội` ở góc phải mở social feed:
+  - `Feed`: các sự kiện xã hội, tin nhắn và drama gần đây.
+  - `Quan hệ`: mức thân, tin tưởng, tình cảm, ghen và căng thẳng giữa các nhân vật.
+  - `Hội thoại`: transcript NPC-NPC đã được ghi trong thị trấn.
+- Click NPC để xem thêm quan hệ đáng chú ý ngay trong thẻ nhân vật.
+
+## Cấu hình LLM cho hội thoại NPC
+
+Gateway tự nạp `LLM_Env.ps1` khi chạy `Start_Game.bat`. File này đang trỏ tới:
+
+```text
+http://your-llm-host:8080/v1/chat/completions
+Qwen/Qwen3-32B-AWQ
+```
+
+Server hiện yêu cầu API key. Mở `LLM_Env.ps1` và điền:
+
+```powershell
+$env:AGENTSHIRE_LLM_API_KEY = "key-that-cua-ban"
+```
+
+Khi có key hợp lệ, hội thoại casual giữa NPC sẽ ưu tiên gọi AI để tạo câu riêng theo tên, tính cách, nhu cầu, ký ức gần đây, quan hệ, thời tiết và thời điểm trong ngày. Nếu AI lỗi hoặc hết thời gian chờ, game tự dùng hội thoại fallback.
+
+Chat với quản gia/cư dân fallback được lưu dài hạn ở:
+
+```text
+C:\Users\<ten-user>\.openclaw\agentshire-longterm
+```
+
+## Reset toàn bộ log cũ
+
+Trước khi reset, nên chạy `Stop_Game.bat` để tắt gateway và Chromium local.
+
+Xóa log dài hạn của hội thoại/LLM và log runtime của gateway:
+
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.openclaw\agentshire-longterm" -ErrorAction SilentlyContinue
+Remove-Item -Force "E:\God_Simulator\.runtime\*.log" -ErrorAction SilentlyContinue
+Remove-Item -Force "$env:LOCALAPPDATA\Temp\openclaw\openclaw-*.log" -ErrorAction SilentlyContinue
+```
+
+Nếu muốn reset sạch cả nhật ký hiển thị trong game/social feed đang lưu trong Chromium local:
+
+```powershell
+Remove-Item -Recurse -Force "E:\God_Simulator\.browser-profile\Default\Local Storage\leveldb" -ErrorAction SilentlyContinue
+```
+
+Sau đó chạy lại `Start_Game.bat`. Game sẽ tự tạo lại các thư mục log cần thiết.
+
+Nếu muốn chạy bằng PowerShell:
+
+```powershell
+PowerShell -ExecutionPolicy Bypass -File E:\God_Simulator\Start_Game.ps1
+PowerShell -ExecutionPolicy Bypass -File E:\God_Simulator\Stop_Game.ps1
+```
+
+## Cách chạy thủ công
+
+### 1. Chạy OpenClaw Gateway và Agentshire
+
+Mở PowerShell tại thư mục Agentshire:
+
+```powershell
+cd E:\God_Simulator\Agentshire
+```
+
+Thêm Node portable vào `PATH` của cửa sổ PowerShell hiện tại:
+
+```powershell
+$env:PATH='E:\God_Simulator\.tools\node-v24.18.0-win-x64;' + $env:PATH
+```
+
+Chạy Gateway:
+
+```powershell
+npx openclaw@2026.3.13 gateway --allow-unconfigured
+```
+
+Khi chạy đúng, log sẽ có các dòng gần giống:
+
+```text
+[agentshire] WebSocket server listening on ws://localhost:55211
+[agentshire] HTTP server listening on port 55210
+Agentshire is live
+```
+
+Giữ cửa sổ PowerShell này mở trong lúc dùng game.
+
+### 2. Mở Chromium local riêng
+
+Mở một cửa sổ PowerShell khác, chạy:
+
+```powershell
+PowerShell -ExecutionPolicy Bypass -File E:\God_Simulator\Open_Agentshire_Browser.ps1
+```
+
+Script này sẽ mở Chromium local tại URL tiếng Việt:
+
+```text
+http://localhost:55210?ws=ws://localhost:55211&lang=vi
+```
+
+Các trang editor cũng nên mở kèm `lang=vi`:
+
+```text
+http://localhost:55210/editor.html?lang=vi
+http://localhost:55210/citizen-editor.html?lang=vi
+```
+
+Chromium local nằm ở:
+
+```text
+E:\God_Simulator\.browsers\chromium-1234\chrome-win64\chrome.exe
+```
+
+Profile riêng của Chromium local nằm ở:
+
+```text
+E:\God_Simulator\.browser-profile
+```
+
+Browser này không dùng extension của trình duyệt chính, nên IDM thường sẽ không bắt nhầm link asset.
+
+Hiện tại dùng `lang=vi`. Một số phần rất sâu của Agentshire có thể vẫn còn tiếng Anh/Trung, nhưng UI chính, profile mặc định và lời thoại casual đã có tuyến tiếng Việt.
+
+## Nếu IDM vẫn bắt link tải
+
+Tắt IDM tạm thời hoặc thêm loại trừ cho:
+
+```text
+localhost
+127.0.0.1
+```
+
+Nếu cần, bỏ bắt các đuôi asset web/3D:
+
+```text
+GLB GLTF BIN WEBP MP4 WAV OGG
+```
+
+## Nếu port bị chiếm
+
+Agentshire cần hai port:
+
+```text
+55210 - HTTP town frontend
+55211 - WebSocket
+```
+
+Kiểm tra process đang dùng port:
+
+```powershell
+Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 55210,55211 } | Select-Object LocalAddress,LocalPort,OwningProcess
+```
+
+Nếu đó là process Node cũ của dự án này, có thể tắt bằng:
+
+```powershell
+Stop-Process -Id <PID> -Force
+```
+
+Chỉ tắt process khi chắc chắn đó là server cũ của dự án này.
+
+## Nếu thiếu Node/npm
+
+Repo đã có Node portable tại:
+
+```text
+E:\God_Simulator\.tools\node-v24.18.0-win-x64
+```
+
+Trước khi chạy lệnh `npm` hoặc `npx`, thêm Node vào `PATH`:
+
+```powershell
+$env:PATH='E:\God_Simulator\.tools\node-v24.18.0-win-x64;' + $env:PATH
+```
+
+## Build frontend để kiểm tra
+
+Nếu cần kiểm tra build:
+
+```powershell
+cd E:\God_Simulator\Agentshire\town-frontend
+$env:PATH='E:\God_Simulator\.tools\node-v24.18.0-win-x64;' + $env:PATH
+npm run build
+```
+
+## Tài liệu dự án
+
+- Plan kỹ thuật: `Ke_hoach_God_Simulator_3D_Agentshire_VN.md`
+- Checklist tiến độ: `TODO_God_Simulator.md`
+- Bản đồ tích hợp source: `INTEGRATION_MAP.md`
+- Source nền: `Agentshire\`
+
+## Bước tiếp theo
+
+Các phần MVP chính đã hoàn tất. Những việc còn lại nằm ở nhóm sau MVP trong `TODO_God_Simulator.md`, chủ yếu là nâng social feed: lọc theo nhân vật/cặp quan hệ, tìm kiếm, xuất file và gom thread theo scandal/chuyện tình.
