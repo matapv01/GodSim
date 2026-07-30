@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { t } from '../i18n'
+import { backendFetch } from '../utils/backend-url'
 
 export interface AgentInfo {
   id: string
@@ -21,7 +22,7 @@ export function useAgents() {
 
     async function load() {
       try {
-        const resp = await fetch('/citizen-workshop/_api/load-published', {
+        const resp = await backendFetch('/citizen-workshop/_api/load-published', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: '{}',

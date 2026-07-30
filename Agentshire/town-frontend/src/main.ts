@@ -10,6 +10,7 @@ import { MockDataSource } from './data/MockDataSource'
 import { TownConfigStore } from './data/TownConfigStore'
 import type { IWorldDataSource } from './data/IWorldDataSource'
 import { InputBar, type TownMessage } from './ui/InputBar'
+import { getConfiguredWsUrl } from './utils/backend-url'
 
 interface WsHistoryMessage {
   role?: 'user' | 'assistant'
@@ -104,7 +105,7 @@ async function main() {
   let dataSource: IWorldDataSource
   const hasExplicitWs = params.has('ws')
   const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
-  const configuredWsUrl = import.meta.env.VITE_AGENTSHIRE_WS_URL?.trim()
+  const configuredWsUrl = getConfiguredWsUrl()
   const useMock = params.get('mock') === 'true' || (!hasExplicitWs && !configuredWsUrl && !isLocalHost)
 
   let bridgeModule: any = null

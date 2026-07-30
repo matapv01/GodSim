@@ -11,6 +11,7 @@ import { createDefaultTownConfig, publishedToTownView, setHasPublished } from '.
 import type { TownConfig } from '../data/TownConfig'
 import type { PublishedCitizenConfig } from '../data/CitizenWorkshopConfig'
 import { t } from '../i18n'
+import { backendFetch } from '../utils/backend-url'
 
 export interface SceneBootstrapDeps {
   ui: UIManager
@@ -48,7 +49,7 @@ export class SceneBootstrap {
 
   async loadFinalConfig(): Promise<TownConfig> {
     try {
-      const res = await fetch('/citizen-workshop/_api/load-published', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const res = await backendFetch('/citizen-workshop/_api/load-published', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       if (res.ok) {
         const data = await res.json()
         const published = data.config as PublishedCitizenConfig | null
