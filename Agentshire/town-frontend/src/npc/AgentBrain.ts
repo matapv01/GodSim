@@ -14,7 +14,7 @@ import type { NPC } from './NPC'
 import type { GameClock } from '../game/GameClock'
 import type { ActivityJournal } from './ActivityJournal'
 import type { PersonaCache } from './PersonaStore'
-import type { DailyPlanItem, TimePeriod } from '../types'
+import type { DailyPlanItem, TimePeriod, WeatherType } from '../types'
 import { BUILDING_REGISTRY, WAYPOINTS } from '../types'
 
 // ── Types ──
@@ -44,6 +44,7 @@ export interface AgentBrainDeps {
 
   getNearbyNpcs: (npcId: string, radius: number) => NearbyNpcInfo[]
   getTownRecent: () => string[]
+  getWeather?: () => WeatherType
   onTalkTo: (initiatorId: string, targetName: string, reason: string) => void
 }
 
@@ -211,12 +212,15 @@ export class AgentBrain {
     const yesterday = this.journal.getYesterdaySummary(dayCount)
     const relationships = this.journal.getRelationshipsForPrompt()
     const places = AVAILABLE_PLACES.map(k => PLACE_NAMES[k] || k)
+    const weather = this.deps.getWeather?.() ?? 'clear'
 
     const user = JSON.stringify({
       yesterday_summary: yesterday,
       relationships,
+      weather,
       available_places: places,
-      instruction: 'Lập lịch sinh hoạt 3-5 mục cho hôm nay bằng tiếng Việt. Phải dùng đúng một tên trong available_places cho place. Lịch cần đời thường: ra khỏi nhà, đi làm, ăn uống, mua đồ, nghỉ ngơi, gặp người khác, về nhà. Chỉ xuất JSON array: [{"time":"morning","place":"...","intent":"..."}].',
+      weather_rule: 'Thời tiết phải ảnh hưởng lịch. Mưa/bão/tuyết mạnh/bão cát thì tránh hẹn ngoài trời, ưu tiên nhà, cafe, quán ăn, phòng khám, công ty. Trời đẹp/aurora mới hợp lý ra công viên hoặc chợ.',
+      instruction: 'Lập lịch sinh hoạt 3-5 mục cho hôm nay bằng tiếng Việt. Phải dùng đúng một tên trong available_places cho place. Lịch cần đời thường, khớp thời tiết: ra khỏi nhà, đi làm, ăn uống, mua đồ, nghỉ ngơi, gặp người khác, về nhà. Chỉ xuất JSON array: [{"time":"morning","place":"...","intent":"..."}].',
     })
 
     try {
@@ -284,6 +288,7 @@ export class AgentBrain {
     const townRecent = this.deps.getTownRecent()
     const currentPlan = this.journal.getCurrentPlanItem()
     const locationName = this.currentPlace ? (PLACE_NAMES[this.currentPlace] ?? this.currentPlace) : 'Thị trấn'
+    const weather = this.deps.getWeather?.() ?? 'clear'
 
     const system = [
       `Bạn là ${name}, cư dân trưởng thành trong một xã hội thu nhỏ.`,
@@ -309,6 +314,7 @@ export class AgentBrain {
       current_time: this.gameClock.getFormattedTime(),
       current_plan: currentPlan ? { intent: currentPlan.intent } : null,
       current_location: locationName,
+      weather,
       nearby_npcs: nearbyForPrompt,
       recent_memory: this.journal.getRecentActivities(3).map(a =>
         `${a.time} ${a.action} @ ${a.location}${a.detail ? ': ' + a.detail : ''}`
@@ -316,6 +322,7 @@ export class AgentBrain {
       town_recent: townRecent.slice(0, 5),
       trigger,
       options,
+      weather_rule: 'Quyết định phải khớp thời tiết. Mưa/bão/tuyết mạnh/bão cát thì không đứng lâu ngoài trời, nên vào nơi kín hoặc về nhà. Trời đẹp/aurora thì có thể ra công viên/chợ nếu hợp quan hệ và kế hoạch.',
       instruction: 'Chọn một hành động. Nếu rời đi, target/place phải dùng đúng tên địa điểm trong options. Chỉ xuất JSON: {"action":"...","target":"...","reason":"..."}.',
     })
 

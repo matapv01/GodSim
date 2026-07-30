@@ -9,7 +9,7 @@ import type { EncounterManager } from '../npc/EncounterManager'
 import type { PersonaStore } from '../npc/PersonaStore'
 import type { TownJournal } from '../npc/TownJournal'
 import type { GameClock } from './GameClock'
-import { BUILDING_REGISTRY, WAYPOINTS } from '../types'
+import { BUILDING_REGISTRY, WAYPOINTS, type WeatherType } from '../types'
 
 export interface DailySchedulerDeps {
   npcManager: NPCManager
@@ -18,6 +18,7 @@ export interface DailySchedulerDeps {
   personaStore: PersonaStore
   getTownJournal: () => TownJournal
   getCurrentSceneType: () => string
+  getWeather?: () => WeatherType
   getNpcSpecialty?: (npcId: string) => string | undefined
   getNpcHomeBuilding?: (npcId: string) => string | undefined
 }
@@ -168,6 +169,7 @@ export class DailyScheduler {
         implicitChat: this.implicitChatForBrain.bind(this),
         getNearbyNpcs: this.getNearbyNpcsForBrain.bind(this),
         getTownRecent: () => this.deps.getTownJournal().getRecentDescriptions(5),
+        getWeather: () => this.deps.getWeather?.() ?? 'clear',
         onTalkTo: (initiatorId, targetName, reason) => {
           this.onBrainTalkTo(initiatorId, targetName, reason)
         },

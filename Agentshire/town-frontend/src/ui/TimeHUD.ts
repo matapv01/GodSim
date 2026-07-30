@@ -31,7 +31,13 @@ type AnimClassRule = { childIndex: number; className: string }[]
 interface TimeHUDOptions {
   onPauseToggle?: () => boolean
   onSpeedChange?: (speed: 1 | 5 | 20) => void
+  onWeatherChange?: (weather: WeatherType | 'auto') => void
 }
+
+const WEATHER_OPTIONS: Array<WeatherType | 'auto'> = [
+  'auto', 'clear', 'cloudy', 'drizzle', 'rain', 'heavyRain', 'storm',
+  'fog', 'lightSnow', 'snow', 'blizzard', 'sandstorm', 'aurora',
+]
 
 const WEATHER_ANIM_CLASSES: Partial<Record<WeatherType, AnimClassRule>> = {
   clear:     [
@@ -90,6 +96,8 @@ export class TimeHUD {
   private infoGroup: HTMLDivElement
   private controlsGroup: HTMLDivElement
   private pauseButton: HTMLButtonElement
+  private weatherButton: HTMLButtonElement
+  private weatherMenu: HTMLDivElement
   private speedButtons = new Map<1 | 5 | 20, HTMLButtonElement>()
   private weatherWrap: HTMLSpanElement
   private weatherLabel: HTMLSpanElement
@@ -191,6 +199,13 @@ export class TimeHUD {
     })
     this.controlsGroup.appendChild(this.pauseButton)
 
+    this.weatherButton = this.createIconButton('cloud-sun', 'Đổi thời tiết')
+    this.weatherButton.addEventListener('click', (event) => {
+      event.stopPropagation()
+      this.toggleWeatherMenu()
+    })
+    this.controlsGroup.appendChild(this.weatherButton)
+
     for (const speed of [1, 5, 20] as const) {
       const btn = this.createSpeedButton(speed)
       btn.addEventListener('click', () => {
@@ -204,6 +219,9 @@ export class TimeHUD {
 
     this.container.appendChild(this.infoGroup)
     this.container.appendChild(this.controlsGroup)
+
+    this.weatherMenu = this.createWeatherMenu()
+    document.addEventListener('click', () => this.hideWeatherMenu())
 
     document.body.appendChild(this.container)
     this.renderPauseButton()
@@ -287,6 +305,41 @@ export class TimeHUD {
 
   destroy(): void {
     this.container.remove()
+    this.weatherMenu.remove()
+  }
+
+  private createWeatherMenu(): HTMLDivElement {
+    const menu = document.createElement('div')
+    menu.className = 'time-weather-menu'
+    menu.style.display = 'none'
+    for (const weather of WEATHER_OPTIONS) {
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.textContent = weather === 'auto' ? 'Tự động' : getWeatherLabel(weather)
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation()
+        this.opts.onWeatherChange?.(weather)
+        this.hideWeatherMenu()
+      })
+      menu.appendChild(btn)
+    }
+    document.body.appendChild(menu)
+    return menu
+  }
+
+  private toggleWeatherMenu(): void {
+    if (this.weatherMenu.style.display === 'grid') {
+      this.hideWeatherMenu()
+      return
+    }
+    const rect = this.weatherButton.getBoundingClientRect()
+    this.weatherMenu.style.top = `${rect.bottom + 6}px`
+    this.weatherMenu.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`
+    this.weatherMenu.style.display = 'grid'
+  }
+
+  private hideWeatherMenu(): void {
+    if (this.weatherMenu) this.weatherMenu.style.display = 'none'
   }
 
   private injectStyles(): void {
@@ -392,6 +445,32 @@ export class TimeHUD {
         .th-cloud-shake,.th-heavy-rain-drop,.th-lightning,.th-lightsnow-dot,
         .th-snow-dot,.th-blizzard-dot,.th-fog-a,.th-fog-b,.th-wind-1,.th-wind-2,
         .th-wind-3,.th-aurora-star,.th-aurora-cross-a,.th-aurora-cross-b { animation: none !important; }
+      }
+      .time-weather-menu {
+        position: fixed;
+        z-index: 1001;
+        width: 190px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(18,22,34,0.96);
+        box-shadow: 0 16px 46px rgba(0,0,0,0.4);
+        backdrop-filter: blur(8px);
+      }
+      .time-weather-menu button {
+        min-width: 0;
+        height: 28px;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 7px;
+        background: rgba(255,255,255,0.07);
+        color: rgba(255,255,255,0.88);
+        font: 800 11px system-ui, sans-serif;
+        cursor: pointer;
+      }
+      .time-weather-menu button:hover {
+        background: rgba(255,255,255,0.14);
       }
     `
     document.head.appendChild(style)

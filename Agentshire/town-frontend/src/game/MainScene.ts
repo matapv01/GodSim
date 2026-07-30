@@ -18,6 +18,7 @@ import { NPC } from '../npc/NPC'
 import { NPCManager } from '../npc/NPCManager'
 import { EncounterManager } from '../npc/EncounterManager'
 import { CasualEncounter } from '../npc/CasualEncounter'
+import { DailyBehavior } from '../npc/DailyBehavior'
 import { FollowBehavior } from '../npc/FollowBehavior'
 import { PersonaStore } from '../npc/PersonaStore'
 import { TownJournal } from '../npc/TownJournal'
@@ -33,7 +34,7 @@ import { EventLogPanel } from '../ui/EventLogPanel'
 import { SocialFeedPanel, type ManualRelationshipUpdate, type SocialNpcSnapshot } from '../ui/SocialFeedPanel'
 import { ModeIndicator } from '../ui/ModeIndicator'
 import { ModeManager } from './workflow/ModeManager'
-import { BUILDING_REGISTRY, WAYPOINTS, type SceneType, type NPCConfig, type WorkSubState, type TimePeriod } from '../types'
+import { BUILDING_REGISTRY, WAYPOINTS, type SceneType, type NPCConfig, type WorkSubState, type TimePeriod, type WeatherType } from '../types'
 import type { IWorldDataSource } from '../data/IWorldDataSource'
 import type { GameEvent, GameNPCRole } from '../data/GameProtocol'
 import { t } from '../i18n'
@@ -97,6 +98,8 @@ export class MainScene implements GameScene {
   private gameClock!: GameClock
   private timeOfDayLighting!: TimeOfDayLighting
   private weatherSystem!: WeatherSystem
+  private lastAppliedSocialWeather: WeatherType | null = null
+  private lastWeatherSocialReactionAt = 0
   private ambientSound = new AmbientSoundManager()
   private bgm = new BGMManager()
   private timeHUD!: TimeHUD
@@ -289,6 +292,7 @@ export class MainScene implements GameScene {
       onSpeedChange: (speed) => {
         this.gameClock.setSpeed(3_600_000 / speed)
       },
+      onWeatherChange: (weather) => this.setPlayerWeather(weather),
     })
     this.eventLogPanel = new EventLogPanel()
     this.initTownMapOverlay()
@@ -315,7 +319,7 @@ export class MainScene implements GameScene {
       weather: {
         get: () => this.weatherSystem.getDisplayWeather(),
         theme: () => this.weatherSystem.getDayTheme(),
-        set: (type: string) => this.weatherSystem.forceWeather(type as import('../types').WeatherType),
+        set: (type: string) => this.setPlayerWeather(type as WeatherType),
         setTheme: (theme: string) => this.weatherSystem.forceTheme(theme),
         themes: () => ['sunny','overcast','drizzleDay','rainy','stormy','snowy','blizzardDay','foggy','sandstormDay','auroraDay'],
         types: () => ['clear','cloudy','drizzle','rain','heavyRain','storm','lightSnow','snow','blizzard','fog','sandstorm','aurora'],
@@ -396,6 +400,7 @@ export class MainScene implements GameScene {
       personaStore: this.personaStore,
       getTownJournal: () => this.townJournal,
       getCurrentSceneType: () => this.sceneSwitcher.getSceneType(),
+      getWeather: () => this.weatherSystem?.getDisplayWeather() ?? 'clear',
       getNpcSpecialty: (npcId) => this.getConfiguredSpecialty(npcId),
       getNpcHomeBuilding: (npcId) => this.getNpcHomeDoorKey(npcId),
     })
@@ -737,9 +742,9 @@ export class MainScene implements GameScene {
       },
       onSetWeather: (event) => {
         if (event.action === 'set' && event.weather) {
-          this.weatherSystem.forceWeather(event.weather as import('../types').WeatherType)
+          this.setPlayerWeather(event.weather as WeatherType)
         } else if (event.action === 'reset') {
-          this.weatherSystem.resetToAutomatic()
+          this.setPlayerWeather('auto')
         }
       },
       onWorkflowIntent: (event) => this.choreographer.handleIntent(event),
@@ -3396,6 +3401,124 @@ __workflow 演出测试指令:
     return labels[period]
   }
 
+  private setPlayerWeather(weather: WeatherType | 'auto'): void {
+    if (weather === 'auto') {
+      this.weatherSystem.resetToAutomatic()
+      this.lastAppliedSocialWeather = null
+      this.townJournal.record('mode_change', ['Người chơi'], 'town', 'Người chơi trả thời tiết về chế độ tự động.')
+      this.ui.showToast('Thời tiết trở lại tự động')
+      return
+    }
+    this.weatherSystem.forceWeather(weather)
+    this.applyWeatherSocialEffects(weather, true)
+    this.ui.showToast(`Đã đổi thời tiết: ${t(`weather.${weather}`)}`)
+  }
+
+  private updateWeatherSocialEffects(): void {
+    const weather = this.weatherSystem?.getDisplayWeather()
+    if (!weather || weather === this.lastAppliedSocialWeather) return
+    this.applyWeatherSocialEffects(weather, false)
+  }
+
+  private applyWeatherSocialEffects(weather: WeatherType, forcedByPlayer: boolean): void {
+    const now = Date.now()
+    if (!forcedByPlayer && now - this.lastWeatherSocialReactionAt < 20_000) return
+    this.lastAppliedSocialWeather = weather
+    this.lastWeatherSocialReactionAt = now
+    DailyBehavior.setCurrentWeather(weather)
+
+    const label = t(`weather.${weather}`)
+    const impact = this.getWeatherImpact(weather)
+    this.townJournal.record(
+      forcedByPlayer ? 'mode_change' : 'time_change',
+      forcedByPlayer ? ['Người chơi'] : ['Thị trấn'],
+      'town',
+      forcedByPlayer
+        ? `Người chơi đổi thời tiết thành ${label}. ${impact.story}`
+        : `Thời tiết chuyển sang ${label}. ${impact.story}`,
+    )
+
+    if (!impact.shelterKeys.length || this.sceneSwitcher.getSceneType() !== 'town') return
+    const movable = [...this.dailyScheduler.getDailyBehaviors().entries()]
+      .filter(([npcId, behavior]) => {
+        if (npcId === 'steward' || this.vehiclePassengerNpcIds.has(npcId)) return false
+        if (behavior.inDialogue) return false
+        const npc = this.npcManager.get(npcId)
+        return !!npc?.mesh.visible && npc.isInActiveScene
+      })
+      .slice(0, impact.maxMoves)
+
+    for (const [npcId, behavior] of movable) {
+      const dest = impact.shelterKeys[Math.floor(Math.random() * impact.shelterKeys.length)]
+      behavior.goToPlaceNow(dest, impact.moveDetail)
+      const npcName = this.getNpcDisplayName(npcId)
+      this.townJournal.record('departure', [npcName], dest, `${npcName} đổi hướng vì ${label}: ${impact.moveDetail}.`)
+    }
+    this.socialFeedPanel?.refresh()
+  }
+
+  private getWeatherImpact(weather: WeatherType): {
+    story: string
+    shelterKeys: string[]
+    moveDetail: string
+    maxMoves: number
+  } {
+    switch (weather) {
+      case 'drizzle':
+      case 'rain':
+        return {
+          story: 'Người ngoài đường bắt đầu tìm mái hiên, quán cafe hoặc quán ăn; cuộc hẹn ngoài trời dễ bị đổi chỗ.',
+          shelterKeys: ['cafe_door', 'restaurant_door', 'market_door'],
+          moveDetail: 'Trú mưa và tiếp tục câu chuyện trong nhà',
+          maxMoves: 3,
+        }
+      case 'heavyRain':
+      case 'storm':
+        return {
+          story: 'Đường vắng nhanh, ai đang lang thang sẽ ưu tiên vào nơi gần nhất hoặc về nhà; chuyện xã hội chuyển sang trú mưa, sợ sấm và hủy hẹn.',
+          shelterKeys: ['cafe_door', 'restaurant_door', 'clinic_door', 'office_door'],
+          moveDetail: 'Tránh mưa lớn, gió và sấm sét',
+          maxMoves: 5,
+        }
+      case 'fog':
+        return {
+          story: 'Tầm nhìn kém, mọi người đi chậm hơn, dễ hỏi đường và tránh lái xe xa.',
+          shelterKeys: ['cafe_door', 'market_door', 'office_door'],
+          moveDetail: 'Vào nơi sáng hơn vì sương mù dày',
+          maxMoves: 2,
+        }
+      case 'sandstorm':
+      case 'blizzard':
+        return {
+          story: 'Thời tiết nguy hiểm, dân thị trấn ưu tiên vào nhà hoặc nơi kín, ít ai đứng nói chuyện ngoài trời lâu.',
+          shelterKeys: ['clinic_door', 'office_door', 'restaurant_door'],
+          moveDetail: 'Tìm chỗ kín để tránh thời tiết nguy hiểm',
+          maxMoves: 6,
+        }
+      case 'clear':
+        return {
+          story: 'Trời đẹp hơn, công viên và chợ dễ đông; các cuộc gặp ngoài trời hợp lý hơn.',
+          shelterKeys: ['park_center', 'market_door', 'cafe_door'],
+          moveDetail: 'Ra ngoài tận hưởng trời đẹp',
+          maxMoves: 2,
+        }
+      case 'aurora':
+        return {
+          story: 'Bầu trời lạ khiến mọi người muốn ra công viên ngắm trời và nói chuyện riêng tư hơn.',
+          shelterKeys: ['park_center', 'cafe_door'],
+          moveDetail: 'Ra ngắm bầu trời lạ',
+          maxMoves: 3,
+        }
+      default:
+        return {
+          story: 'Không khí đổi khác, mọi người điều chỉnh nhịp đi lại theo thời tiết.',
+          shelterKeys: [],
+          moveDetail: 'Điều chỉnh kế hoạch vì thời tiết',
+          maxMoves: 0,
+        }
+    }
+  }
+
   private getSocialNpcSnapshots(): SocialNpcSnapshot[] {
     const result: SocialNpcSnapshot[] = []
     const user = this.npcManager.get('user')
@@ -3664,6 +3787,7 @@ __workflow 演出测试指令:
       this.cameraCtrl.update(deltaTime)
       this.timeOfDayLighting?.update(this.gameClock)
       this.weatherSystem?.update(deltaTime, this.gameClock)
+      this.updateWeatherSocialEffects()
       this.vehicleManager?.update(this.gameClock, deltaTime)
     } else if (curScene === 'office') {
       this.cameraCtrl.updateOfficePan(deltaTime)

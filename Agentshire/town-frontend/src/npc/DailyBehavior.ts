@@ -1,5 +1,5 @@
 import { NPC } from './NPC'
-import { WAYPOINTS, BUILDING_REGISTRY, LOCATION_ZONES, type BuildingDef, type NPCRouteProfile } from '../types'
+import { WAYPOINTS, BUILDING_REGISTRY, LOCATION_ZONES, type BuildingDef, type NPCRouteProfile, type WeatherType } from '../types'
 import type { GameClock } from '../game/GameClock'
 import type { ActivityJournal } from './ActivityJournal'
 import type { AgentBrain } from './AgentBrain'
@@ -50,6 +50,41 @@ function getDestinationCount(buildingKey: string): number {
   return destinationCounts.get(buildingKey) ?? 0
 }
 
+function getWeatherDestinationMultiplier(weather: WeatherType, building: BuildingDef, homeBuilding: string): number {
+  const indoorShelter = ['cafe_door', 'restaurant_door', 'clinic_door', 'office_door', 'coworking_door', homeBuilding]
+  const outdoor = building.key === 'park_center' || building.key.startsWith('park_') || building.key === 'market_door'
+  if (weather === 'clear') {
+    if (building.key === 'park_center' || building.key === 'market_door') return 1.45
+    return 1
+  }
+  if (weather === 'aurora') {
+    if (building.key === 'park_center') return 1.8
+    if (building.key === 'cafe_door') return 1.25
+    return 0.9
+  }
+  if (weather === 'cloudy' || weather === 'fog') {
+    if (outdoor) return 0.75
+    if (indoorShelter.includes(building.key)) return 1.2
+    return 1
+  }
+  if (weather === 'drizzle' || weather === 'rain') {
+    if (outdoor) return 0.35
+    if (indoorShelter.includes(building.key)) return 1.65
+    return 1
+  }
+  if (weather === 'heavyRain' || weather === 'storm' || weather === 'sandstorm' || weather === 'blizzard') {
+    if (outdoor) return 0.08
+    if (building.key === homeBuilding) return 2.2
+    if (indoorShelter.includes(building.key)) return 1.9
+    return 0.6
+  }
+  if (weather === 'lightSnow' || weather === 'snow') {
+    if (outdoor) return 0.45
+    if (indoorShelter.includes(building.key)) return 1.4
+  }
+  return 1
+}
+
 export function generateRouteProfile(npcId: string, homeBuilding: string, specialty?: string): NPCRouteProfile {
   const template = matchTemplate(specialty ?? '')
   const profession = getProfessionForSpecialty(specialty)
@@ -88,6 +123,7 @@ export function generateRouteProfile(npcId: string, homeBuilding: string, specia
 
 export class DailyBehavior {
   private static nextDebugId = 1
+  private static currentWeather: WeatherType = 'clear'
   private npc: NPC
   private gameClock: GameClock
   private profile: NPCRouteProfile
@@ -113,6 +149,10 @@ export class DailyBehavior {
   private journal: ActivityJournal | null = null
   private brain: AgentBrain | null = null
   private debugId: number
+
+  static setCurrentWeather(weather: WeatherType): void {
+    DailyBehavior.currentWeather = weather
+  }
 
   constructor(npc: NPC, gameClock: GameClock, profile: NPCRouteProfile, spotAllocator?: import('./SpotAllocator').SpotAllocator) {
     this.npc = npc
@@ -552,6 +592,9 @@ export class DailyBehavior {
       // Crowding penalty: more people heading there = less attractive
       const crowdCount = getDestinationCount(b.key)
       w *= 1 / (1 + crowdCount)
+
+      // Weather changes daily life: people avoid exposed places in bad weather.
+      w *= getWeatherDestinationMultiplier(DailyBehavior.currentWeather, b, this.profile.homeBuilding)
 
       // Recently visited penalty
       if (b.key === this.lastVisitedKey) w *= 0.15
