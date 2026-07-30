@@ -22,7 +22,7 @@ const CHAT_DURATION_MS = 10_500
 const FACE_DISTANCE = 1.5
 const AI_CHAT_WAIT_MS = 8_500
 
-type SpeakerSide = 'a' | 'b'
+type SpeakerSide = 'a' | 'b' | `audience:${string}`
 
 interface ChatTurn {
   speaker: SpeakerSide
@@ -39,6 +39,7 @@ interface NearbyPerson {
 interface ActiveChat {
   npcA: NPC
   npcB: NPC
+  participants: NPC[]
   turns: ChatTurn[]
   lineIndex: number
   timer: number
@@ -240,15 +241,26 @@ export class CasualEncounter {
     if (this.isInChat(a.id) || this.isInChat(b.id)) return
     if (Math.random() > CHAT_CHANCE * this.socialFactor(a, b)) return
 
-    this.markInteraction(a.id)
-    this.markInteraction(b.id)
-    this.markPair(a.id, b.id)
-
     const audience = this.getNearbyAudience(a, b)
+      .filter(p => this.canInteract(p.id) && !this.isInChat(p.id) && !this.isBlocked?.(p.id))
+      .slice(0, 2)
+    const groupNpcs = audience
+      .map(p => this.currentNpcs.find(n => n.id === p.id))
+      .filter((n): n is NPC => !!n)
+    const participants = [a, b, ...groupNpcs]
+
+    for (const p of participants) this.markInteraction(p.id)
+    for (let i = 0; i < participants.length; i++) {
+      for (let j = i + 1; j < participants.length; j++) {
+        this.markPair(participants[i].id, participants[j].id)
+      }
+    }
+
     const built = this.buildChat(a, b, audience)
     const chat: ActiveChat = {
       npcA: a,
       npcB: b,
+      participants,
       turns: built.turns,
       lineIndex: 0,
       timer: this.implicitChat ? -AI_CHAT_WAIT_MS : 0,
@@ -256,7 +268,7 @@ export class CasualEncounter {
       positionSet: false,
       summary: built.summary,
       audience,
-      aiPending: !!this.implicitChat,
+      aiPending: !!this.implicitChat && audience.length === 0,
     }
 
     this.activeChats.push(chat)
@@ -288,8 +300,7 @@ export class CasualEncounter {
       })
     }
     this.onEvent?.({ type: 'chat_start', npcA: a, npcB: b, audience })
-    this.onPause(a.id)
-    this.onPause(b.id)
+    for (const p of participants) this.onPause(p.id)
   }
 
   private async requestAiChat(a: NPC, b: NPC, audience: NearbyPerson[]): Promise<{ turns: ChatTurn[]; summary: string } | null> {
@@ -638,6 +649,16 @@ export class CasualEncounter {
 
     if (audience.length > 0) {
       const listener = audience[0].name
+      const listenerId = audience[0].id
+      return {
+        summary: `tro chuyen nhom voi ${listener} dang dung gan`,
+        turns: [
+          { speaker: 'a', text: `${bName}, ${listener} cung dang o day. Noi chung mot lat, dung de ai noi chong len ai.` },
+          { speaker: `audience:${listenerId}`, text: topic ? `Toi nghe duoc chuyen "${topic}". Neu rieng tu qua thi doi cho khac nhe.` : 'Toi dung gan nen nghe thay. Cu noi chuyen dang dien ra thoi, dung ke bi mat o day.' },
+          { speaker: 'b', text: topic ? `Ung, chi noi phan da co that: "${topic}", khong them that thanh tin don.` : 'Duoc, noi binh thuong thoi. Xong thi moi nguoi tam biet ro rang roi di tiep.' },
+          { speaker: 'a', text: 'Vay thong nhat nhe. Noi ngan gon, dung ngu canh, roi ai ve viec nguoi do.' },
+        ],
+      }
       return {
         summary: `nhận ra ${listener} đang đứng gần`,
         turns: [
@@ -713,8 +734,7 @@ export class CasualEncounter {
 
       if (!chat.positionSet) {
         chat.positionSet = true
-        chat.npcA.stopMoving()
-        chat.npcB.stopMoving()
+        for (const p of chat.participants) p.stopMoving()
 
         const posA = chat.npcA.getPosition()
         const posB = chat.npcB.getPosition()
@@ -728,20 +748,29 @@ export class CasualEncounter {
         const nz = len > 0.1 ? dz / len : 1
         const halfDist = FACE_DISTANCE / 2
 
-        chat.npcA.mesh.position.x = midX - nx * halfDist
-        chat.npcA.mesh.position.z = midZ - nz * halfDist
-        chat.npcB.mesh.position.x = midX + nx * halfDist
-        chat.npcB.mesh.position.z = midZ + nz * halfDist
+        if (chat.participants.length <= 2) {
+          chat.npcA.mesh.position.x = midX - nx * halfDist
+          chat.npcA.mesh.position.z = midZ - nz * halfDist
+          chat.npcB.mesh.position.x = midX + nx * halfDist
+          chat.npcB.mesh.position.z = midZ + nz * halfDist
+        } else {
+          const radius = 1.25
+          chat.participants.forEach((npc, index) => {
+            const angle = -Math.PI / 2 + (index / chat.participants.length) * Math.PI * 2
+            npc.mesh.position.x = midX + Math.cos(angle) * radius
+            npc.mesh.position.z = midZ + Math.sin(angle) * radius
+          })
+        }
 
-        const angleAtoB = Math.atan2(dx, dz)
-        chat.npcA.mesh.rotation.y = angleAtoB
-        chat.npcB.mesh.rotation.y = angleAtoB + Math.PI
+        for (const npc of chat.participants) {
+          npc.smoothLookAt({ x: midX, z: midZ })
+        }
       }
 
       const expectedLine = Math.floor(chat.timer / chat.lineInterval)
       if (expectedLine >= chat.lineIndex && chat.lineIndex < chat.turns.length) {
         const turn = chat.turns[chat.lineIndex]
-        const speaker = turn.speaker === 'a' ? chat.npcA : chat.npcB
+        const speaker = this.resolveTurnSpeaker(chat, turn.speaker)
         const text = turn.text
         this.onAnim(speaker.id, chat.lineIndex === 0 ? 'wave' : 'typing')
         this.onBubble(speaker.id, text, chat.lineInterval * 0.8)
@@ -751,14 +780,13 @@ export class CasualEncounter {
       }
 
       if (chat.lineIndex >= chat.turns.length && chat.timer >= CHAT_DURATION_MS) {
-        this.onResume(chat.npcA.id)
-        this.onResume(chat.npcB.id)
+        for (const p of chat.participants) this.onResume(p.id)
         this.onEvent?.({
           type: 'chat_end',
           npcA: chat.npcA,
           npcB: chat.npcB,
           turns: chat.turns.map(turn => ({
-            speaker: turn.speaker === 'a' ? (chat.npcA.label ?? chat.npcA.name ?? chat.npcA.id) : (chat.npcB.label ?? chat.npcB.name ?? chat.npcB.id),
+            speaker: this.resolveTurnSpeaker(chat, turn.speaker).label ?? this.resolveTurnSpeaker(chat, turn.speaker).name ?? this.resolveTurnSpeaker(chat, turn.speaker).id,
             text: turn.text,
           })),
           summary: chat.summary,
@@ -766,8 +794,7 @@ export class CasualEncounter {
         })
         this.activeChats.splice(i, 1)
       } else if (chat.timer >= CHAT_DURATION_MS + 7000) {
-        this.onResume(chat.npcA.id)
-        this.onResume(chat.npcB.id)
+        for (const p of chat.participants) this.onResume(p.id)
         this.onEvent?.({ type: 'chat_end', npcA: chat.npcA, npcB: chat.npcB, summary: chat.summary, audience: chat.audience })
         this.activeChats.splice(i, 1)
       }
@@ -777,8 +804,14 @@ export class CasualEncounter {
   private cancelChat(chat: ActiveChat): void {
     const idx = this.activeChats.indexOf(chat)
     if (idx >= 0) this.activeChats.splice(idx, 1)
-    this.onResume(chat.npcA.id)
-    this.onResume(chat.npcB.id)
+    for (const p of chat.participants) this.onResume(p.id)
+  }
+
+  private resolveTurnSpeaker(chat: ActiveChat, side: SpeakerSide): NPC {
+    if (side === 'a') return chat.npcA
+    if (side === 'b') return chat.npcB
+    const id = side.slice('audience:'.length)
+    return chat.participants.find(n => n.id === id) ?? chat.npcA
   }
 
   private getNearbyAudience(a: NPC, b: NPC, radius = 3.2): NearbyPerson[] {
@@ -796,7 +829,7 @@ export class CasualEncounter {
   }
 
   private isInChat(npcId: string): boolean {
-    return this.activeChats.some(c => c.npcA.id === npcId || c.npcB.id === npcId)
+    return this.activeChats.some(c => c.participants.some(p => p.id === npcId))
   }
 
   private dist(a: NPC, b: NPC): number {
