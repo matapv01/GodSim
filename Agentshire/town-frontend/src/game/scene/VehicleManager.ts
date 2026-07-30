@@ -442,6 +442,58 @@ export class VehicleManager {
     }
   }
 
+  getPlayerCabinInfo(): {
+    id: string
+    ownerNpcId: string
+    ownerName: string
+    appearance: string
+    destination: string
+    phase: PooledVehicle['phase']
+    position: RoadPoint
+    driverNpcId?: string
+    passengerNpcIds: string[]
+  } | null {
+    const vehicle = this.pool.find(v => v.occupantNpcId === 'user' || v.guestNpcIds.has('user'))
+    if (!vehicle) return null
+    return {
+      id: vehicle.homeRoute.id,
+      ownerNpcId: vehicle.homeRoute.ownerNpcId,
+      ownerName: vehicle.homeRoute.owner,
+      appearance: vehicle.homeRoute.appearance,
+      destination: vehicle.homeRoute.to,
+      phase: vehicle.phase,
+      position: { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z },
+      driverNpcId: vehicle.occupantNpcId,
+      passengerNpcIds: [...vehicle.guestNpcIds],
+    }
+  }
+
+  getNpcVehicleInfo(npcId: string): {
+    id: string
+    ownerNpcId: string
+    ownerName: string
+    appearance: string
+    destination: string
+    phase: PooledVehicle['phase']
+    position: RoadPoint
+    driverNpcId?: string
+    passengerNpcIds: string[]
+  } | null {
+    const vehicle = this.pool.find(v => v.occupantNpcId === npcId || v.guestNpcIds.has(npcId))
+    if (!vehicle) return null
+    return {
+      id: vehicle.homeRoute.id,
+      ownerNpcId: vehicle.homeRoute.ownerNpcId,
+      ownerName: vehicle.homeRoute.owner,
+      appearance: vehicle.homeRoute.appearance,
+      destination: vehicle.homeRoute.to,
+      phase: vehicle.phase,
+      position: { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z },
+      driverNpcId: vehicle.occupantNpcId,
+      passengerNpcIds: [...vehicle.guestNpcIds],
+    }
+  }
+
   movePlayerVehicle(dx: number, dz: number, delta: number, clamp: (x: number, z: number) => RoadPoint): boolean {
     const vehicle = this.pool.find(v => v.phase === 'manual' && v.occupantNpcId === 'user')
     if (!vehicle) return false

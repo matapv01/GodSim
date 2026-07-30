@@ -2589,10 +2589,13 @@ __workflow 演出测试指令:
   private resolveTownSpeechTarget(): string {
     const sceneType = this.sceneSwitcher?.getSceneType()
     const user = this.npcManager.get('user')
+    const cabinTarget = this.resolveCabinSpeechTarget()
+    if (cabinTarget) return cabinTarget
     if (!user || !user.mesh.visible) return this.dialogTarget
     const selected = this.dialogTarget && this.dialogTarget !== 'steward'
       ? this.npcManager.get(this.dialogTarget)
       : null
+    if (selected && this.isNpcInPlayerCabin(selected.id)) return selected.id
     if (selected?.mesh.visible && selected.isInActiveScene && selected.getPosition().distanceTo(user.getPosition()) <= 6) {
       return selected.id
     }
@@ -2600,6 +2603,25 @@ __workflow 演出测试指令:
     if (nearestCitizen) return nearestCitizen.id
     const nearestAny = this.findNearestSpeechTarget(user, 2.2, true)
     return nearestAny?.id ?? (sceneType === 'town' ? 'steward' : this.dialogTarget)
+  }
+
+  private resolveCabinSpeechTarget(): string | null {
+    const cabin = this.vehicleManager?.getPlayerCabinInfo()
+    if (!cabin) return null
+    const occupants = [
+      ...(cabin.driverNpcId ? [cabin.driverNpcId] : []),
+      ...cabin.passengerNpcIds,
+    ].filter(id => id && id !== 'user' && id !== 'steward')
+    if (!occupants.length) return null
+    if (this.dialogTarget && occupants.includes(this.dialogTarget)) return this.dialogTarget
+    const driver = cabin.driverNpcId && cabin.driverNpcId !== 'user' ? cabin.driverNpcId : null
+    return driver ?? occupants[0] ?? null
+  }
+
+  private isNpcInPlayerCabin(npcId: string): boolean {
+    const cabin = this.vehicleManager?.getPlayerCabinInfo()
+    if (!cabin) return false
+    return cabin.driverNpcId === npcId || cabin.passengerNpcIds.includes(npcId)
   }
 
   private findNearestSpeechTarget(user: NPC, maxDistance: number, includeSteward: boolean): NPC | null {
@@ -2645,7 +2667,11 @@ __workflow 演出测试指令:
   private recordDirectNpcMessage(npcId: string, text: string): void {
     const npc = this.npcManager.get(npcId)
     const npcName = npc?.label ?? npc?.name ?? npcId
-    this.townJournal?.recordEncounterMessage(npcName, text, 'town')
+    const vehicleInfo = this.vehicleManager?.getNpcVehicleInfo(npcId)
+    const location = vehicleInfo
+      ? `trong ${vehicleInfo.appearance} của ${vehicleInfo.ownerName}`
+      : 'town'
+    this.townJournal?.recordEncounterMessage(npcName, text, location)
     const journal = this.dailyScheduler.getActivityJournals().get(npcId)
     const normalized = this.normalizeText(text)
     const update = /(khong|tu choi|dung ep|khong muon|khong thoai mai|chua than)/i.test(normalized)
@@ -2685,11 +2711,21 @@ __workflow 演出测试指令:
     const relation = journal?.getRelationship('user')
     const playerProfession = this.getConfiguredSpecialty('user') ?? 'Người quan sát'
     const npcProfession = this.getConfiguredSpecialty(npcId) ?? ''
+    const vehicleInfo = this.vehicleManager?.getNpcVehicleInfo(npcId)
+    const currentBuilding = this.dailyScheduler.getDailyBehaviors().get(npcId)?.getCurrentBuilding() ?? 'town'
+    const currentLocation = vehicleInfo ? `inside_vehicle:${vehicleInfo.id}` : currentBuilding
+    const currentLocationName = vehicleInfo
+      ? `Trong ${vehicleInfo.appearance} của ${vehicleInfo.ownerName}, ${vehicleInfo.phase === 'manual' ? 'đang đi cùng người chơi' : `đang trên đường tới ${vehicleInfo.destination}`}`
+      : currentBuilding
 
     const result = await this.dailyScheduler.implicitChatForBrain({
       scene: 'encounter_reply',
       maxTokens: 90,
       system: [
+        vehicleInfo
+          ? 'Hai nguoi dang ngoi trong xe. Loi noi phai hop voi khong gian tren xe: tiep tuc tam su, noi ve diem den, thoi tiet ngoai cua kinh, nguoi dang lai va cam giac rieng tu trong cabin.'
+          : 'Hai nguoi dang noi chuyen truc tiep tai dia diem hien tai; loi noi phai khop voi vi tri va viec dang lam.',
+        'Neu noi se di choi, ghe dau, ve nha, xuong xe, doi tai xe, hoac ru ai len xe thi cau tra loi phai ro la dong y/tu choi va khong mau thuan voi vehicle_context.',
         `Bạn là ${npcName}, một cư dân trong thị trấn.`,
         'Trả lời người chơi bằng tiếng Việt, 1 câu ngắn tự nhiên.',
         'Trả lời trực tiếp đúng nội dung người chơi vừa nói và giữ đúng tính cách, quan hệ, hoạt động hiện tại.',
@@ -2707,9 +2743,29 @@ __workflow 演出测试指令:
         needs: profile.needs,
         recent_activity: recent,
         recent_dialogues: journal?.getRecentDialogueSummaries(3) ?? [],
-        current_location: this.dailyScheduler.getDailyBehaviors().get(npcId)?.getCurrentBuilding() ?? 'town',
+        current_location: currentLocation,
+        current_location_name: currentLocationName,
+        weather: this.weatherSystem?.getDisplayWeather() ?? 'clear',
+        period: this.gameClock?.getPeriod(),
+        vehicle_context: vehicleInfo ? {
+          vehicle_id: vehicleInfo.id,
+          owner: vehicleInfo.ownerName,
+          ownerNpcId: vehicleInfo.ownerNpcId,
+          appearance: vehicleInfo.appearance,
+          phase: vehicleInfo.phase,
+          destination: vehicleInfo.destination,
+          driverNpcId: vehicleInfo.driverNpcId,
+          passengers: vehicleInfo.passengerNpcIds,
+          player_is_driver: vehicleInfo.driverNpcId === 'user',
+          player_is_passenger: vehicleInfo.passengerNpcIds.includes('user'),
+        } : null,
         relationship: relation ? {
           label: relation.label,
+          status: relation.status,
+          sentiment: relation.sentiment,
+          trust: relation.trust,
+          romance: relation.romance,
+          tension: relation.tension,
           interactionCount: relation.interactionCount,
           recentTopics: relation.recentTopics?.slice(-3),
         } : null,
@@ -2727,6 +2783,17 @@ __workflow 演出测试指令:
     const journal = this.dailyScheduler.getActivityJournals().get(npcId)
     const relation = journal?.getRelationship('user')
     const current = journal?.getRecentActivities(1)[0]?.detail
+    const vehicleInfo = this.vehicleManager?.getNpcVehicleInfo(npcId)
+    if (vehicleInfo) {
+      if (/(di dau|toi dau|den dau|choi dau|ghe dau)/i.test(normalized)) {
+        return vehicleInfo.driverNpcId === 'user'
+          ? `Tôi đang ngồi trên xe của bạn. Bạn muốn ghé đâu thì nói rõ, tôi sẽ trả lời thật.`
+          : `Mình đang trên ${vehicleInfo.appearance} của ${vehicleInfo.ownerName}, hướng tới ${vehicleInfo.destination}. Cứ nói tiếp đi.`
+      }
+      if (/(chao|hello|xin chao|hey|alo)\b/i.test(normalized)) {
+        return 'Tôi vẫn nghe đây. Ngồi trong xe nói chuyện cũng dễ thật hơn ngoài đường.'
+      }
+    }
     if (/(chao|hello|xin chao|hey|alo)\b/i.test(normalized)) {
       return relation && relation.interactionCount > 1 ? 'Chào bạn. Tôi đang nghe đây, có chuyện gì vậy?' : 'Chào bạn. Mình cứ nói chuyện từ từ để biết nhau nhé.'
     }
@@ -3076,7 +3143,13 @@ __workflow 演出测试指令:
   private async handleVehicleInvitation(npcId: string): Promise<void> {
     const npc = this.npcManager.get(npcId)
     const user = this.npcManager.get('user')
-    if (!npc || !user || !npc.mesh.visible || !npc.isInActiveScene) return
+    if (!npc || !user || (!npc.mesh.visible && !this.isNpcInPlayerCabin(npcId)) || !npc.isInActiveScene) return
+    if (this.isNpcInPlayerCabin(npcId)) {
+      const reply = 'Tôi đang ngồi trong xe với bạn rồi đây. Muốn đi đâu hay nói chuyện gì thì nói rõ, tôi nghe.'
+      this.dialogManager.onDialogMessage(npcId, reply, false)
+      this.recordDirectNpcMessage(npcId, reply)
+      return
+    }
     if (npc.getPosition().distanceTo(user.getPosition()) > 6.2) {
       this.dialogManager.onDialogMessage(npcId, 'Đứng xa thế mà rủ lên xe gì? Lại đây nói chuyện trực tiếp đã.', false)
       return
