@@ -30,7 +30,7 @@ import { TimeOfDayLighting } from './visual/TimeOfDayLighting'
 import { WeatherSystem } from './WeatherSystem'
 import { TimeHUD } from '../ui/TimeHUD'
 import { EventLogPanel } from '../ui/EventLogPanel'
-import { SocialFeedPanel, type SocialNpcSnapshot } from '../ui/SocialFeedPanel'
+import { SocialFeedPanel, type ManualRelationshipUpdate, type SocialNpcSnapshot } from '../ui/SocialFeedPanel'
 import { ModeIndicator } from '../ui/ModeIndicator'
 import { ModeManager } from './workflow/ModeManager'
 import { BUILDING_REGISTRY, WAYPOINTS, type SceneType, type NPCConfig, type WorkSubState, type TimePeriod } from '../types'
@@ -799,6 +799,8 @@ export class MainScene implements GameScene {
     this.socialFeedPanel = new SocialFeedPanel({
       getEvents: () => this.townJournal.getRecentArchiveEvents(500),
       getNpcs: () => this.getSocialNpcSnapshots(),
+      onClearAllLogs: () => this.clearAllTownLogs(),
+      onSetRelationship: (update) => this.applyManualRelationship(update),
     })
     this.townJournal.onEvent((event) => {
       this.eventLogPanel?.add(event)
@@ -3396,6 +3398,15 @@ __workflow 演出测试指令:
 
   private getSocialNpcSnapshots(): SocialNpcSnapshot[] {
     const result: SocialNpcSnapshot[] = []
+    const user = this.npcManager.get('user')
+    if (user) {
+      result.push({
+        npcId: 'user',
+        name: user.label ?? user.name ?? this.getPlayerName(),
+        relationships: [],
+        dialogues: [],
+      })
+    }
     for (const [npcId, journal] of this.dailyScheduler.getActivityJournals().entries()) {
       const npc = this.npcManager.get(npcId)
       result.push({
@@ -3406,6 +3417,91 @@ __workflow 演出测试指令:
       })
     }
     return result
+  }
+
+  private clearAllTownLogs(): void {
+    this.townJournal.clearAll()
+    for (const journal of this.dailyScheduler.getActivityJournals().values()) {
+      journal.clearAll()
+    }
+    this.dialogManager.getWorkLogs().clear()
+    try {
+      localStorage.removeItem(this.configStore.getScopedKey('agentshire_snapshot'))
+    } catch {
+      // localStorage unavailable
+    }
+    this.eventLogPanel?.restore([])
+    this.socialFeedPanel?.refresh()
+    this.ui.showToast('Đã xóa toàn bộ log và ký ức xã hội của thị trấn')
+  }
+
+  private applyManualRelationship(update: ManualRelationshipUpdate): void {
+    if (update.fromNpcId === update.toNpcId) return
+    const preset = this.getManualRelationshipPreset(update.status)
+    const fromName = this.getNpcDisplayName(update.fromNpcId)
+    const toName = this.getNpcDisplayName(update.toNpcId)
+    const topic = update.topic || `Người chơi định nghĩa quan hệ: ${fromName} và ${toName} là ${preset.label}.`
+
+    const setOneWay = (ownerId: string, partnerId: string, partnerName: string) => {
+      const journal = this.dailyScheduler.getActivityJournals().get(ownerId)
+      if (!journal) return
+      journal.setRelationshipManual({ npcId: partnerId, name: partnerName }, { ...preset, topic })
+    }
+
+    if (update.fromNpcId === 'user') {
+      setOneWay(update.toNpcId, 'user', fromName)
+    } else if (update.toNpcId === 'user') {
+      setOneWay(update.fromNpcId, 'user', toName)
+    } else {
+      setOneWay(update.fromNpcId, update.toNpcId, toName)
+      setOneWay(update.toNpcId, update.fromNpcId, fromName)
+    }
+
+    this.townJournal.record(
+      'reflection',
+      [fromName, toName],
+      'town',
+      `Quan hệ được chỉnh: ${fromName} và ${toName} là ${preset.label}. ${topic}`,
+    )
+    this.socialFeedPanel?.refresh()
+    this.saveSnapshot()
+    this.ui.showToast(`Đã đặt quan hệ: ${fromName} ↔ ${toName}`)
+  }
+
+  private getManualRelationshipPreset(status: NonNullable<import('../types').Relationship['status']>): {
+    status: NonNullable<import('../types').Relationship['status']>
+    label: string
+    sentiment: number
+    familiarity: number
+    trust: number
+    romance: number
+    tension: number
+    jealousy: number
+  } {
+    const presets = {
+      lover: { label: 'người yêu', sentiment: 0.82, familiarity: 1, trust: 0.86, romance: 0.95, tension: 0.08, jealousy: 0.18 },
+      crush: { label: 'có cảm tình', sentiment: 0.58, familiarity: 0.72, trust: 0.46, romance: 0.62, tension: 0.12, jealousy: 0.08 },
+      flirt: { label: 'mập mờ', sentiment: 0.38, familiarity: 0.68, trust: 0.34, romance: 0.58, tension: 0.38, jealousy: 0.22 },
+      close_friend: { label: 'bạn thân', sentiment: 0.72, familiarity: 0.96, trust: 0.9, romance: 0.08, tension: 0.04, jealousy: 0.02 },
+      friend: { label: 'bạn quen', sentiment: 0.42, familiarity: 0.76, trust: 0.56, romance: 0.04, tension: 0.04, jealousy: 0.01 },
+      neighbor: { label: 'hàng xóm quen', sentiment: 0.18, familiarity: 0.5, trust: 0.28, romance: 0.02, tension: 0.04, jealousy: 0.01 },
+      stranger: { label: 'người lạ', sentiment: 0, familiarity: 0.08, trust: 0.02, romance: 0, tension: 0.02, jealousy: 0 },
+      strained: { label: 'căng thẳng', sentiment: -0.55, familiarity: 0.62, trust: 0.08, romance: 0.02, tension: 0.76, jealousy: 0.28 },
+      rival: { label: 'đối thủ', sentiment: -0.72, familiarity: 0.7, trust: 0.02, romance: 0, tension: 0.9, jealousy: 0.18 },
+      ex: { label: 'người yêu cũ', sentiment: -0.1, familiarity: 0.95, trust: 0.22, romance: 0.28, tension: 0.62, jealousy: 0.38 },
+    } satisfies Record<NonNullable<import('../types').Relationship['status']>, {
+      label: string; sentiment: number; familiarity: number; trust: number; romance: number; tension: number; jealousy: number
+    }>
+    return { status, ...presets[status] }
+  }
+
+  private getNpcDisplayName(npcId: string): string {
+    const npc = this.npcManager.get(npcId)
+    if (npc) return npc.label ?? npc.name ?? npcId
+    const config = this.configStore.load()
+    if (npcId === 'user') return config?.user.name ?? this.getPlayerName()
+    if (npcId === 'steward') return config?.steward.name ?? 'Quản gia'
+    return config?.citizens.find(c => c.id === npcId)?.name ?? npcId
   }
 
   private recordNpcActivity(npcId: string | undefined, action: import('../types').ActivityAction, detail?: string): void {

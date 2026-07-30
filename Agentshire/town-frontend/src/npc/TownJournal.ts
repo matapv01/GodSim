@@ -342,6 +342,18 @@ export class TownJournal {
     if (data.lastDayCount != null) this.lastDayCount = data.lastDayCount
   }
 
+  clearAll(): void {
+    this.events.length = 0
+    this.currentDayEvents.length = 0
+    this.dailySummaries.length = 0
+    this.lastDayCount = this.gameClock.getState().dayCount
+    try {
+      localStorage.removeItem(LONG_TERM_STORAGE_KEY)
+    } catch {
+      // localStorage unavailable
+    }
+  }
+
   private persistLongTermEvent(event: TownEvent): void {
     try {
       const raw = localStorage.getItem(LONG_TERM_STORAGE_KEY)

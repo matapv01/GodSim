@@ -10,6 +10,14 @@ export interface SocialNpcSnapshot {
 }
 
 type SocialTab = 'feed' | 'relations' | 'dialogs'
+type RelationshipStatus = NonNullable<Relationship['status']>
+
+export interface ManualRelationshipUpdate {
+  fromNpcId: string
+  toNpcId: string
+  status: RelationshipStatus
+  topic: string
+}
 
 export class SocialFeedPanel {
   private root: HTMLElement
@@ -18,13 +26,19 @@ export class SocialFeedPanel {
   private activeTab: SocialTab = 'feed'
   private getEvents: () => TownEvent[]
   private getNpcs: () => SocialNpcSnapshot[]
+  private onClearAllLogs?: () => void
+  private onSetRelationship?: (update: ManualRelationshipUpdate) => void
 
   constructor(opts: {
     getEvents: () => TownEvent[]
     getNpcs: () => SocialNpcSnapshot[]
+    onClearAllLogs?: () => void
+    onSetRelationship?: (update: ManualRelationshipUpdate) => void
   }) {
     this.getEvents = opts.getEvents
     this.getNpcs = opts.getNpcs
+    this.onClearAllLogs = opts.onClearAllLogs
+    this.onSetRelationship = opts.onSetRelationship
     this.injectStyles()
 
     this.toggleBtn = document.createElement('button')
@@ -45,13 +59,28 @@ export class SocialFeedPanel {
     title.className = 'social-feed-title'
     title.textContent = 'Xã hội'
     header.appendChild(title)
+    const tools = document.createElement('div')
+    tools.className = 'social-feed-tools'
+    const clearBtn = document.createElement('button')
+    clearBtn.className = 'social-feed-tool'
+    clearBtn.title = 'Xóa toàn bộ log và ký ức xã hội'
+    const clearIcon = createLucideIcon('trash-2', 14, 'currentColor')
+    if (clearIcon) clearBtn.appendChild(clearIcon)
+    clearBtn.addEventListener('click', (event) => {
+      event.stopPropagation()
+      if (!confirm('Xóa toàn bộ log, hội thoại, ký ức và quan hệ đã lưu của thị trấn?')) return
+      this.onClearAllLogs?.()
+      this.render()
+    })
+    tools.appendChild(clearBtn)
     const close = document.createElement('button')
     close.className = 'social-feed-close'
     close.title = 'Đóng'
     const closeIcon = createLucideIcon('x', 15, 'currentColor')
     if (closeIcon) close.appendChild(closeIcon)
     close.addEventListener('click', () => this.hide())
-    header.appendChild(close)
+    tools.appendChild(close)
+    header.appendChild(tools)
     this.root.appendChild(header)
 
     const tabs = document.createElement('div')
@@ -128,15 +157,21 @@ export class SocialFeedPanel {
   private renderRelations(): void {
     const npcs = this.getNpcs()
     const rows = npcs
-      .flatMap(npc => npc.relationships.map(rel => ({ owner: npc.name, rel })))
+      .flatMap(npc => npc.relationships.map(rel => ({ ownerId: npc.npcId, owner: npc.name, rel })))
       .sort((a, b) => b.rel.lastInteraction - a.rel.lastInteraction)
       .slice(0, 80)
+    this.renderRelationTools(npcs)
     if (rows.length === 0) return this.renderEmpty('Chưa đủ tương tác để tạo sổ quan hệ.')
     this.renderRelationGraph(npcs)
     for (const rowData of rows) {
       const row = document.createElement('article')
       row.className = 'social-feed-item social-relation-item'
       row.appendChild(this.meta(`${rowData.owner} → ${rowData.rel.name}`))
+      const action = document.createElement('button')
+      action.className = 'social-relation-edit'
+      action.textContent = 'Sửa'
+      action.addEventListener('click', () => this.showRelationshipEditor(rowData.ownerId, rowData.rel.npcId))
+      row.appendChild(action)
       const title = document.createElement('div')
       title.className = 'social-relation-title'
       title.textContent = rowData.rel.label
@@ -171,17 +206,20 @@ export class SocialFeedPanel {
     if (nodeNames.length < 2) return
 
     const nodeIndex = new Map(nodeNames.map((name, i) => [name, i]))
-    const edgeMap = new Map<string, { a: string; b: string; strength: number; romance: number; tension: number; count: number }>()
+    const edgeMap = new Map<string, { a: string; b: string; aId: string; bId: string; strength: number; romance: number; tension: number; count: number }>()
     for (const owner of npcs) {
       for (const rel of owner.relationships) {
         if (!nodeIndex.has(owner.name) || !nodeIndex.has(rel.name)) continue
-        const a = owner.name < rel.name ? owner.name : rel.name
-        const b = owner.name < rel.name ? rel.name : owner.name
-        const key = `${a}::${b}`
+        const ownerFirst = owner.name < rel.name
+        const a = ownerFirst ? owner.name : rel.name
+        const b = ownerFirst ? rel.name : owner.name
+        const aId = ownerFirst ? owner.npcId : rel.npcId
+        const bId = ownerFirst ? rel.npcId : owner.npcId
+        const key = `${aId}::${bId}`
         const prev = edgeMap.get(key)
         const strength = this.relationStrength(rel)
         const next = {
-          a, b,
+          a, b, aId, bId,
           strength: Math.max(prev?.strength ?? 0, strength),
           romance: Math.max(prev?.romance ?? 0, rel.romance ?? 0),
           tension: Math.max(prev?.tension ?? 0, rel.tension ?? 0, rel.jealousy ?? 0),
@@ -225,6 +263,8 @@ export class SocialFeedPanel {
       line.setAttribute('class', edge.tension > 0.35 ? 'edge tense' : edge.romance > 0.35 ? 'edge romance' : 'edge')
       line.setAttribute('stroke-width', String(1 + Math.min(4, edge.strength * 4)))
       line.setAttribute('opacity', String(0.25 + Math.min(0.55, edge.strength * 0.55)))
+      line.setAttribute('tabindex', '0')
+      line.addEventListener('click', () => this.showRelationshipEditor(edge.aId, edge.bId))
       svg.appendChild(line)
     }
 
@@ -263,6 +303,89 @@ export class SocialFeedPanel {
     const tension = Math.max(0, rel.tension ?? 0, rel.jealousy ?? 0)
     const count = Math.min(1, rel.interactionCount / 8)
     return Math.max(0.08, Math.min(1, count * 0.35 + sentiment * 0.25 + trust * 0.2 + romance * 0.15 + tension * 0.12))
+  }
+
+  private renderRelationTools(npcs: SocialNpcSnapshot[]): void {
+    const tools = document.createElement('div')
+    tools.className = 'social-relation-tools'
+    const btn = document.createElement('button')
+    btn.className = 'social-relation-create'
+    btn.textContent = 'Tạo quan hệ'
+    btn.addEventListener('click', () => this.showRelationshipEditor(npcs[0]?.npcId, npcs[1]?.npcId))
+    tools.appendChild(btn)
+    this.body.appendChild(tools)
+  }
+
+  private getPeople(): Array<{ id: string; name: string }> {
+    const map = new Map<string, string>()
+    for (const npc of this.getNpcs()) {
+      map.set(npc.npcId, npc.name)
+      for (const rel of npc.relationships) map.set(rel.npcId, rel.name)
+    }
+    return [...map.entries()].map(([id, name]) => ({ id, name }))
+  }
+
+  private showRelationshipEditor(fromNpcId?: string, toNpcId?: string): void {
+    const people = this.getPeople()
+    if (people.length < 2) {
+      this.renderEmpty('Cần ít nhất hai nhân vật để đặt quan hệ.')
+      return
+    }
+    const first = fromNpcId && people.some(p => p.id === fromNpcId) ? fromNpcId : people[0].id
+    const second = toNpcId && people.some(p => p.id === toNpcId) && toNpcId !== first ? toNpcId : people.find(p => p.id !== first)!.id
+
+    const backdrop = document.createElement('div')
+    backdrop.className = 'social-relation-modal-backdrop'
+    const card = document.createElement('form')
+    card.className = 'social-relation-modal'
+    card.innerHTML = `
+      <div class="social-relation-modal-title">Định nghĩa quan hệ</div>
+      <label>Người A<select name="from">${people.map(p => `<option value="${this.esc(p.id)}"${p.id === first ? ' selected' : ''}>${this.esc(p.name)}</option>`).join('')}</select></label>
+      <label>Người B<select name="to">${people.map(p => `<option value="${this.esc(p.id)}"${p.id === second ? ' selected' : ''}>${this.esc(p.name)}</option>`).join('')}</select></label>
+      <label>Kiểu quan hệ<select name="status">
+        <option value="lover">Người yêu</option>
+        <option value="crush">Có cảm tình / tán tỉnh</option>
+        <option value="close_friend">Bạn thân</option>
+        <option value="friend" selected>Bạn quen</option>
+        <option value="neighbor">Hàng xóm quen</option>
+        <option value="strained">Căng thẳng</option>
+        <option value="rival">Đối thủ / ghét nhau</option>
+        <option value="stranger">Người lạ</option>
+      </select></label>
+      <label>Câu chuyện/ghi chú<textarea name="topic" rows="3" placeholder="Ví dụ: Hôm qua Vy hẹn Minh đi cafe nhưng Minh để Vy chờ quá lâu."></textarea></label>
+      <div class="social-relation-modal-actions">
+        <button type="button" data-cancel>Hủy</button>
+        <button type="submit">Lưu</button>
+      </div>
+    `
+    card.querySelector('[data-cancel]')?.addEventListener('click', () => backdrop.remove())
+    card.addEventListener('submit', (event) => {
+      event.preventDefault()
+      const form = new FormData(card)
+      const from = String(form.get('from') ?? '')
+      const to = String(form.get('to') ?? '')
+      if (!from || !to || from === to) {
+        alert('Chọn hai người khác nhau.')
+        return
+      }
+      this.onSetRelationship?.({
+        fromNpcId: from,
+        toNpcId: to,
+        status: String(form.get('status') ?? 'friend') as RelationshipStatus,
+        topic: String(form.get('topic') ?? '').trim(),
+      })
+      backdrop.remove()
+      this.render()
+    })
+    backdrop.addEventListener('click', (event) => {
+      if (event.target === backdrop) backdrop.remove()
+    })
+    backdrop.appendChild(card)
+    document.body.appendChild(backdrop)
+  }
+
+  private esc(text: string): string {
+    return text.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!))
   }
 
   private renderDialogs(): void {
@@ -362,6 +485,12 @@ export class SocialFeedPanel {
         border-bottom: 1px solid rgba(255,255,255,0.08);
       }
       .social-feed-title { font: 800 13px system-ui, sans-serif; }
+      .social-feed-tools {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .social-feed-tool,
       .social-feed-close {
         width: 28px;
         height: 28px;
@@ -371,6 +500,11 @@ export class SocialFeedPanel {
         display: grid;
         place-items: center;
         cursor: pointer;
+      }
+      .social-feed-tool:hover,
+      .social-feed-close:hover {
+        background: rgba(255,255,255,0.08);
+        color: rgba(255,255,255,0.92);
       }
       .social-feed-tabs {
         display: grid;
@@ -411,6 +545,36 @@ export class SocialFeedPanel {
         color: rgba(255,255,255,0.86);
         font: 800 13px system-ui, sans-serif;
         margin-bottom: 7px;
+      }
+      .social-relation-item {
+        position: relative;
+        padding-right: 44px;
+      }
+      .social-relation-edit {
+        position: absolute;
+        right: 0;
+        top: 9px;
+        height: 24px;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 7px;
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.78);
+        font: 800 11px system-ui, sans-serif;
+        cursor: pointer;
+      }
+      .social-relation-tools {
+        display: flex;
+        justify-content: flex-end;
+        margin: 0 0 8px;
+      }
+      .social-relation-create {
+        height: 28px;
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 7px;
+        background: rgba(255,255,255,0.08);
+        color: rgba(255,255,255,0.86);
+        font: 800 12px system-ui, sans-serif;
+        cursor: pointer;
       }
       .social-relation-bars {
         display: grid;
@@ -465,6 +629,7 @@ export class SocialFeedPanel {
       .social-relation-graph .edge {
         stroke: rgba(130, 190, 255, 0.72);
         stroke-linecap: round;
+        cursor: pointer;
       }
       .social-relation-graph .edge.romance {
         stroke: rgba(236, 120, 150, 0.82);
@@ -486,6 +651,67 @@ export class SocialFeedPanel {
         color: rgba(255,255,255,0.45);
         font: 11px/1.35 system-ui, sans-serif;
         margin-top: 4px;
+      }
+      .social-relation-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 850;
+        display: grid;
+        place-items: center;
+        background: rgba(0,0,0,0.48);
+        backdrop-filter: blur(4px);
+      }
+      .social-relation-modal {
+        width: min(360px, calc(100vw - 28px));
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(20,23,32,0.97);
+        box-shadow: 0 18px 52px rgba(0,0,0,0.42);
+        color: white;
+      }
+      .social-relation-modal-title {
+        font: 900 14px system-ui, sans-serif;
+      }
+      .social-relation-modal label {
+        display: grid;
+        gap: 5px;
+        color: rgba(255,255,255,0.62);
+        font: 800 11px system-ui, sans-serif;
+      }
+      .social-relation-modal select,
+      .social-relation-modal textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid rgba(255,255,255,0.16);
+        border-radius: 7px;
+        background: rgba(255,255,255,0.08);
+        color: white;
+        padding: 8px;
+        font: 13px/1.35 system-ui, sans-serif;
+      }
+      .social-relation-modal textarea {
+        resize: vertical;
+      }
+      .social-relation-modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .social-relation-modal-actions button {
+        height: 30px;
+        border-radius: 7px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(255,255,255,0.08);
+        color: rgba(255,255,255,0.88);
+        font: 800 12px system-ui, sans-serif;
+        cursor: pointer;
+      }
+      .social-relation-modal-actions button[type="submit"] {
+        background: rgba(236, 120, 150, 0.25);
+        border-color: rgba(236, 120, 150, 0.4);
       }
       @media (max-width: 560px) {
         .social-feed-panel { top: 64px; bottom: 84px; }

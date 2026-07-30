@@ -157,6 +157,14 @@ export class ActivityJournal {
     this.dialogues.length = 0
   }
 
+  clearAll(): void {
+    this.entries.length = 0
+    this.dialogues.length = 0
+    this.relationships.clear()
+    this.reflections.length = 0
+    this._currentPlan = null
+  }
+
   // ── Relationship Graph ──
 
   getRelationship(npcId: string): Relationship | undefined {
@@ -226,11 +234,47 @@ export class ActivityJournal {
     this.relationships.set(partner.npcId, rel)
   }
 
+  setRelationshipManual(partner: { npcId: string; name: string }, values: {
+    status: NonNullable<Relationship['status']>
+    label: string
+    sentiment: number
+    familiarity?: number
+    trust?: number
+    romance?: number
+    tension?: number
+    jealousy?: number
+    topic?: string
+  }): void {
+    const old = this.relationships.get(partner.npcId)
+    const rel: Relationship = {
+      npcId: partner.npcId,
+      name: partner.name,
+      label: values.label,
+      sentiment: Math.max(-1, Math.min(1, values.sentiment)),
+      familiarity: clamp01(values.familiarity ?? 0.85),
+      trust: clamp01(values.trust ?? 0),
+      romance: clamp01(values.romance ?? 0),
+      tension: clamp01(values.tension ?? 0),
+      jealousy: clamp01(values.jealousy ?? 0),
+      status: values.status,
+      lastInteraction: Date.now(),
+      interactionCount: Math.max(3, old?.interactionCount ?? 0),
+      recentTopics: old?.recentTopics.slice(-2) ?? [],
+    }
+    if (values.topic?.trim()) rel.recentTopics.push(values.topic.trim())
+    while (rel.recentTopics.length > MAX_RECENT_TOPICS) rel.recentTopics.shift()
+    this.relationships.set(partner.npcId, rel)
+  }
+
   getRelationshipsForPrompt(): Record<string, string> {
     const result: Record<string, string> = {}
     for (const rel of this.relationships.values()) {
-      const sentiment = rel.sentiment > 0.3 ? '，关系不错' : rel.sentiment < -0.3 ? '，关系一般' : ''
-      result[rel.name] = `${rel.label}${sentiment}`
+      const sentiment = rel.sentiment > 0.3 ? ', quan he tot' : rel.sentiment < -0.3 ? ', quan he xau/cang' : ''
+      const romance = (rel.romance ?? 0) > 0.35 ? `, tinh cam ${Math.round((rel.romance ?? 0) * 100)}%` : ''
+      const trust = (rel.trust ?? 0) > 0.35 ? `, tin tuong ${Math.round((rel.trust ?? 0) * 100)}%` : ''
+      const tension = Math.max(rel.tension ?? 0, rel.jealousy ?? 0) > 0.35 ? `, cang/ghen ${Math.round(Math.max(rel.tension ?? 0, rel.jealousy ?? 0) * 100)}%` : ''
+      const topic = rel.recentTopics.length ? `, chuyen gan day: ${rel.recentTopics.slice(-2).join(' / ')}` : ''
+      result[rel.name] = `${rel.label} (${rel.status ?? 'unknown'}${sentiment}${romance}${trust}${tension}${topic})`
     }
     return result
   }
