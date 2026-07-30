@@ -519,9 +519,10 @@ export class MainScene implements GameScene {
         const config = this.configStore.load()
         return config?.citizens.find(c => c.id === npcId)?.avatarUrl
       },
-      onDialogTargetChange: (npcId) => { this.dialogTarget = npcId },
+      onDialogTargetChange: (npcId) => { this.syncDialogTarget(npcId) },
       onInputTargetChange: (npc) => {
         if (npc) {
+          this.syncDialogTarget(npc.id)
           this.ui.updateChatTargetIndicator(npc, true)
         } else {
           this.ui.clearChatTarget()
@@ -541,14 +542,14 @@ export class MainScene implements GameScene {
         avatarUrl: savedConfig?.steward.avatarUrl,
       },
       onSwitchToSteward: () => {
-        this.dialogTarget = 'steward'
+        this.syncDialogTarget('steward')
         this.citizenChat.resetIdleTimer()
         this.ui.updateChatTargetIndicator(null, false)
       },
       onSwitchToCitizen: () => {
         const npcId = this.citizenChat.getActiveNpcId()
         if (!npcId || !this.citizenChat.canSwitchToCitizen()) return
-        this.dialogTarget = npcId
+        this.syncDialogTarget(npcId)
         this.citizenChat.resetIdleTimer()
         this.ui.updateChatTargetIndicator(null, true)
       },
@@ -1042,7 +1043,7 @@ __workflow 演出测试指令:
       this.saveSnapshot()
     }
     this.citizenChat.onUserMessage(targetNpcId)
-    if (!skipLocalCitizenReply) this.replyFromLocalCitizenIfNeeded(text)
+    if (!skipLocalCitizenReply) this.replyFromLocalCitizenIfNeeded(text, targetNpcId)
   }
 
   private initTownMapOverlay(): void {
@@ -1225,6 +1226,10 @@ __workflow 演出测试指令:
 
   getDialogTarget(): string {
     return this.dialogTarget
+  }
+
+  sendUserMessage(text: string, requestedTargetNpcId?: string): void {
+    this.onUserMessage(text, requestedTargetNpcId)
   }
 
   getUIManager(): UIManager { return this.ui }
@@ -1553,14 +1558,16 @@ __workflow 演出测试指令:
     }
   }
 
-  private onUserMessage(text: string): void {
+  private onUserMessage(text: string, requestedTargetNpcId?: string): void {
     if (!this.inputEnabled) return
 
-    const speechTarget = this.resolveTownSpeechTarget()
+    const speechTarget = requestedTargetNpcId && this.npcManager.get(requestedTargetNpcId)
+      ? requestedTargetNpcId
+      : this.resolveTownSpeechTarget()
     this.syncDialogTarget(speechTarget)
     const mayBeAppointment = this.isPlayerAppointmentText(text)
     this.showUserBubble(text, mayBeAppointment, speechTarget)
-    this.capturePlayerAppointment(text)
+    this.capturePlayerAppointment(text, speechTarget)
     this.dataSource.sendAction({ type: 'user_message', targetNpcId: speechTarget, text })
   }
 
@@ -2022,6 +2029,20 @@ __workflow 演出测试指令:
     this.selectNPC(npc)
     this.cameraCtrl.follow(npc.mesh)
 
+    if (npc.id === 'steward') {
+      this.syncDialogTarget('steward')
+    } else if (npc.id !== 'user') {
+      const user = this.npcManager.get('user')
+      const closeEnoughToTalk = !!user
+        && npc.mesh.visible
+        && npc.isInActiveScene
+        && npc.getPosition().distanceTo(user.getPosition()) <= 6
+      if (closeEnoughToTalk) {
+        this.syncDialogTarget(npc.id)
+        this.citizenChat.startChat(npc.id)
+      }
+    }
+
     const currentConfig = this.configStore.load()
     const configAvatarUrl = npc.id === 'steward'
       ? currentConfig?.steward.avatarUrl
@@ -2399,7 +2420,7 @@ __workflow 演出测试指令:
   }
 
   private syncDialogTarget(npcId: string): void {
-    if (!npcId || this.dialogTarget === npcId) return
+    if (!npcId) return
     const npc = this.npcManager.get(npcId)
     if (!npc) return
     this.dialogTarget = npcId
@@ -2422,8 +2443,7 @@ __workflow 演出测试指令:
     this.saveSnapshot()
   }
 
-  private replyFromLocalCitizenIfNeeded(text: string): void {
-    const targetId = this.dialogTarget
+  private replyFromLocalCitizenIfNeeded(text: string, targetId: string): void {
     if (!targetId || targetId === 'steward') return
     const npc = this.npcManager.get(targetId)
     if (!npc || !npc.mesh.visible) return
@@ -2792,10 +2812,10 @@ __workflow 演出测试指令:
       && !!(this.resolveSocialPlace(normalized) ?? this.inferDefaultSocialPlace(normalized))
   }
 
-  private capturePlayerAppointment(text: string): void {
-    if (!this.dialogTarget || this.dialogTarget === 'steward') return
+  private capturePlayerAppointment(text: string, targetNpcId: string): void {
+    if (!targetNpcId || targetNpcId === 'steward') return
     const user = this.npcManager.get('user')
-    const target = this.npcManager.get(this.dialogTarget)
+    const target = this.npcManager.get(targetNpcId)
     if (!user || !target) return
 
     if (!this.isPlayerAppointmentText(text)) return

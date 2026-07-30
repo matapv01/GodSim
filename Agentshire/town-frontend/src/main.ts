@@ -340,14 +340,12 @@ async function main() {
   const sendToBackend = (msg: TownMessage): void => {
     if (msg.type === 'chat') {
       const routed = parseMentionTarget(msg.message)
-      const targetNpcId = routed?.targetNpcId ?? scene.getDialogTarget()
-      dataSource.sendAction({ type: 'user_message', targetNpcId, text: routed?.text ?? msg.message })
+      scene.sendUserMessage(routed?.text ?? msg.message, routed?.targetNpcId)
     } else if (msg.type === 'multimodal') {
       const textPart = msg.parts.find(p => p.kind === 'text')
       const text = textPart && 'text' in textPart ? textPart.text : '[image]'
       const routed = parseMentionTarget(text)
-      const targetNpcId = routed?.targetNpcId ?? scene.getDialogTarget()
-      dataSource.sendAction({ type: 'user_message', targetNpcId, text: routed?.text ?? text })
+      scene.sendUserMessage(routed?.text ?? text, routed?.targetNpcId)
     }
   }
 
@@ -392,7 +390,7 @@ async function main() {
       }
     },
     onUserMessage: (text) => {
-      scene.showUserBubble(text)
+      if (topicState?.phase === 'active') scene.showUserBubble(text)
     },
     onNewSession: startNewTownSession,
   })
