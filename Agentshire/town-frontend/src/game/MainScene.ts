@@ -1301,6 +1301,20 @@ __workflow 演出测试指令:
     this.onUserMessage(text, requestedTargetNpcId)
   }
 
+  setVirtualKey(key: string, pressed: boolean): void {
+    if (pressed) this.playerKeys.add(key)
+    else this.playerKeys.delete(key)
+  }
+
+  triggerVirtualInteraction(): void {
+    this.tryUseNearbyInteraction()
+  }
+
+  focusOnSteward(): void {
+    const stewardNpc = this.npcManager.get('steward')
+    if (stewardNpc) this.cameraCtrl.follow(stewardNpc.mesh)
+  }
+
   getUIManager(): UIManager { return this.ui }
   getModeManager(): ModeManager { return this.modeManager }
   isNpcVisible(npcId: string): boolean { return !!this.npcManager.get(npcId)?.mesh.visible }

@@ -10,6 +10,7 @@ import { MockDataSource } from './data/MockDataSource'
 import { TownConfigStore } from './data/TownConfigStore'
 import type { IWorldDataSource } from './data/IWorldDataSource'
 import { InputBar, type TownMessage } from './ui/InputBar'
+import { VirtualControls } from './ui/VirtualControls'
 import { getConfiguredWsUrl } from './utils/backend-url'
 
 interface WsHistoryMessage {
@@ -70,8 +71,50 @@ function applyHtmlLocale(): void {
   if (moreBtn) moreBtn.innerHTML = `${t('more_btn')} <span style="font-size:10px;">▾</span>`
 }
 
+function showPlatformModal(): Promise<'laptop' | 'mobile'> {
+  const existing = document.getElementById('platform-modal')
+  if (existing) existing.remove()
+  return new Promise(resolve => {
+    const modal = document.createElement('div')
+    modal.id = 'platform-modal'
+    modal.innerHTML = `
+      <div class="pm-overlay">
+        <div class="pm-card">
+          <div class="pm-title">Chọn nền tảng</div>
+          <div class="pm-sub">Chọn thiết bị bạn đang sử dụng</div>
+          <div class="pm-options">
+            <button class="pm-btn pm-btn-laptop" data-choice="laptop">
+              <span class="pm-icon">💻</span>
+              <span class="pm-label">Laptop / PC</span>
+              <span class="pm-desc">Bàn phím + chuột</span>
+            </button>
+            <button class="pm-btn pm-btn-mobile" data-choice="mobile">
+              <span class="pm-icon">📱</span>
+              <span class="pm-label">Điện thoại</span>
+              <span class="pm-desc">Cảm ứng + phím ảo</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    document.body.appendChild(modal)
+    modal.querySelectorAll('.pm-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const choice = (btn as HTMLElement).dataset.choice as 'laptop' | 'mobile'
+        localStorage.setItem('agentshire_platform', choice)
+        modal.remove()
+        resolve(choice)
+      })
+    })
+  })
+}
+
 async function main() {
   const params = new URLSearchParams(location.search)
+
+  const savedPlatform = localStorage.getItem('agentshire_platform') as 'laptop' | 'mobile' | null
+  const platform = params.get('platform') as 'laptop' | 'mobile' | null || savedPlatform || await showPlatformModal()
+  if (platform === 'mobile') document.body.classList.add('mobile-mode')
 
   const container = document.getElementById('game-container')
   if (!container) throw new Error('game-container not found')
@@ -533,6 +576,15 @@ async function main() {
   bridge.sendStateChange({ status: 'running', tick: 0, fps: 60, objectCount: 0 })
 
   engine.start()
+
+  let virtualControls: VirtualControls | null = null
+  if (platform === 'mobile') {
+    virtualControls = new VirtualControls({
+      onKeyChange: (key, pressed) => scene.setVirtualKey(key, pressed),
+      onInteract: () => scene.triggerVirtualInteraction(),
+      onCamera: () => scene.focusOnSteward(),
+    })
+  }
 
   document.addEventListener('agentshire:music', (e: Event) => {
     const { enabled } = (e as CustomEvent).detail

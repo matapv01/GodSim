@@ -615,3 +615,105 @@
 body.has-town-panel #input-bar,
 body.has-town-panel #tab-bar { display: none; }
 body.has-town-panel #game-root { padding-bottom: 0; }
+
+/* ── Virtual Controls (Mobile) ── */
+
+.vc-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  pointer-events: none;
+}
+
+.vc-joystick-base {
+  position: absolute;
+  left: 24px; bottom: 100px;
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.10);
+  border: 2px solid rgba(255,255,255,0.20);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.vc-joystick-knob {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(212,165,116,0.6);
+  border: 2px solid rgba(212,165,116,0.8);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.vc-actions {
+  position: absolute;
+  right: 20px; bottom: 100px;
+  display: flex; flex-direction: column; gap: 12px;
+  pointer-events: none;
+}
+
+.vc-btn {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(6px);
+  color: #fff; font-size: 22px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.vc-btn:active {
+  background: rgba(212,165,116,0.4);
+  border-color: rgba(212,165,116,0.6);
+  transform: scale(0.92);
+}
+
+.vc-btn-e {
+  width: 64px; height: 64px;
+  font-size: 26px;
+  background: rgba(212,165,116,0.25);
+  border-color: rgba(212,165,116,0.5);
+}
+
+.vc-btn-cam {
+  font-size: 20px;
+}
+
+/* Adjust bottom panel for mobile controls */
+body.mobile-mode #town-bottom-panel {
+  bottom: 88px;
+}
+
+body.mobile-mode #npc-card {
+  bottom: 180px;
+}
+
+@media (max-height: 700px) {
+  .vc-joystick-base {
+    left: 16px; bottom: 80px;
+    width: 80px; height: 80px;
+  }
+  .vc-joystick-knob {
+    width: 36px; height: 36px;
+  }
+  .vc-actions {
+    right: 12px; bottom: 80px;
+    gap: 8px;
+  }
+  .vc-btn {
+    width: 48px; height: 48px;
+    font-size: 18px;
+  }
+  .vc-btn-e {
+    width: 54px; height: 54px;
+    font-size: 22px;
+  }
+  body.mobile-mode #town-bottom-panel {
+    bottom: 72px;
+  }
+}
