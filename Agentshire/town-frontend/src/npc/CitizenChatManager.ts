@@ -124,9 +124,8 @@ export class CitizenChatManager {
       return
     }
 
-    const userScene = this.deps.getSceneType()
     const npcInScene = npc.isInActiveScene ?? true
-    const sameScene = userScene === 'town' && npcInScene
+    const sameScene = npcInScene
 
     if (!sameScene) {
       this.disconnect()

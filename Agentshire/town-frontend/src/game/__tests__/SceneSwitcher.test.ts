@@ -149,6 +149,7 @@ describe('SceneSwitcher', () => {
 
   it('moves only the player and actual occupants into a visited house', async () => {
     deps.getIndoorNpcIds = vi.fn(() => ['citizen_1'])
+    deps.onVisitEntered = vi.fn()
 
     await switcher.switchScene('house_a')
 
@@ -161,6 +162,7 @@ describe('SceneSwitcher', () => {
       expect.anything(),
     )
     expect(deps.onStopDailyBehaviors).not.toHaveBeenCalled()
+    expect(deps.onVisitEntered).toHaveBeenCalledWith('house_a', ['citizen_1'])
   })
 
   it('restores an indoor resident to the same town position and visibility on exit', async () => {

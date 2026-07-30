@@ -179,6 +179,10 @@ export class MainScene implements GameScene {
   private townMapButton: HTMLButtonElement | null = null
   private townMapPanel: HTMLDivElement | null = null
   private lastTownMapRenderAt = 0
+  private lastUserProximityCheckAt = 0
+  private nearbyUserNpcId: string | null = null
+  private userReactionCooldowns = new Map<string, number>()
+  private pendingUserReactions = new Set<string>()
 
   private dispatcher!: EventDispatcher
   private dialogManager!: DialogManager
@@ -427,6 +431,7 @@ export class MainScene implements GameScene {
         return { x: pos.x, z: pos.z }
       },
       getIndoorNpcIds: () => this.getIndoorNpcIdsForLastEntrance(),
+      onVisitEntered: (_sceneType, npcIds) => this.handleVisitEntered(npcIds),
       getSummonPlayed: () => this.workflow.summonPlayed,
       setSummonPlayed: (v) => { this.workflow.summonPlayed = v },
       getWorkingCitizens: () => this.workflow.workingCitizens,
@@ -1295,6 +1300,172 @@ __workflow 演出测试指令:
   private getDoorKeyForBuildingId(buildingId: string): string {
     if (buildingId === 'park') return 'park_center'
     return buildingId.endsWith('_door') ? buildingId : `${buildingId}_door`
+  }
+
+  private handleVisitEntered(npcIds: string[]): void {
+    this.nearbyUserNpcId = null
+    const firstNpcId = npcIds.find(id => {
+      const npc = this.npcManager.get(id)
+      return npc?.mesh.visible && npc.isInActiveScene
+    })
+    if (!firstNpcId) return
+
+    this.nearbyUserNpcId = firstNpcId
+    window.setTimeout(() => {
+      if (this.sceneSwitcher.getSceneType() === 'town') return
+      void this.triggerUserReaction(firstNpcId, 'visit')
+    }, 250)
+  }
+
+  private updateUserProximityReactions(): void {
+    const now = performance.now()
+    if (now - this.lastUserProximityCheckAt < 500) return
+    this.lastUserProximityCheckAt = now
+
+    const user = this.npcManager.get('user')
+    if (!user?.mesh.visible || !user.isInActiveScene) {
+      this.nearbyUserNpcId = null
+      return
+    }
+
+    const nearest = this.findNearestSpeechTarget(user, 3.1, false)
+    if (!nearest) {
+      this.nearbyUserNpcId = null
+      return
+    }
+    if (nearest.id === this.nearbyUserNpcId) return
+
+    this.nearbyUserNpcId = nearest.id
+    void this.triggerUserReaction(nearest.id, 'proximity')
+  }
+
+  private async triggerUserReaction(npcId: string, context: 'visit' | 'proximity'): Promise<void> {
+    const cooldownKey = `${context}:${npcId}`
+    const now = Date.now()
+    if ((this.userReactionCooldowns.get(cooldownKey) ?? 0) > now) return
+    if (this.pendingUserReactions.has(cooldownKey)) return
+
+    const npc = this.npcManager.get(npcId)
+    const user = this.npcManager.get('user')
+    if (!npc || !user || !npc.mesh.visible || !npc.isInActiveScene || !user.isInActiveScene) return
+
+    this.pendingUserReactions.add(cooldownKey)
+    this.userReactionCooldowns.set(cooldownKey, now + (context === 'visit' ? 120_000 : 45_000))
+
+    npc.stopMoving()
+    npc.smoothLookAt({ x: user.mesh.position.x, z: user.mesh.position.z })
+    user.smoothLookAt({ x: npc.mesh.position.x, z: npc.mesh.position.z })
+
+    if (context === 'visit' && npc.getPosition().distanceTo(user.getPosition()) > 3.2) {
+      const userPos = user.getPosition()
+      const npcPos = npc.getPosition()
+      const dx = userPos.x - npcPos.x
+      const dz = userPos.z - npcPos.z
+      const length = Math.sqrt(dx * dx + dz * dz) || 1
+      void npc.moveTo({
+        x: userPos.x - (dx / length) * 2.2,
+        z: userPos.z - (dz / length) * 2.2,
+      }, 2.4)
+    } else {
+      npc.playAnim('wave')
+      window.setTimeout(() => {
+        if (npc.mesh.visible && npc.isInActiveScene) npc.playAnim('idle')
+      }, 900)
+    }
+
+    try {
+      const text = await this.buildUserReaction(npcId, context)
+      if (!text || !npc.mesh.visible || !npc.isInActiveScene) return
+      this.syncDialogTarget(npcId)
+      this.dialogManager.onDialogMessage(npcId, text, false)
+      if (context === 'visit' && this.isUserIntrudingOnNpcHome(npcId)) {
+        this.dailyScheduler.getActivityJournals().get(npcId)?.updateRelationship(
+          { npcId: 'user', name: this.getPlayerName() },
+          {
+            topic: 'Người chơi tự tiện xông vào nhà riêng',
+            sentimentDelta: -0.12,
+            trustDelta: -0.08,
+          },
+        )
+        this.socialFeedPanel?.refresh()
+        this.saveSnapshot()
+      }
+    } finally {
+      this.pendingUserReactions.delete(cooldownKey)
+    }
+  }
+
+  private async buildUserReaction(npcId: string, context: 'visit' | 'proximity'): Promise<string> {
+    const npc = this.npcManager.get(npcId)
+    const npcName = npc?.label ?? npc?.name ?? npcId
+    const profile = getGodSimNpcProfile(npcId)
+    const journal = this.dailyScheduler.getActivityJournals().get(npcId)
+    const relation = journal?.getRelationship('user')
+    const doorKey = this.getDoorKeyForBuildingId(this.lastTownEntranceBuildingId)
+    const building = BUILDING_REGISTRY.find(b => b.key === doorKey)
+    const isIntrusion = context === 'visit' && this.isUserIntrudingOnNpcHome(npcId)
+    const fallback = this.buildFallbackUserReaction(npcId, isIntrusion)
+
+    const request = this.dailyScheduler.implicitChatForBrain({
+      scene: 'encounter_init',
+      maxTokens: 70,
+      system: [
+        `Bạn là ${npcName}. ${profile.personality}`,
+        isIntrusion
+          ? 'Người chơi vừa tự nhiên xông vào nhà riêng của bạn. Bạn phải phản ứng ngay, không được im lặng.'
+          : 'Người chơi vừa đi sát tới trước mặt bạn. Hãy chủ động phản ứng tự nhiên.',
+        'Phản ứng theo đúng quan hệ: người lạ thì dè chừng hoặc khó chịu; quen biết thì hỏi chuyện; thân thiết thì tự nhiên hơn.',
+        'Nói đời thường, trực tiếp, có cảm xúc; tránh khách sáo và tránh văn phong trợ lý.',
+        'Chỉ trả về đúng 1 câu thoại tiếng Việt, tối đa 22 từ, không markdown.',
+      ].join('\n'),
+      user: JSON.stringify({
+        event: isIntrusion ? 'player_entered_my_private_home_uninvited' : 'player_approached_me',
+        place: building?.name ?? 'thị trấn',
+        relationship: relation ? {
+          label: relation.label,
+          status: relation.status,
+          sentiment: relation.sentiment,
+          trust: relation.trust,
+          interactionCount: relation.interactionCount,
+        } : { status: 'stranger', interactionCount: 0 },
+      }),
+    })
+
+    try {
+      const result = await Promise.race([
+        request,
+        new Promise<{ text: string; fallback: boolean }>(resolve => {
+          window.setTimeout(() => resolve({ text: '', fallback: true }), 3500)
+        }),
+      ])
+      const text = result.text.trim()
+      return result.fallback || !text ? fallback : text.slice(0, 160)
+    } catch {
+      return fallback
+    }
+  }
+
+  private buildFallbackUserReaction(npcId: string, isIntrusion: boolean): string {
+    const relation = this.dailyScheduler.getActivityJournals().get(npcId)?.getRelationship('user')
+    if (isIntrusion) {
+      if (relation?.status === 'lover' || relation?.status === 'crush' || relation?.status === 'close_friend') {
+        return 'Tới rồi à? Ít nhất cũng phải nhắn tôi một tiếng chứ, làm tôi giật cả mình.'
+      }
+      if (relation?.status === 'friend' || relation?.status === 'neighbor') {
+        return 'Ơ, bạn vào lúc nào thế? Có chuyện gì mà không gọi tôi trước?'
+      }
+      return 'Khoan đã, ai cho bạn tự tiện vào nhà tôi vậy? Bạn cần gì?'
+    }
+    if (relation?.status === 'strained' || relation?.status === 'rival') return 'Lại có chuyện gì với tôi nữa đây?'
+    if (relation?.status === 'friend' || relation?.status === 'close_friend') return 'Ê, đi đâu đấy? Lại đây nói chuyện chút.'
+    if (relation?.status === 'lover' || relation?.status === 'crush') return 'Thấy tôi mà định đi lướt qua luôn à?'
+    return 'Chào bạn, hình như mình chưa nói chuyện tử tế với nhau bao giờ nhỉ?'
+  }
+
+  private isUserIntrudingOnNpcHome(npcId: string): boolean {
+    const doorKey = this.getDoorKeyForBuildingId(this.lastTownEntranceBuildingId)
+    const building = BUILDING_REGISTRY.find(b => b.key === doorKey)
+    return building?.tag === 'home' && this.getNpcHomeDoorKey(npcId) === doorKey
   }
 
   setSoulModeEnabled(enabled: boolean): void {
@@ -2953,6 +3124,7 @@ __workflow 演出测试指令:
       : curScene === 'town' ? this.townScene
       : this.museumScene
     this.npcManager?.update(deltaTime, this.engine.camera, this.engine.renderer, activeScene)
+    this.updateUserProximityReactions()
     this.updateSelectionRing()
     if (curScene === 'town' && this.postTownReturnDebugFrames > 0) {
       this.postTownReturnDebugFrames -= 1

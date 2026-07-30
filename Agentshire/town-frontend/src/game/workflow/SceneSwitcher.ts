@@ -38,6 +38,7 @@ export interface SceneSwitcherDeps {
   onSyncTopHudLayout: () => void
   getTownDoorPosition: (buildingId: string) => { x: number; z: number } | null
   getIndoorNpcIds: () => string[]
+  onVisitEntered?: (sceneType: SceneType, npcIds: string[]) => void
   getSummonPlayed: () => boolean
   setSummonPlayed: (v: boolean) => void
   getWorkingCitizens: () => Set<string>
@@ -251,12 +252,12 @@ export class SceneSwitcher {
       vfx.setScene(museumScene)
       this.deps.weatherSystem?.setEnabled(false)
       const roomSlots = [
-        { x: 8, z: 8 },
-        { x: 12, z: 8 },
-        { x: 16, z: 8 },
-        { x: 8, z: 12 },
-        { x: 12, z: 12 },
-        { x: 16, z: 12 },
+        { x: 10, z: 12 },
+        { x: 14, z: 12 },
+        { x: 8, z: 10 },
+        { x: 16, z: 10 },
+        { x: 10, z: 8 },
+        { x: 14, z: 8 },
       ]
       this.moveVisitNpcsToScene(
         ['user', ...indoorNpcIds],
@@ -312,5 +313,8 @@ export class SceneSwitcher {
     engine.world.scene = targetScene
     bubbles.updateCamera(engine.camera)
     await ui.fadeFromBlack(300)
+    if (!isWorkMode && sceneType !== 'town') {
+      this.deps.onVisitEntered?.(sceneType, indoorNpcIds)
+    }
   }
 }
