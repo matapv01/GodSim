@@ -178,6 +178,7 @@ export class MainScene implements GameScene {
   private socialAppointments: SocialAppointment[] = []
   private townMapButton: HTMLButtonElement | null = null
   private townMapPanel: HTMLDivElement | null = null
+  private lastTownMapRenderAt = 0
 
   private dispatcher!: EventDispatcher
   private dialogManager!: DialogManager
@@ -1138,13 +1139,49 @@ __workflow 演出测试指令:
     ]
     const sx = (x: number) => (x / 56) * 100
     const sz = (z: number) => (z / 34) * 100
-    const npcs = (this.npcManager?.getAll() ?? [])
-      .filter(n => n.mesh.visible && n.isInActiveScene)
-      .map(n => {
-        const p = n.getPosition()
+    const sceneType = this.sceneSwitcher?.getSceneType() ?? 'town'
+    const mapNpcs = (this.npcManager?.getAll() ?? []).map(n => {
+      const behavior = this.dailyScheduler?.getDailyBehaviors().get(n.id)
+      const currentBuilding = behavior?.getCurrentBuilding()
+      let p = n.getPosition()
+      let locationLabel = ''
+
+      if (currentBuilding && WAYPOINTS[currentBuilding]) {
+        const wp = WAYPOINTS[currentBuilding]
+        p = new THREE.Vector3(wp.x, 0, wp.z)
+        locationLabel = BUILDING_REGISTRY.find(b => b.key === currentBuilding)?.name ?? ''
+      } else if (this.workflow?.workingCitizens.has(n.id)) {
+        p = new THREE.Vector3(WAYPOINTS.office_door.x, 0, WAYPOINTS.office_door.z)
+        locationLabel = 'Công ty'
+      } else if (n.id === 'user' && sceneType !== 'town') {
+        const doorKey = this.getDoorKeyForBuildingId(this.lastTownEntranceBuildingId)
+        const wp = WAYPOINTS[doorKey]
+        if (wp) p = new THREE.Vector3(wp.x, 0, wp.z)
+        locationLabel = this.getBuildingInteractionLabel(this.lastTownEntranceBuildingId)
+      }
+
+      return { npc: n, p, locationLabel }
+    })
+
+    const markerGroups = new Map<string, number>()
+    const npcs = mapNpcs
+      .map(({ npc: n, p, locationLabel }) => {
+        const groupKey = `${p.x.toFixed(1)}:${p.z.toFixed(1)}`
+        const groupIndex = markerGroups.get(groupKey) ?? 0
+        markerGroups.set(groupKey, groupIndex + 1)
+        if (groupIndex > 0) {
+          const angle = groupIndex * 2.4
+          const radius = 0.65 + Math.floor(groupIndex / 5) * 0.45
+          p = new THREE.Vector3(
+            p.x + Math.cos(angle) * radius,
+            0,
+            p.z + Math.sin(angle) * radius,
+          )
+        }
         const name = n.id === 'user' ? 'Bạn' : (n.label ?? n.name ?? n.id)
         const color = n.id === 'user' ? '#facc15' : n.id === 'steward' ? '#c4b5fd' : '#ffffff'
-        return `<div title="${name}" style="position:absolute;left:${sx(p.x)}%;top:${sz(p.z)}%;width:9px;height:9px;border-radius:999px;background:${color};border:2px solid #111827;transform:translate(-50%,-50%);box-shadow:0 0 0 2px rgba(255,255,255,0.22);"></div>
+        const title = locationLabel ? `${name} - ${locationLabel}` : name
+        return `<div title="${title}" style="position:absolute;left:${sx(p.x)}%;top:${sz(p.z)}%;width:9px;height:9px;border-radius:999px;background:${color};border:2px solid #111827;transform:translate(-50%,-50%);box-shadow:0 0 0 2px rgba(255,255,255,0.22);"></div>
           <div style="position:absolute;left:${sx(p.x)}%;top:calc(${sz(p.z)}% + 8px);transform:translateX(-50%);font-size:10px;font-weight:900;color:white;text-shadow:0 1px 3px #000;white-space:nowrap;">${name}</div>`
       }).join('')
     const placeHtml = places.map(p => `
@@ -2867,7 +2904,13 @@ __workflow 演出测试指令:
     const curScene = this.sceneSwitcher.getSceneType()
     this.updateNearbyDoorInteraction()
     this.updatePlayerKeyboardMovement(deltaTime)
-    if (this.townMapPanel?.style.display === 'block') this.renderTownMap()
+    if (this.townMapPanel?.style.display === 'block') {
+      const now = performance.now()
+      if (now - this.lastTownMapRenderAt >= 250) {
+        this.lastTownMapRenderAt = now
+        this.renderTownMap()
+      }
+    }
 
     if (curScene === 'town') {
       this.cameraCtrl.update(deltaTime)
