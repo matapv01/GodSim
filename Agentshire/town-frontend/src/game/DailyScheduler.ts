@@ -10,6 +10,9 @@ import type { PersonaStore } from '../npc/PersonaStore'
 import type { TownJournal } from '../npc/TownJournal'
 import type { GameClock } from './GameClock'
 import { BUILDING_REGISTRY, WAYPOINTS, type WeatherType } from '../types'
+import { MODERATE_PERSONALITY_GUIDANCE } from '../npc/PersonalityTone'
+
+const CJK_TEXT_RE = /[\u3400-\u9fff]/
 
 export interface DailySchedulerDeps {
   npcManager: NPCManager
@@ -286,10 +289,10 @@ export class DailyScheduler {
       const transcript = opts.conversationSoFar.map(t => `${t.speaker}: ${t.text}`).join('\n')
       const result = await this._implicitChatFn({
         scene: 'dialogue_summary',
-        system: '用一句简短的话总结这段对话的主题和内容，20字以内。只输出总结。',
+        system: 'Dùng một cụm ngắn bằng tiếng Việt để tóm tắt chủ đề và nội dung cuộc trò chuyện, tối đa 20 từ. Chỉ xuất phần tóm tắt, không dùng tiếng Trung.',
         user: transcript,
       })
-      return result.text
+      return CJK_TEXT_RE.test(result.text) ? 'trò chuyện vài câu' : result.text
     }
 
     const persona = opts.speaker.persona
@@ -316,16 +319,17 @@ export class DailyScheduler {
     const privacyRule = audience.length
       ? [
           `Đang có người khác đủ gần để nghe: ${audience.map(p => `${p.name} (${Math.min(p.distanceToSpeaker, p.distanceToListener).toFixed(1)}m)`).join(', ')}.`,
-          'Nếu chủ đề là bí mật, tán tỉnh, ghen tuông, gia đình nhạy cảm, hẹn riêng, hoặc kế hoạch kín, nhân vật phải nhận ra bối cảnh này.',
-          'Không nói thẳng chuyện riêng trước mặt người thứ ba. Hãy nói bóng gió, hạ giọng, rủ ra địa điểm khác/thời điểm khác, hoặc dừng câu chuyện.',
+          'Nếu chủ đề là bí mật, tình cảm, gia đình nhạy cảm, hẹn riêng, hoặc kế hoạch kín, nhân vật phải nhận ra bối cảnh này.',
+          'Không nói thẳng chuyện riêng trước mặt người thứ ba. Hãy nói bóng gió nhẹ nhàng, hạ giọng, rủ ra địa điểm công cộng/thời điểm khác, hoặc dừng câu chuyện.',
         ].join('\n')
-      : 'Không có người thứ ba đủ gần để nghe; có thể nói riêng tư hơn nếu hợp quan hệ và tình huống.'
+      : 'Không có người thứ ba đủ gần để nghe; có thể nói chuyện cá nhân hơn nếu hợp quan hệ và tình huống, nhưng vẫn phải trong sáng, không tình dục, không khêu gợi, không rủ vào phòng/đóng cửa/tắt đèn.'
     let system: string
 
     if (opts.scene === 'encounter_init') {
       system = [
         `Bạn là ${name}. ${persona?.coreSummary ?? ''}`,
         persona?.speakingStyle ? `Phong cách nói: ${persona.speakingStyle}` : '',
+        MODERATE_PERSONALITY_GUIDANCE,
         `Bây giờ là ${this.deps.gameClock?.getFormattedTime() ?? 'ban ngày'}. Bạn chủ động bắt chuyện với ${opts.listener.name}.`,
         opts.tacticalReason ? `Động cơ của bạn: ${opts.tacticalReason}` : '',
         professionRule,
@@ -337,6 +341,7 @@ export class DailyScheduler {
       system = [
         `Bạn là ${name}. ${persona?.coreSummary ?? ''}`,
         persona?.speakingStyle ? `Phong cách nói: ${persona.speakingStyle}` : '',
+        MODERATE_PERSONALITY_GUIDANCE,
         professionRule,
         homeRule,
         privacyRule,

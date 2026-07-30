@@ -192,6 +192,24 @@ const zhCN: Record<string, string> = {
   // ── Town name ──
   'town_name': '夏尔小镇',
 
+  // ── Traffic incidents ──
+  'traffic_incident.location': '交通事故现场',
+  'traffic_incident.vehicle_title': '{owner}的车辆刚刚发生碰撞',
+  'traffic_incident.vehicle_detail': '车辆已停车，现场正在争吵',
+  'traffic_incident.toast': '车辆撞到了{victim}，附近居民正在围观！',
+  'traffic_incident.victim_start': '{driver}，你怎么开车的？差点出大事！',
+  'traffic_incident.driver_reply': '{victim}为什么靠马路这么近？别把责任都推给我！',
+  'traffic_incident.victim_escalate': '下车把话说清楚！别躲在车里不认账！',
+  'traffic_incident.fight_start': '想打架是吧？我现在就下车！',
+  'traffic_incident.crowd_gather': '撞车后吵起来了！大家快来看！',
+  'traffic_incident.victim_fight': '还敢顶嘴？我忍不了了！',
+  'traffic_incident.crowd_stop': '住手！有事好好说，别在街上打架！',
+  'traffic_incident.driver_end': '好了，够了！我会负责，别再闹大了。',
+  'traffic_incident.disperse': '冲突被制止，围观居民逐渐散去',
+  'traffic_incident.log_start': '{driver}驾车撞到{victim}，双方立刻争吵，附近居民开始围观。',
+  'traffic_incident.log_end': '围绕{victim}的冲突被制止，{count}名目击者离开现场。',
+  'traffic_incident.activity': '被车辆撞到后与司机发生激烈争执',
+
   // ── Editor ──
   'editor.scene_workshop': '场景工坊',
   'editor.citizen_workshop': '角色工坊',

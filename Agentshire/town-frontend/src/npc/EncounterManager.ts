@@ -4,6 +4,7 @@ import type { ActivityJournal } from './ActivityJournal'
 import type { DailyBehavior } from './DailyBehavior'
 import type { PersonaCache, PersonaStore } from './PersonaStore'
 import { getLocale } from '../i18n'
+import { containsCjkText, isUnsafeNpcText } from './TextSafety'
 
 const FALLBACK_INIT_ZH = ['嗨，好久不见！', '哟，你也在这啊', '今天天气不错呢', '最近怎么样？', '嘿！在忙啥呢？']
 const FALLBACK_REPLY_ZH = ['是呀！', '哈哈对', '嗯嗯', '说得也是', '可不是嘛', '哈哈，你说得对']
@@ -13,9 +14,30 @@ const FALLBACK_INIT_EN = ['Hey, long time!', 'Oh, you\'re here too', 'Nice day, 
 const FALLBACK_REPLY_EN = ['Yeah!', 'Haha right', 'Mhm', 'True that', 'Exactly', 'Haha, you said it']
 const FAREWELL_PHRASES_EN = ['See ya~', 'Chat later~', 'Gotta go!', 'Bye~']
 
-function getFallbackInit() { return getLocale() === 'en' ? FALLBACK_INIT_EN : FALLBACK_INIT_ZH }
-function getFallbackReply() { return getLocale() === 'en' ? FALLBACK_REPLY_EN : FALLBACK_REPLY_ZH }
-function getFarewellPhrases() { return getLocale() === 'en' ? FAREWELL_PHRASES_EN : FAREWELL_PHRASES_ZH }
+const FALLBACK_INIT_VI = ['Lâu rồi mới gặp!', 'Ồ, cậu cũng ở đây à', 'Hôm nay trời dễ chịu ghê', 'Dạo này cậu thế nào?', 'Này, đang bận gì đó?']
+const FALLBACK_REPLY_VI = ['Ừ đúng đó!', 'Haha, phải rồi', 'Ừm', 'Nghe cũng hợp lý', 'Đúng thật', 'Cậu nói phải đó']
+const FAREWELL_PHRASES_VI = ['Gặp lại sau nha~', 'Lần sau nói tiếp nhé~', 'Tôi đi trước đây!', 'Tạm biệt nha~']
+
+function getFallbackInit() {
+  const locale = getLocale()
+  if (locale === 'en') return FALLBACK_INIT_EN
+  if (locale === 'vi') return FALLBACK_INIT_VI
+  return FALLBACK_INIT_ZH
+}
+
+function getFallbackReply() {
+  const locale = getLocale()
+  if (locale === 'en') return FALLBACK_REPLY_EN
+  if (locale === 'vi') return FALLBACK_REPLY_VI
+  return FALLBACK_REPLY_ZH
+}
+
+function getFarewellPhrases() {
+  const locale = getLocale()
+  if (locale === 'en') return FAREWELL_PHRASES_EN
+  if (locale === 'vi') return FAREWELL_PHRASES_VI
+  return FAREWELL_PHRASES_ZH
+}
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -260,7 +282,7 @@ export class EncounterManager {
         const journal = this.getJournal?.(speaker.id)
         const context = journal?.toContextJSON({
           currentLocation: 'town',
-          currentLocationName: getLocale() === 'en' ? 'Town' : '小镇',
+          currentLocationName: getLocale() === 'en' ? 'Town' : getLocale() === 'vi' ? 'Thị trấn' : '小镇',
           encounteredNpc: { name: listener.label ?? listener.id },
         })
         const persona = this.personaStore?.get(speaker.id)
@@ -281,6 +303,7 @@ export class EncounterManager {
 
         detectedEnd = /\[END\]/.test(raw)
         text = raw.replace(/\[END\]/g, '').trim()
+        if (isUnsafeNpcText(text)) return true
       } catch {
         return true
       }
@@ -332,7 +355,11 @@ export class EncounterManager {
 
   private async generateSummary(dialogue: ActiveDialogue): Promise<string> {
     const { turns } = dialogue
-    if (turns.length === 0) return getLocale() === 'en' ? 'had a brief chat' : '闲聊了几句'
+    if (turns.length === 0) {
+      if (getLocale() === 'en') return 'had a brief chat'
+      if (getLocale() === 'vi') return 'trò chuyện vài câu'
+      return '闲聊了几句'
+    }
 
     if (this.dialogueProvider) {
       try {
@@ -350,12 +377,15 @@ export class EncounterManager {
         ]) as string
 
         const text = raw.replace(/\[END\]/g, '').trim()
-        if (text) return text
+        if (text && !(getLocale() === 'vi' && containsCjkText(text))) return text
       } catch { /* fallback below */ }
     }
 
-    const joined = turns.map(t => t.text).join(getLocale() === 'en' ? ', ' : '、').slice(0, 30)
-    return getLocale() === 'en' ? `chatted about ${joined}` : `聊了${joined}`
+    const locale = getLocale()
+    const joined = turns.map(t => t.text).join(locale === 'en' ? ', ' : ', ').slice(0, 30)
+    if (locale === 'en') return `chatted about ${joined}`
+    if (locale === 'vi') return `trò chuyện về ${joined}`
+    return `聊了${joined}`
   }
 
   // ── Relationship update (local rules, no LLM) ──
@@ -429,15 +459,18 @@ export class EncounterManager {
     const jI = this.getJournal?.(initiator.id)
     const jR = this.getJournal?.(responder.id)
 
-    const townLabel = getLocale() === 'en' ? 'Town' : '小镇'
+    const locale = getLocale()
+    const townLabel = locale === 'en' ? 'Town' : locale === 'vi' ? 'Thị trấn' : '小镇'
 
     jI?.record({
       location: 'town',
       locationName: townLabel,
       action: 'chatted',
-      detail: getLocale() === 'en'
+      detail: locale === 'en'
         ? `with ${responder.label ?? responder.id}: ${summary}`
-        : `和${responder.label ?? responder.id}${summary}`,
+        : locale === 'vi'
+          ? `với ${responder.label ?? responder.id}: ${summary}`
+          : `和${responder.label ?? responder.id}${summary}`,
       relatedNpc: responder.label ?? responder.id,
     })
     jI?.recordDialogue({
@@ -453,9 +486,11 @@ export class EncounterManager {
       location: 'town',
       locationName: townLabel,
       action: 'chatted',
-      detail: getLocale() === 'en'
+      detail: locale === 'en'
         ? `with ${initiator.label ?? initiator.id}: ${summary}`
-        : `和${initiator.label ?? initiator.id}${summary}`,
+        : locale === 'vi'
+          ? `với ${initiator.label ?? initiator.id}: ${summary}`
+          : `和${initiator.label ?? initiator.id}${summary}`,
       relatedNpc: initiator.label ?? initiator.id,
     })
     jR?.recordDialogue({

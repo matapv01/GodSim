@@ -111,62 +111,62 @@ export class ActivityStream {
     return 'wrench'
   }
 
-  /** Generate a human-readable Chinese description of what a tool is doing */
+  /** Generate a human-readable Vietnamese description of what a tool is doing */
   toolActivityMsg(toolName: string, input?: Record<string, unknown>): string {
     const inp = input ?? {}
     if (toolName === '__thinking__') {
       const content = String(inp.content ?? '')
       const firstLine = content.split('\n')[0].trim()
       const preview = firstLine.length > 60 ? firstLine.slice(0, 57) + '...' : firstLine
-      return `思考完成\n${preview}`
+      return `Suy nghĩ xong\n${preview}`
     }
-    if (toolName === '__thinking_placeholder__') return '正在思考'
+    if (toolName === '__thinking_placeholder__') return 'Đang suy nghĩ'
     if (toolName === 'bash' || toolName === 'exec') {
       const cmd = String(inp.command ?? '').trim()
-      if (/\b(pnpm|npm|yarn)\s+(install|i|ci)\b/.test(cmd)) return '安装依赖'
-      if (/\b(git\s+clone|cp\s+-r|rsync)\b/.test(cmd)) return '克隆项目'
-      if (/\bmkdir\b/.test(cmd)) return '创建目录'
-      if (/\b(rm|rmdir)\b/.test(cmd)) return '删除文件'
-      if (/\b(pnpm|npm|yarn|npx)\s+(run|exec|start|dev|build|test)\b/.test(cmd)) return '运行脚本'
-      if (/\b(node|ts-node|tsx)\b/.test(cmd)) return '运行脚本'
-      if (/\b(cat|head|tail|less|more)\b/.test(cmd)) return '查看文件'
-      if (/\bls\b/.test(cmd)) return '查看目录'
-      if (/\b(sed|awk|grep|find)\b/.test(cmd)) return '处理文件'
-      if (/\bscreencapture\b/.test(cmd)) return '截取屏幕'
-      if (/\bcurl|wget\b/.test(cmd)) return '网络请求'
-      if (/\bdocker\b/.test(cmd)) return '运行容器'
-      if (/\bcd\b/.test(cmd)) return '切换目录'
-      return '执行命令'
+      if (/\b(pnpm|npm|yarn)\s+(install|i|ci)\b/.test(cmd)) return 'Cài đặt phụ thuộc'
+      if (/\b(git\s+clone|cp\s+-r|rsync)\b/.test(cmd)) return 'Sao chép dự án'
+      if (/\bmkdir\b/.test(cmd)) return 'Tạo thư mục'
+      if (/\b(rm|rmdir)\b/.test(cmd)) return 'Xóa tệp'
+      if (/\b(pnpm|npm|yarn|npx)\s+(run|exec|start|dev|build|test)\b/.test(cmd)) return 'Chạy script'
+      if (/\b(node|ts-node|tsx)\b/.test(cmd)) return 'Chạy script'
+      if (/\b(cat|head|tail|less|more)\b/.test(cmd)) return 'Xem tệp'
+      if (/\bls\b/.test(cmd)) return 'Xem thư mục'
+      if (/\b(sed|awk|grep|find)\b/.test(cmd)) return 'Xử lý tệp'
+      if (/\bscreencapture\b/.test(cmd)) return 'Chụp màn hình'
+      if (/\bcurl|wget\b/.test(cmd)) return 'Gửi yêu cầu mạng'
+      if (/\bdocker\b/.test(cmd)) return 'Chạy container'
+      if (/\bcd\b/.test(cmd)) return 'Đổi thư mục'
+      return 'Thực thi lệnh'
     }
     if (['read', 'read_file', 'grep', 'glob'].includes(toolName)) {
       const p = String(inp.path ?? inp.pattern ?? '').split('/').pop() ?? ''
-      return `阅读 ${p || '文件'}`
+      return `Đọc ${p || 'tệp'}`
     }
     if (['write', 'edit', 'write_file', 'edit_file'].includes(toolName)) {
       const p = String(inp.path ?? inp.file ?? inp.content?.toString().slice(0, 0) ?? '').split('/').pop() ?? ''
       const writePath = String(inp.path ?? inp.file ?? '').split('/').pop() ?? ''
-      return `编辑 ${writePath || '文件'}`
+      return `Sửa ${writePath || 'tệp'}`
     }
-    if (toolName === 'web_search') return '搜索网络'
-    if (toolName === 'web_fetch') return '访问网页'
-    if (toolName === 'browser') return '浏览器操作'
+    if (toolName === 'web_search') return 'Tìm kiếm web'
+    if (toolName === 'web_fetch') return 'Mở trang web'
+    if (toolName === 'browser') return 'Thao tác trình duyệt'
     if (toolName === 'process') {
       const action = String(inp.action ?? '')
-      if (action === 'poll') return '等待进程完成'
-      if (action === 'log') return '查看进程日志'
-      if (action === 'kill') return '终止进程'
-      return '进程操作'
+      if (action === 'poll') return 'Chờ tiến trình hoàn tất'
+      if (action === 'log') return 'Xem log tiến trình'
+      if (action === 'kill') return 'Dừng tiến trình'
+      return 'Thao tác tiến trình'
     }
     if (toolName === 'skill') {
       const sn = String(inp.skill_name ?? inp.name ?? '').slice(0, 20)
-      return `使用技能：${sn || '技能'}`
+      return `Dùng kỹ năng: ${sn || 'kỹ năng'}`
     }
     if (toolName === 'spawn_agent' || toolName === 'sessions_spawn') {
       const name = String(inp.name ?? inp.displayName ?? inp.label ?? '').slice(0, 15)
-      return `召唤 ${name || '居民'}`
+      return `Gọi ${name || 'cư dân'}`
     }
     if (toolName === 'todo_write') return ''
-    return `使用工具：${toolName}`
+    return `Dùng công cụ: ${toolName}`
   }
 
   isTodoWrite(toolName: string): boolean {

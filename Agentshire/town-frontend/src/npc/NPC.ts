@@ -24,6 +24,14 @@ export type NpcState =
   | 'emoting'
   | 'departing'
 
+export interface NPCNavigationAdapter {
+  projectTarget(target: { x: number; z: number }): { x: number; z: number }
+  resolveMovement(
+    from: { x: number; z: number },
+    desired: { x: number; z: number },
+  ): { x: number; z: number }
+}
+
 const STATE_TRANSITIONS: Record<NpcState, Set<NpcState>> = {
   idle:        new Set(['walking', 'working', 'thinking', 'celebrating', 'emoting', 'departing']),
   walking:     new Set(['idle', 'working']),
@@ -44,12 +52,14 @@ export class NPC {
   public npcState: NpcState = 'idle'
   public label: string
   public labelElement: HTMLDivElement | null = null
+  public readonly collisionRadius = 0.45
 
   private static assetLoader: AssetLoader | null = null
 
   private targetPos: THREE.Vector3 | null = null
   private speed: number = 3
   private moveResolve: ((status: 'arrived' | 'interrupted') => void) | null = null
+  private navigationAdapter: NPCNavigationAdapter | null = null
 
   private bobPhase: number = 0
   private isMoving: boolean = false
@@ -547,6 +557,10 @@ export class NPC {
     }
   }
 
+  setNavigationAdapter(adapter: NPCNavigationAdapter | null): void {
+    this.navigationAdapter = adapter
+  }
+
   moveTo(target: { x: number; z: number }, speed?: number): Promise<'arrived' | 'interrupted'> {
     return new Promise<'arrived' | 'interrupted'>((resolve) => {
       if (this.moveResolve) {
@@ -555,7 +569,8 @@ export class NPC {
       this.isMoving = true
       this.moveResolve = resolve
       this.speed = speed ?? 3
-      this.targetPos = new THREE.Vector3(target.x, 0, target.z)
+      const walkableTarget = this.navigationAdapter?.projectTarget(target) ?? target
+      this.targetPos = new THREE.Vector3(walkableTarget.x, 0, walkableTarget.z)
 
       if (this.npcState !== 'idle' && this.npcState !== 'walking') {
         this.transitionTo('idle')
@@ -626,8 +641,13 @@ export class NPC {
         const step = Math.min(this.speed * deltaTime, dist)
         const nx = dx / dist
         const nz = dz / dist
-        current.x += nx * step
-        current.z += nz * step
+        const desired = {
+          x: current.x + nx * step,
+          z: current.z + nz * step,
+        }
+        const resolved = this.navigationAdapter?.resolveMovement(current, desired) ?? desired
+        current.x = resolved.x
+        current.z = resolved.z
 
         this.desiredRotationY = Math.atan2(nx, nz)
       }

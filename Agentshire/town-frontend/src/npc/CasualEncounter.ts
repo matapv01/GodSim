@@ -14,6 +14,10 @@ import type { TimePeriod, WeatherType } from '../types'
 import type { GodSimNpcProfile } from '../data/god-sim-npc-profiles'
 import type { ActivityJournal } from './ActivityJournal'
 import { getProfessionForSpecialty, isPoliceSpecialty } from '../data/Professions'
+import { MODERATE_PERSONALITY_GUIDANCE } from './PersonalityTone'
+import { isUnsafeNpcText } from './TextSafety'
+
+const WAVE_DISTANCE = 3.5
 const CHAT_DISTANCE = 3.5
 const CHAT_CHANCE = 0.52
 const GLOBAL_COOLDOWN_MS = 9_000
@@ -348,7 +352,9 @@ export class CasualEncounter {
       system: [
         'Bạn viết hội thoại đời thường cho game mô phỏng xã hội thu nhỏ bằng tiếng Việt.',
         'Tạo 3-4 lượt thoại ngắn giữa hai NPC trưởng thành đang gặp nhau trong thị trấn.',
-        'Hội thoại phải có chất người: nhớ chuyện cũ, tò mò, tán tỉnh rõ hơn, căng thẳng tình cảm/thể xác, ngại ngùng, ghen, tin đồn, tâm sự gia đình, rủ đi riêng, nghi ngờ, hoặc giấu chuyện riêng.',
+        'Hội thoại có chất người nhưng nhẹ nhàng: hỏi thăm, nhớ chuyện cũ, tò mò vừa phải, chia sẻ việc thường ngày hoặc giúp đỡ nhau.',
+        'Ưu tiên cảm giác dễ thương: quan tâm bằng chi tiết nhỏ, nhường nhau một chút, nói lời cảm ơn/xin lỗi tự nhiên, rủ nhau làm việc bình dị thay vì đẩy căng cảm xúc.',
+        MODERATE_PERSONALITY_GUIDANCE,
         'Không khách sáo kiểu trợ lý. Không chung chung. Không tự nhận là AI. Không markdown.',
         'Tính liên tục là bắt buộc: chỉ được nhắc chuyện cũ, lời hứa, tin đồn, tình cảm, bí mật hoặc cuộc hẹn nếu dữ liệu relationship/recent_activity/recent_dialogues thực sự có chi tiết đó.',
         'Không được tự bịa "chuyện hôm trước", "tối qua", "đã hẹn", ghen tuông, ngoại tình hay một người thứ ba khi context không ghi nhận.',
@@ -357,6 +363,7 @@ export class CasualEncounter {
         'Cho phép lời nói đời thường hơn: có thể cáu bẳn, nói thẳng, đùa tục nhẹ, chửi bậy kiểu người lớn như "mẹ", "vãi", "chết tiệt", "đồ điên" khi hợp tình huống. Đừng quá đà và đừng biến tất cả thành cãi nhau.',
         'Có thể có drama người lớn như hấp dẫn thể xác, ham muốn, lời rủ rê thân mật, hẹn hò riêng, thích nhầm người, bắt cá hai tay, ngoại tình/tình cũ/đánh ghen; đừng né tránh chủ đề tình dục một cách máy móc.',
         'Mọi quan hệ thân mật phải là người trưởng thành và đồng thuận; không cưỡng ép, không đe dọa, không vị thành niên. Có thể nói thẳng về mong muốn, đồng ý, từ chối và ranh giới; nếu câu chuyện chạm tới mô tả tình dục đồ họa/chi tiết hành vi hoặc bộ phận, hãy dùng ẩn ý/cắt cảnh và tập trung vào cảm xúc, bí mật, lựa chọn và hậu quả.',
+        'Không chủ động tạo ghen tuông, xúc phạm, tán tỉnh lộ liễu, chuyện tình dục hoặc xung đột nếu dữ liệu quan hệ và tình huống không yêu cầu.',
         'Nếu nhân vật hẹn, rủ, hứa, định làm việc gì hoặc nói sẽ đi đâu, hãy nói rõ thời điểm hoặc địa điểm đời thường như quán cà phê, công viên, quán ăn, chợ, công ty, nhà văn hóa, phòng khám, hoặc về nhà.',
         audience.length
           ? 'Quan trọng: có người thứ ba đang đứng đủ gần để nghe. Nhân vật phải nhận biết điều đó: đừng nói bí mật, tán tỉnh lộ liễu, chuyện ngoại tình, chuyện gia đình nhạy cảm, hay kế hoạch riêng một cách trơ trẽn. Hãy đổi sang nói bóng gió, hạ giọng, rủ ra chỗ khác, hoặc hoãn cuộc nói chuyện nếu cần.'
@@ -393,6 +400,8 @@ export class CasualEncounter {
           .slice(0, 4)
         : []
       if (turns.length < 2) return null
+      const summary = String(data.summary ?? 'trò chuyện trong thị trấn').trim().slice(0, 80)
+      if (isUnsafeNpcText(summary) || turns.some((turn: ChatTurn) => isUnsafeNpcText(turn.text))) return null
       const combined = turns.map((turn: ChatTurn) => turn.text).join(' ').toLowerCase()
       const rel = this.getJournal?.(a.id)?.getRelationship(b.id)
       const hasGroundedHistory = !!rel?.recentTopics?.length
@@ -405,7 +414,7 @@ export class CasualEncounter {
         return null
       }
       return {
-        summary: String(data.summary ?? 'trò chuyện trong thị trấn').trim().slice(0, 80),
+        summary,
         turns,
       }
     } catch {
@@ -542,7 +551,7 @@ export class CasualEncounter {
       },
     ]
 
-    if (!hasAudience && Math.random() < 0.34) return _pick(dramaSeeds)
+    if (!hasAudience && Math.random() < 0.06) return _pick(dramaSeeds)
 
     if (weather === 'rain' || weather === 'heavyRain' || weather === 'storm') {
       return {

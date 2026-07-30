@@ -173,6 +173,24 @@ const vi: Record<string, string> = {
 
   'town_name': 'Thị trấn Shire',
 
+  // ── Traffic incidents ──
+  'traffic_incident.location': 'Hiện trường va chạm',
+  'traffic_incident.vehicle_title': 'Xe nhà {owner} vừa va chạm',
+  'traffic_incident.vehicle_detail': 'Đã dừng xe — đang tranh cãi tại hiện trường',
+  'traffic_incident.toast': 'Xe vừa va vào {victim} — mọi người đang kéo tới!',
+  'traffic_incident.victim_start': 'Lái xe kiểu gì vậy, {driver}?! Suýt nữa thì xảy ra chuyện lớn rồi!',
+  'traffic_incident.driver_reply': 'Ai bảo {victim} đi sát lòng đường? Đừng có đổ hết lỗi cho tôi!',
+  'traffic_incident.victim_escalate': 'Xuống xe nói chuyện cho rõ! Đừng tưởng ngồi trong xe là muốn nói gì cũng được!',
+  'traffic_incident.fight_start': 'Thích gây sự đúng không? Tôi xuống ngay đây!',
+  'traffic_incident.crowd_gather': 'Ôi, va chạm rồi cãi nhau to! Mọi người lại xem kìa!',
+  'traffic_incident.victim_fight': 'Còn cãi nữa à? Tôi không nhịn đâu!',
+  'traffic_incident.crowd_stop': 'Dừng lại! Có chuyện gì thì nói, đừng đánh nhau giữa đường!',
+  'traffic_incident.driver_end': 'Được rồi, đủ rồi! Tôi sẽ chịu trách nhiệm, đừng làm lớn thêm.',
+  'traffic_incident.disperse': 'Vụ va chạm đã được can ngăn, mọi người giải tán',
+  'traffic_incident.log_start': '{driver} lái xe va vào {victim}; hai bên lập tức cãi vã và đám đông bắt đầu tụ tập.',
+  'traffic_incident.log_end': 'Cuộc ẩu đả quanh {victim} đã được can ngăn; {count} người chứng kiến rời hiện trường.',
+  'traffic_incident.activity': 'Bị xe va phải rồi tranh cãi dữ dội với tài xế',
+
   'editor.scene_workshop': 'Sửa cảnh',
   'editor.citizen_workshop': 'Xưởng nhân vật',
   'editor.save': 'Lưu',

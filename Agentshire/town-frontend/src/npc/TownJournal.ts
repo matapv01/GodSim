@@ -44,6 +44,11 @@ const MAX_LONG_TERM_EVENTS = 2000
 const MAX_DAILY_SUMMARIES = 30
 const RECENT_EVENTS_FOR_PERCEPTION = 10
 const LONG_TERM_STORAGE_KEY = 'agentshire_town_journal_archive_v1'
+const CJK_TEXT_RE = /[\u3400-\u9fff]/
+
+function containsCjkText(text: string): boolean {
+  return CJK_TEXT_RE.test(text)
+}
 
 const PERIOD_LABELS: Partial<Record<TimePeriod, string>> = {
   dawn: t('journal.period.dawn'),
@@ -217,15 +222,15 @@ export class TownJournal {
       try {
         const result = await this.deps.implicitChat({
           scene: 'town_journal',
-          system: '你是小镇日志的记录者。根据今天发生的事件，写一段3~5句话的叙事日志。语气温暖自然，像在讲故事。只输出日志内容。',
-          user: `第${dayCount}天的事件：\n${eventLog}`,
+          system: 'Bạn là người ghi nhật kí thị trấn. Dựa trên các sự kiện trong ngày, hãy viết một đoạn nhật kí 3-5 câu bằng tiếng Việt. Giọng văn ấm áp, tự nhiên, như đang kể lại chuyện trong thị trấn. Chỉ xuất nội dung nhật kí, không dùng tiếng Trung, không markdown.',
+          user: `Sự kiện ngày ${dayCount}:\n${eventLog}`,
         })
-        text = result.fallback ? this.buildFallbackSummary(dayEvents) : result.text
+        text = result.fallback || containsCjkText(result.text) ? this.buildFallbackSummary(dayEvents) : result.text
       } catch {
         text = this.buildFallbackSummary(dayEvents)
       }
     } else {
-      text = '平静的一天，小镇一切如常。'
+      text = 'Một ngày yên bình, mọi thứ trong thị trấn vẫn diễn ra như thường lệ.'
     }
 
     const summary: DailySummary = {
@@ -257,11 +262,11 @@ export class TownJournal {
     }
 
     const parts: string[] = []
-    if (actors.size > 0) parts.push(`${[...actors].slice(0, 3).join('、')}等人度过了忙碌的一天`)
-    if (encounters > 0) parts.push(`发生了${encounters}次对话`)
-    if (places.size > 0) parts.push(`大家去了${[...places].slice(0, 3).join('、')}`)
+    if (actors.size > 0) parts.push(`${[...actors].slice(0, 3).join(', ')} đã có một ngày khá bận rộn`)
+    if (encounters > 0) parts.push(`có ${encounters} cuộc trò chuyện đáng nhớ`)
+    if (places.size > 0) parts.push(`mọi người ghé qua ${[...places].slice(0, 3).join(', ')}`)
 
-    return parts.length > 0 ? parts.join('，') + '。' : '平静的一天。'
+    return parts.length > 0 ? parts.join(', ') + '.' : 'Một ngày yên bình.'
   }
 
   // ── Nightly Reflection Orchestration ──
@@ -277,25 +282,25 @@ export class TownJournal {
     for (const citizen of citizens) {
       const recentActivities = citizen.journal.getRecentActivities(5)
         .map(a => `${a.time} ${a.action} @ ${a.location}`)
-        .join('、')
+        .join(', ')
 
       const system = [
-        `你是${citizen.name}。${citizen.persona?.coreSummary ?? ''}`,
-        '回顾今天，写一句感想，30字以内。只输出感想内容。',
+        `Bạn là ${citizen.name}. ${citizen.persona?.coreSummary ?? ''}`,
+        'Nhìn lại hôm nay, hãy viết một câu cảm nghĩ ngắn bằng tiếng Việt, tối đa 30 từ. Giọng ấm áp, đời thường. Chỉ xuất nội dung cảm nghĩ, không dùng tiếng Trung.',
       ].join('\n')
 
       try {
         const result = await this.deps.implicitChat({
           scene: 'daily_reflection',
           system,
-          user: recentActivities || '今天没做什么特别的事',
+          user: recentActivities || 'Hôm nay không có việc gì đặc biệt.',
         })
 
-        const reflection = result.text || '今天过得还不错'
+        const reflection = result.text && !containsCjkText(result.text) ? result.text : 'Hôm nay trôi qua khá ổn.'
         citizen.journal.addReflection(dayCount, reflection)
         this.recordReflection(citizen.name, reflection)
       } catch {
-        const fallback = '今天过得还不错'
+        const fallback = 'Hôm nay trôi qua khá ổn.'
         citizen.journal.addReflection(dayCount, fallback)
         this.recordReflection(citizen.name, fallback)
       }

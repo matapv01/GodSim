@@ -75,7 +75,7 @@ export class EventTranslator {
     if (event.subtype === 'init') {
       console.log('[EventTranslator] handleSystem init, sending world_init (NPCs already spawned by MainScene from town-defaults.json)')
       return [
-        { type: 'world_init', config: { townName: '夏尔', stewardName: 'OpenClaw', citizenCount: 5 } },
+        { type: 'world_init', config: { townName: 'Agentshire', stewardName: 'OpenClaw', citizenCount: 5 } },
       ]
     }
     return []

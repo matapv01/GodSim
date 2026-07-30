@@ -192,6 +192,24 @@ const en: Record<string, string> = {
   // ── Town name ──
   'town_name': 'Shire Town',
 
+  // ── Traffic incidents ──
+  'traffic_incident.location': 'Traffic incident',
+  'traffic_incident.vehicle_title': '{owner}’s car was in a collision',
+  'traffic_incident.vehicle_detail': 'Vehicle stopped — argument in progress',
+  'traffic_incident.toast': 'A car hit {victim} — a crowd is gathering!',
+  'traffic_incident.victim_start': 'Watch where you are driving, {driver}! That could have been serious!',
+  'traffic_incident.driver_reply': 'Why was {victim} so close to the road? Do not put all the blame on me!',
+  'traffic_incident.victim_escalate': 'Get out and explain yourself! You cannot hide in the car after that!',
+  'traffic_incident.fight_start': 'Looking for a fight? Fine, I am getting out!',
+  'traffic_incident.crowd_gather': 'A crash and a huge argument! Everyone, come look!',
+  'traffic_incident.victim_fight': 'Still arguing? I am done holding back!',
+  'traffic_incident.crowd_stop': 'Stop! Talk it out—do not fight in the street!',
+  'traffic_incident.driver_end': 'All right, enough! I will take responsibility. Let us end this.',
+  'traffic_incident.disperse': 'The traffic dispute was stopped and the crowd dispersed',
+  'traffic_incident.log_start': '{driver} hit {victim} with a car; they began arguing as a crowd gathered.',
+  'traffic_incident.log_end': 'The fight involving {victim} was stopped and {count} witnesses left the scene.',
+  'traffic_incident.activity': 'Was hit by a car and got into a heated dispute with the driver',
+
   // ── Editor ──
   'editor.scene_workshop': 'Scene Editor',
   'editor.citizen_workshop': 'Character Workshop',

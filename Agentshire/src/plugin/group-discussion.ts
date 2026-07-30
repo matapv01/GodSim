@@ -90,7 +90,7 @@ export function onUserMessage(message: string): void {
     activeDiscussion.pendingUserMessages.push(message);
     console.log(`[group-discussion] User message queued (speaker active): "${message.slice(0, 50)}"`);
   } else {
-    activeDiscussion.history.push({ speaker: "镇长", text: message });
+    activeDiscussion.history.push({ speaker: "Thị trưởng", text: message });
     console.log(`[group-discussion] User message added to history: "${message.slice(0, 50)}"`);
     sendToNextSpeaker();
   }
@@ -141,7 +141,7 @@ export function onCitizenTurnEnd(agentId: string): void {
 
   while (activeDiscussion.pendingUserMessages.length > 0) {
     const userMsg = activeDiscussion.pendingUserMessages.shift()!;
-    activeDiscussion.history.push({ speaker: "镇长", text: userMsg });
+    activeDiscussion.history.push({ speaker: "Thị trưởng", text: userMsg });
     console.log(`[group-discussion] Flushed queued user message: "${userMsg.slice(0, 50)}"`);
   }
 
@@ -166,9 +166,9 @@ export function endDiscussion(): void {
 function buildContextMessage(discussion: ActiveDiscussion): string {
   let context = "";
   for (const entry of discussion.history) {
-    context += `${entry.speaker}：${entry.text}\n`;
+    context += `${entry.speaker}: ${entry.text}\n`;
   }
-  context += `\n轮到你了，简短回复。`;
+  context += `\nĐến lượt bạn, hãy trả lời ngắn gọn bằng tiếng Việt.`;
 
   return context;
 }

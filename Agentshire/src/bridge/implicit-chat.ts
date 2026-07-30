@@ -59,10 +59,10 @@ const SCENE_MAX_TOKENS: Record<ImplicitScene, number> = {
 const DEFAULT_STOP = ['\n\n']
 
 const FALLBACK: Partial<Record<ImplicitScene, string[]>> = {
-  encounter_init: ['嗨，好久不见！', '哟，你也在这啊', '今天天气不错呢', '嘿！在干嘛呢？'],
-  encounter_reply: ['是呀！', '哈哈对', '嗯嗯', '说得也是', '确实如此'],
-  dialogue_summary: ['闲聊了几句'],
-  daily_reflection: ['今天过得还不错', '充实的一天', '平淡但安心'],
+  encounter_init: ['Lâu rồi mới gặp!', 'Ồ, cậu cũng ở đây à', 'Hôm nay trời dễ chịu ghê', 'Này, đang bận gì đó?'],
+  encounter_reply: ['Ừ đúng đó!', 'Haha, phải rồi', 'Ừm', 'Nghe cũng hợp lý', 'Đúng thật'],
+  dialogue_summary: ['trò chuyện vài câu'],
+  daily_reflection: ['Hôm nay trôi qua khá ổn.', 'Một ngày bận rộn nhưng dễ chịu.', 'Bình dị mà thấy yên tâm.'],
   daily_plan: [],
   tactical_decision: [],
 }

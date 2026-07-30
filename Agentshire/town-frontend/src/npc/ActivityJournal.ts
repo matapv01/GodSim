@@ -269,11 +269,11 @@ export class ActivityJournal {
   getRelationshipsForPrompt(): Record<string, string> {
     const result: Record<string, string> = {}
     for (const rel of this.relationships.values()) {
-      const sentiment = rel.sentiment > 0.3 ? ', quan he tot' : rel.sentiment < -0.3 ? ', quan he xau/cang' : ''
-      const romance = (rel.romance ?? 0) > 0.35 ? `, tinh cam ${Math.round((rel.romance ?? 0) * 100)}%` : ''
-      const trust = (rel.trust ?? 0) > 0.35 ? `, tin tuong ${Math.round((rel.trust ?? 0) * 100)}%` : ''
-      const tension = Math.max(rel.tension ?? 0, rel.jealousy ?? 0) > 0.35 ? `, cang/ghen ${Math.round(Math.max(rel.tension ?? 0, rel.jealousy ?? 0) * 100)}%` : ''
-      const topic = rel.recentTopics.length ? `, chuyen gan day: ${rel.recentTopics.slice(-2).join(' / ')}` : ''
+      const sentiment = rel.sentiment > 0.3 ? ', quan hệ khá tốt' : rel.sentiment < -0.3 ? ', quan hệ hơi xa cách' : ''
+      const romance = (rel.romance ?? 0) > 0.35 ? `, tình cảm ${Math.round((rel.romance ?? 0) * 100)}%` : ''
+      const trust = (rel.trust ?? 0) > 0.35 ? `, tin tưởng ${Math.round((rel.trust ?? 0) * 100)}%` : ''
+      const tension = Math.max(rel.tension ?? 0, rel.jealousy ?? 0) > 0.35 ? `, căng/ghen ${Math.round(Math.max(rel.tension ?? 0, rel.jealousy ?? 0) * 100)}%` : ''
+      const topic = rel.recentTopics.length ? `, chuyện gần đây: ${rel.recentTopics.slice(-2).join(' / ')}` : ''
       result[rel.name] = `${rel.label} (${rel.status ?? 'unknown'}${sentiment}${romance}${trust}${tension}${topic})`
     }
     return result
@@ -298,7 +298,7 @@ export class ActivityJournal {
 
   getYesterdaySummary(currentDayCount: number): string {
     const yesterday = this.reflections.find(r => r.dayCount === currentDayCount - 1)
-    return yesterday?.text ?? '没什么特别的'
+    return yesterday?.text ?? 'Không có gì đặc biệt.'
   }
 
   // ── Daily Plan ──
@@ -390,7 +390,7 @@ export class ActivityJournal {
     const nearby = options.nearbyNpcs?.map(n => ({
       name: n.name,
       distance: n.distance,
-      relationship: this.relationships.get(n.npcId)?.label ?? '不认识',
+      relationship: this.relationships.get(n.npcId)?.label ?? 'chưa quen',
     }))
 
     return {

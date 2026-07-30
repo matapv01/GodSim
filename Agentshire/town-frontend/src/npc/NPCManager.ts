@@ -1,11 +1,13 @@
 import * as THREE from 'three'
 import { NPC } from './NPC'
 import type { NPCConfig } from '../types'
+import type { CollisionWorld } from '../game/physics/CollisionWorld'
 
 export class NPCManager {
   private npcs: Map<string, NPC> = new Map()
   private scene: THREE.Scene
   private labelContainer: HTMLElement
+  private collisionWorld: CollisionWorld | null = null
 
   constructor(scene: THREE.Scene, labelContainer: HTMLElement) {
     this.scene = scene
@@ -20,6 +22,7 @@ export class NPCManager {
         this.npcs.delete(cfg.id)
       }
       const npc = new NPC(cfg)
+      this.configureNavigation(npc)
       this.scene.add(npc.mesh)
       npc.createLabel(this.labelContainer)
       this.npcs.set(cfg.id, npc)
@@ -29,6 +32,12 @@ export class NPCManager {
   get(id: string): NPC | undefined { return this.npcs.get(id) }
   getAll(): NPC[] { return Array.from(this.npcs.values()) }
   getWorkers(): NPC[] { return this.getAll().filter(n => n.role === 'worker') }
+
+  setCollisionWorld(collisionWorld: CollisionWorld | null): void {
+    this.collisionWorld = collisionWorld
+    collisionWorld?.setActorsProvider(() => this.getAll())
+    for (const npc of this.npcs.values()) this.configureNavigation(npc)
+  }
 
   remove(id: string): void {
     const npc = this.npcs.get(id)
@@ -43,6 +52,9 @@ export class NPCManager {
       npc.mesh.userData.isInActiveScene = npc.isInActiveScene
       if (npc.isInActiveScene) npc.update(dt)
       npc.updateLabel(camera, renderer)
+    }
+    if (activeScene && this.collisionWorld) {
+      this.collisionWorld.resolveOverlaps(this.getAll(), activeScene)
     }
   }
 
@@ -82,5 +94,13 @@ export class NPCManager {
   destroy(): void {
     for (const npc of this.npcs.values()) npc.destroy()
     this.npcs.clear()
+  }
+
+  private configureNavigation(npc: NPC): void {
+    npc.setNavigationAdapter(this.collisionWorld ? {
+      projectTarget: target => this.collisionWorld?.projectTarget(npc, target) ?? target,
+      resolveMovement: (from, desired) =>
+        this.collisionWorld?.moveActor(npc, from, desired, { allowDetour: npc.id !== 'user' }) ?? desired,
+    } : null)
   }
 }

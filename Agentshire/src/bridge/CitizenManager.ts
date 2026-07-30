@@ -189,7 +189,7 @@ export class CitizenManager {
       this.deps.emit([
         { type: 'npc_anim', npcId, anim: 'wave' },
         { type: 'fx', effect: 'exclamation', params: { npcId } },
-        { type: 'dialog_message', npcId, text: `你好！我是${citizenName}，很高兴来到小镇！`, isStreaming: false },
+        { type: 'dialog_message', npcId, text: `Xin chào! Tôi là ${citizenName}, rất vui được đến thị trấn!`, isStreaming: false },
       ])
 
       await this.deps.delayMs(2500)

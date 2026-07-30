@@ -3,6 +3,7 @@ import { AssetLoader } from '../visual/AssetLoader'
 import { ScreenRenderer } from './ScreenRenderer'
 import { WhiteboardRenderer } from './WhiteboardRenderer'
 import type { ScreenState } from '../../data/GameProtocol'
+import type { CollisionObstacle } from '../physics/CollisionWorld'
 
 export interface Workstation {
   id: string
@@ -23,10 +24,12 @@ export class OfficeBuilder {
   public doorPos = new THREE.Vector3(15, 0, 25)
   public whiteboard = new WhiteboardRenderer()
   public whiteboardMesh: THREE.Mesh | null = null
+  private collisionObstacles: CollisionObstacle[] = []
 
   constructor(scene: THREE.Scene) { this.scene = scene }
 
   build(assets: AssetLoader): void {
+    this.collisionObstacles = []
     this.buildFloor()
     this.buildWalls()
     this.buildEquipment(assets)
@@ -35,6 +38,10 @@ export class OfficeBuilder {
     this.buildStorage(assets)
     this.buildDecorations(assets)
     this.addLighting()
+  }
+
+  getCollisionObstacles(): CollisionObstacle[] {
+    return [...this.collisionObstacles]
   }
 
   private add(obj: THREE.Object3D): void {
@@ -94,6 +101,11 @@ export class OfficeBuilder {
 
     this.box(t, h, 25, c, 0, h / 2, 12.5)
     this.box(t, h, 25, c, 30, h / 2, 12.5)
+    this.addBoxObstacle('office_wall_north', 15, 0, 30, t)
+    this.addBoxObstacle('office_wall_south_left', 6.75, 25, 13.5, t)
+    this.addBoxObstacle('office_wall_south_right', 23.25, 25, 13.5, t)
+    this.addBoxObstacle('office_wall_west', 0, 12.5, t, 25)
+    this.addBoxObstacle('office_wall_east', 30, 12.5, t, 25)
 
     for (const wx of [5, 15, 25]) {
       this.box(2, 1.2, 0.05, 0x87ceeb, wx, 1.8, 0.15)
@@ -105,6 +117,9 @@ export class OfficeBuilder {
   }
 
   private buildEquipment(assets: AssetLoader): void {
+    this.addBoxObstacle('office_cabinet_main', 25, 1.5, 1.3, 0.85)
+    this.addBoxObstacle('office_cactus', 2, 1.5, 0.65, 0.65)
+    this.addBoxObstacle('office_cabinet_small', 28, 1.5, 1.25, 0.7)
     if (!this.placeModel(assets, 'cabinet_medium', 25, 0, 1.5)) {
       this.box(1.2, 0.6, 0.8, 0x888888, 25, 0.3, 1.5)
       this.box(1.0, 0.1, 0.6, 0x444444, 25, 0.65, 1.5)
@@ -164,6 +179,7 @@ export class OfficeBuilder {
 
     for (let i = 0; i < ids.length; i++) {
       const [x, z] = positions[i]
+      this.addBoxObstacle(`office_desk_${ids[i]}`, x, z, 2, 0.9)
 
       const deskModel = this.placeModel(assets, 'table_medium', x, 0, z, 1.2)
       let deskMesh: THREE.Mesh
@@ -220,6 +236,9 @@ export class OfficeBuilder {
   }
 
   private buildVisitorArea(assets: AssetLoader): void {
+    this.addBoxObstacle('office_visitor_couch', 3, 23, 3.1, 1.05)
+    this.addBoxObstacle('office_visitor_table', 3, 21, 1.55, 0.85)
+    this.addBoxObstacle('office_visitor_armchair', 5.5, 21, 0.9, 0.9)
     if (!this.placeModel(assets, 'couch_pillows', 3, 0, 23, 1.2, Math.PI)) {
       this.box(3, 0.45, 1, 0x4a6fa5, 3, 0.225, 23)
       this.box(3, 0.5, 0.2, 0x3a5f95, 3, 0.6, 22.5)
@@ -250,6 +269,10 @@ export class OfficeBuilder {
   }
 
   private buildDecorations(assets: AssetLoader): void {
+    this.addBoxObstacle('office_shelf_west', 0.6, 5, 0.8, 1.8)
+    this.addBoxObstacle('office_cabinet_west', 0.6, 8, 0.8, 1.5)
+    this.addBoxObstacle('office_cabinet_east', 29.4, 5, 0.8, 1.5)
+    this.addBoxObstacle('office_armchair_east', 29, 12, 0.9, 0.9)
     this.placeModel(assets, 'lamp_standing', 1, 0, 24)
     this.placeModel(assets, 'lamp_standing', 29, 0, 24)
 
@@ -325,5 +348,17 @@ export class OfficeBuilder {
     for (const obj of this.objects) this.scene.remove(obj)
     this.objects = []
     this.workstations = []
+    this.collisionObstacles = []
+  }
+
+  private addBoxObstacle(id: string, x: number, z: number, width: number, depth: number): void {
+    this.collisionObstacles.push({
+      type: 'box',
+      id,
+      minX: x - width / 2,
+      maxX: x + width / 2,
+      minZ: z - depth / 2,
+      maxZ: z + depth / 2,
+    })
   }
 }

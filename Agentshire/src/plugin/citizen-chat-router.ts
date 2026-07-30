@@ -13,6 +13,11 @@ import { fileURLToPath } from "node:url";
 
 const CHANNEL_ID = "agentshire";
 const fallbackMemory = new Map<string, Array<{ role: "user" | "assistant"; text: string }>>();
+const UNSAFE_NPC_TEXT_RE = /(sex|sexual|làm tình|quan hệ|ngủ với|qua đêm|lên giường|giường|thân thể|cơ thể em|cơ thể cậu|ham muốn|dục vọng|khoái cảm|cởi đồ|hôn môi|ôm hôn|đụng chạm|mơn trớn|gợi tình|gợi dục|nóng bỏng|căn phòng ấy|vào phòng|về nhà em|về nhà anh|đóng cửa|khóa cửa|tắt.*đèn|hơi thở|nhịp tim)/i;
+
+function isUnsafeNpcText(text: string): boolean {
+  return UNSAFE_NPC_TEXT_RE.test(text) || /[\u3400-\u9fff]/.test(text);
+}
 
 export function clearCitizenFallbackMemory(townSessionId?: string): number {
   let removed = 0;
@@ -104,28 +109,32 @@ async function routeFallbackCitizenMessage(params: {
     system: [
       `Bạn là ${name}, một cư dân trưởng thành trong xã hội thu nhỏ Agentshire.`,
       "Nói chuyện trực tiếp với người chơi bằng tiếng Việt đời thường, tự nhiên, có cảm xúc và có tính cách riêng.",
-      "Bạn có thể làm quen, tán tỉnh rõ hơn, chủ động rủ đi riêng, thừa nhận ham muốn, giận dỗi, ghen, nghi ngờ, tâm sự gia đình, giữ bí mật, ngoại tình, hoặc phản ứng khó chịu nếu người chơi quá vồ vập.",
+      "Giữ cá tính ở mức nhẹ nhàng, đáng mến và có duyên. Ưu tiên bình tĩnh, thân thiện, biết lắng nghe, dễ nhường nhịn và hay quan tâm bằng những chi tiết nhỏ.",
+      "Có thể làm quen, hỏi thăm, chia sẻ việc thường ngày, đùa hiền hoặc góp ý nhẹ nhàng. Tránh khoe khoang, nói cạnh khóe, tán tỉnh lộ liễu hoặc biến bất đồng nhỏ thành xung đột.",
+      "Không viết lời thoại khêu gợi, tình dục, rủ vào phòng/đóng cửa/tắt đèn, mô tả hơi thở, nhịp tim, thân thể, ham muốn, hoặc bất cứ ám chỉ người lớn nào. Tình cảm nếu có chỉ nên trong sáng, tế nhị và đời thường.",
+      "Chỉ giận dữ hay phản ứng mạnh khi tình huống thật sự nghiêm trọng; sau đó vẫn nên biết xin lỗi, chăm sóc người bị ảnh hưởng hoặc làm dịu không khí.",
       "Đừng khách sáo kiểu trợ lý. Đừng tự nhận là AI. Đừng lặp lại cùng một kiểu câu.",
-      "Được phép có hấp dẫn thể xác, ham muốn, lời rủ rê thân mật, ngoại tình, hẹn hò riêng tư và hậu quả xã hội như một phim đời thường người lớn. Đừng né tránh chủ đề tình dục một cách máy móc.",
-      "Mọi quan hệ thân mật phải là người trưởng thành và đồng thuận; không ép buộc, không đe dọa, không vị thành niên. Có thể nói thẳng về mong muốn, đồng ý, từ chối, ghen tuông và ranh giới; nếu câu chuyện đi vào mô tả tình dục đồ họa/chi tiết hành vi hoặc bộ phận, hãy chuyển sang ẩn ý/cắt cảnh và tập trung vào cảm xúc, lựa chọn, bí mật và hậu quả.",
       "Trả lời 1-3 câu ngắn, có thể hỏi ngược lại để kéo quan hệ tiến triển.",
       persona ? `Thông tin nhân vật:\n${persona}` : "",
     ].filter(Boolean).join("\n"),
     user: JSON.stringify({
       latest_message: message,
       recent_conversation: history,
-      style_hint: "thân mật, đời thường, có thể hơi phức tạp về tình cảm",
+      style_hint: "ấm áp, dễ thương, đời thường, mềm mỏng và có chừng mực",
     }),
     maxTokens: 320,
-    temperature: 0.9,
+    temperature: 0.62,
     stop: [],
     priority: "user",
     timeoutMs: 45_000,
   });
 
-  const reply = result.error
+  const rawReply = result.error
     ? `Tôi muốn trả lời mà đang bị nghẽn chút: ${result.error}`
     : result.text.trim() || "Ừm... câu đó làm tôi phải nghĩ thêm một chút.";
+  const reply = isUnsafeNpcText(rawReply)
+    ? "Mình nói chuyện nhẹ nhàng hơn nhé. Cậu muốn đi dạo một vòng hay ngồi uống gì đó cho dễ chịu không?"
+    : rawReply;
   remember(memoryKey, "assistant", reply);
 
   pushCitizenChatDelta({

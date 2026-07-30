@@ -16,6 +16,7 @@ import type { ActivityJournal } from './ActivityJournal'
 import type { PersonaCache } from './PersonaStore'
 import type { DailyPlanItem, TimePeriod, WeatherType } from '../types'
 import { BUILDING_REGISTRY, WAYPOINTS } from '../types'
+import { MODERATE_PERSONALITY_GUIDANCE } from './PersonalityTone'
 
 // ── Types ──
 
@@ -206,6 +207,7 @@ export class AgentBrain {
       `Bạn là ${name}, một cư dân trưởng thành của ${this.townName}.`,
       this.persona?.coreSummary ?? '',
       this.persona?.speakingStyle ? `Phong cách nói: ${this.persona.speakingStyle}` : '',
+      MODERATE_PERSONALITY_GUIDANCE,
       `Hôm nay là ngày ${dayCount}.`,
     ].filter(Boolean).join('\n')
 
@@ -293,6 +295,7 @@ export class AgentBrain {
     const system = [
       `Bạn là ${name}, cư dân trưởng thành trong một xã hội thu nhỏ.`,
       this.persona?.coreSummary ?? '',
+      MODERATE_PERSONALITY_GUIDANCE,
       'Chọn hành động hợp lý theo địa điểm hiện tại, quan hệ gần đây, thời gian và người ở gần.',
       'Hành động phải đời thường và liên tục với chuyện vừa xảy ra, không chọn lung tung.',
     ].filter(Boolean).join('\n')
@@ -300,7 +303,7 @@ export class AgentBrain {
     const nearbyForPrompt = nearby.map(n => ({
       name: n.name,
       distance: Math.round(n.distance * 10) / 10,
-      relationship: this.journal.getRelationship(n.npcId)?.label ?? '不认识',
+      relationship: this.journal.getRelationship(n.npcId)?.label ?? 'chưa quen',
     }))
 
     const options: string[] = ['stay']
