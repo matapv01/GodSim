@@ -705,22 +705,45 @@ body.mobile-mode .vc-btn-cam {
    - NPC card above controls.
    ── */
 
-/* ── Hide agent status / more dropdown on mobile ── */
+/* ── Mobile: compact target indicator + minimal input ── */
 
 body.mobile-mode #town-agent-status {
+  padding: 4px 10px 0;
+  min-height: 0;
+  border-bottom: none;
+}
+body.mobile-mode #town-agent-status .tas-meta {
+  flex: 1;
+}
+body.mobile-mode #town-agent-status .tas-session {
   display: none;
 }
+body.mobile-mode #town-agent-status .tas-model {
+  display: none;
+}
+body.mobile-mode #town-more-btn,
 body.mobile-mode #town-end-topic-btn {
   display: none !important;
 }
-body.mobile-mode #town-more-btn {
-  display: none !important;
+body.mobile-mode .tas-name {
+  font-size: 12px;
+}
+body.mobile-mode .tas-avatar-wrap img,
+body.mobile-mode .tas-avatar-wrap .tas-avatar-fallback {
+  width: 18px; height: 18px;
+  font-size: 10px;
+}
+body.mobile-mode .tas-click-wrap {
+  gap: 4px;
+}
+body.mobile-mode .tas-switch-arrow svg {
+  width: 12px; height: 12px;
 }
 
-/* ── Ultra-compact input row ── */
+/* ── Mobile: ultra-compact input row ── */
 
 body.mobile-mode #town-input-row {
-  padding: 6px 10px;
+  padding: 4px 10px 8px;
   gap: 6px;
   border-top: none;
 }
