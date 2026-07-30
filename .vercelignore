@@ -1,0 +1,13 @@
+.git
+.browser-profile
+.browsers
+.runtime
+.tools
+.agentshire-git-backup
+LLM_Env.ps1
+.env
+.env.*
+*.log
+*.lnk
+Agentshire/node_modules
+Agentshire/town-frontend/node_modules
