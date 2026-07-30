@@ -1440,7 +1440,7 @@ __workflow 演出测试指令:
     const doorKey = this.getDoorKeyForBuildingId(this.lastTownEntranceBuildingId)
     const building = BUILDING_REGISTRY.find(b => b.key === doorKey)
     const isIntrusion = context === 'visit' && this.isUserIntrudingOnNpcHome(npcId)
-    const fallback = this.buildFallbackUserReaction(npcId, isIntrusion)
+    const fallback = this.buildFallbackUserReaction(npcId, isIntrusion, context)
 
     const request = this.dailyScheduler.implicitChatForBrain({
       scene: 'encounter_init',
@@ -1450,7 +1450,12 @@ __workflow 演出测试指令:
         isIntrusion
           ? 'Người chơi vừa tự nhiên xông vào nhà riêng của bạn. Bạn phải phản ứng ngay, không được im lặng.'
           : 'Người chơi vừa đi sát tới trước mặt bạn. Hãy chủ động phản ứng tự nhiên.',
-        'Phản ứng theo đúng quan hệ: người lạ thì dè chừng hoặc khó chịu; quen biết thì hỏi chuyện; thân thiết thì tự nhiên hơn.',
+        context === 'proximity'
+          ? 'Ngoai duong la gap mat xa hoi binh thuong: uu tien chao hoi am ap, to mo, co the vui ve hoac hoi tham. Khong duoc gat gong voi nguoi la chi vi ho di gan qua.'
+          : 'Neu khong phai nha rieng cua ban, hay phan ung nhu gap mat o noi cong cong.',
+        'Phản ứng theo đúng quan hệ: người lạ thì lịch sự, hơi giữ khoảng cách nhưng vẫn có thiện chí; quen biết thì hỏi chuyện; thân thiết thì tự nhiên hơn.',
+        'Chi duoc kho chiu/gat neu relationship co tension cao, trang thai strained/rival, hoac nguoi choi dang xong vao nha rieng. Neu khong co ly do ro rang, nguoi la cung nen lich su va mo loi de lam quen.',
+        'Neu relationship.recentTopics hoac recent_dialogues co noi dung cu giua hai nguoi, hay bam vao dung noi dung do de hoi tiep mot cach tu nhien.',
         'Chỉ nhắc chuyện cũ, lời hứa, cuộc hẹn hoặc tình cảm nếu chúng có trong dữ liệu gần đây. Không tự bịa "tối gặp", "chuyện hôm trước" hay một mức thân thiết chưa tồn tại.',
         'Không nói rằng bạn hoặc người chơi sắp đi đâu nếu dữ liệu không có kế hoạch đó.',
         'Nói đời thường, trực tiếp, có cảm xúc; tránh khách sáo và tránh văn phong trợ lý.',
@@ -1468,7 +1473,7 @@ __workflow 演出测试指令:
           recentTopics: relation.recentTopics?.slice(-3),
         } : { status: 'stranger', interactionCount: 0 },
         recent_activity: journal?.getRecentActivities(3) ?? [],
-        recent_dialogues: journal?.getRecentDialogueSummaries(2) ?? [],
+        recent_dialogues: journal?.getRecentDialogueSummaries(4) ?? [],
       }),
     })
 
@@ -1486,10 +1491,11 @@ __workflow 演出测试指令:
     }
   }
 
-  private buildFallbackUserReaction(npcId: string, isIntrusion: boolean): string {
+  private buildFallbackUserReaction(npcId: string, isIntrusion: boolean, context: 'visit' | 'proximity'): string {
     const journal = this.dailyScheduler.getActivityJournals().get(npcId)
     const relation = journal?.getRelationship('user')
     const topic = relation?.recentTopics?.slice(-1)[0]
+    const isStreetGreeting = context === 'proximity'
     if (isIntrusion) {
       if (relation?.status === 'lover' || relation?.status === 'crush' || relation?.status === 'close_friend') {
         return 'Tới rồi à? Ít nhất cũng phải nhắn tôi một tiếng chứ, làm tôi giật cả mình.'
@@ -1499,10 +1505,20 @@ __workflow 演出测试指令:
       }
       return 'Khoan đã, ai cho bạn tự tiện vào nhà tôi vậy? Bạn cần gì?'
     }
-    if (relation?.status === 'strained' || relation?.status === 'rival') return 'Lại có chuyện gì với tôi nữa đây?'
+    if (isStreetGreeting && topic && (relation?.interactionCount ?? 0) > 0) {
+      return `Chào bạn. Tôi vẫn nhớ chuyện "${topic}", nếu bạn muốn thì mình nói tiếp cho rõ.`
+    }
+    if (isStreetGreeting && (relation?.status === 'lover' || relation?.status === 'crush')) {
+      return 'Bạn đến đúng lúc đấy. Lại đây nói chuyện với tôi một chút, hôm nay tôi muốn gặp bạn.'
+    }
+    if (isStreetGreeting && (relation?.status === 'friend' || relation?.status === 'close_friend' || relation?.status === 'neighbor')) {
+      return 'Chào bạn, gặp ở ngoài đường thế này cũng vui. Đang đi đâu đấy, có gì kể tôi nghe với.'
+    }
+    if (relation?.status === 'strained' || relation?.status === 'rival') return 'Chào. Nếu bạn muốn nói chuyện đàng hoàng thì tôi nghe, nhưng đừng đẩy mọi chuyện căng lên.'
     if (topic && (relation?.interactionCount ?? 0) > 0) return `Chào bạn. Chuyện "${topic}" lần trước, bạn còn muốn nói tiếp không?`
     if (relation?.status === 'friend' || relation?.status === 'close_friend') return 'Chào bạn. Tôi đang rảnh một chút, có chuyện gì mới không?'
     if (relation?.status === 'lover' || relation?.status === 'crush') return 'Bạn tới rồi à? Lại đây, nói tôi nghe hôm nay bạn thế nào.'
+    if (isStreetGreeting) return 'Chào bạn. Mình gặp nhau ngoài đường thì cứ chào một câu đã, bạn đang đi đâu vậy?'
     return 'Chào bạn. Mình chưa quen rõ, nhưng nếu bạn muốn nói chuyện thì tôi đang nghe.'
   }
 
