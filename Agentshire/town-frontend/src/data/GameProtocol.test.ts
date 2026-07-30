@@ -129,7 +129,7 @@ describe('GameProtocol type coverage', () => {
 
   it('GameAction type handles all expected action types at compile time', () => {
     const actionTypes: Array<GameAction['type']> = [
-      'user_message', 'npc_clicked', 'abort_requested',
+      'user_message', 'direct_speech', 'npc_clicked', 'abort_requested',
       'building_door_clicked', 'return_to_town',
       'npc_encounter_triggered', 'npc_building_status',
       'game_popup_action', 'work_abort_requested',

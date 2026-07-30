@@ -1630,12 +1630,17 @@ __workflow 演出测试指令:
     this.syncDialogTarget(speechTarget)
     const isVehicleInvite = this.isVehicleInvitationText(text)
     const mayBeAppointment = this.isPlayerAppointmentText(text)
-    this.showUserBubble(text, mayBeAppointment || isVehicleInvite, speechTarget)
+    this.showUserBubble(text, true, speechTarget)
     if (isVehicleInvite && speechTarget !== 'steward') {
       void this.handleVehicleInvitation(speechTarget)
       return
     }
     if (mayBeAppointment && this.capturePlayerAppointment(text, speechTarget)) return
+    if (speechTarget !== 'steward') {
+      this.replyFromLocalCitizenIfNeeded(text, speechTarget, true)
+      this.dataSource.sendAction({ type: 'direct_speech', targetNpcId: speechTarget, text })
+      return
+    }
     this.dataSource.sendAction({ type: 'user_message', targetNpcId: speechTarget, text })
   }
 
@@ -2711,12 +2716,12 @@ __workflow 演出测试指令:
     this.saveSnapshot()
   }
 
-  private replyFromLocalCitizenIfNeeded(text: string, targetId: string): void {
+  private replyFromLocalCitizenIfNeeded(text: string, targetId: string, forceDirect = false): void {
     if (!targetId || targetId === 'steward') return
     const npc = this.npcManager.get(targetId)
     if (!npc || (!npc.mesh.visible && !this.vehiclePassengerNpcIds.has(targetId))) return
     const agentConfigured = this.bootstrap.agentConfigMap.get(targetId)
-    if (agentConfigured?.agentEnabled) return
+    if (agentConfigured?.agentEnabled && !forceDirect) return
 
     this.buildLocalCitizenReply(targetId, text).then((reply) => {
       if (!reply) return

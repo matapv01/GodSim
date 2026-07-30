@@ -247,6 +247,8 @@ async function main() {
             if (wsMsg) wsSend(wsMsg)
             else wsSend({ type: 'chat', body: [{ kind: 'text', text: action.text }] })
           }
+        } else if (action.type === 'direct_speech') {
+          director.onUserMessage(action.text)
         } else if (action.type === 'abort_requested') {
           wsSend({ type: 'abort' })
         } else {

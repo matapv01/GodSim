@@ -188,6 +188,7 @@ export type GameEvent =
 export type GameAction =
   // User interaction
   | { type: 'user_message'; targetNpcId: string; text: string }
+  | { type: 'direct_speech'; targetNpcId: string; text: string }
   | { type: 'npc_clicked'; npcId: string }
   | { type: 'abort_requested' }
   | { type: 'building_door_clicked'; scene: SceneType }
