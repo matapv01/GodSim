@@ -50,6 +50,12 @@ export class SceneSwitcher {
   private currentSceneType: SceneType = 'town'
   private sceneSwitching = false
   private pendingSceneSwitch: SceneType | null = null
+  private visitNpcSnapshots = new Map<string, {
+    x: number
+    y: number
+    z: number
+    visible: boolean
+  }>()
   private deps: SceneSwitcherDeps
 
   constructor(deps: SceneSwitcherDeps) {
@@ -58,6 +64,49 @@ export class SceneSwitcher {
 
   getSceneType(): SceneType {
     return this.currentSceneType
+  }
+
+  private moveVisitNpcsToScene(
+    npcIds: string[],
+    scene: THREE.Scene,
+    getPosition: (index: number, id: string) => { x: number; z: number },
+  ): string[] {
+    const uniqueIds = [...new Set(npcIds)]
+    this.visitNpcSnapshots.clear()
+
+    for (const id of uniqueIds) {
+      const npc = this.deps.npcManager.get(id)
+      if (!npc) continue
+      this.visitNpcSnapshots.set(id, {
+        x: npc.mesh.position.x,
+        y: npc.mesh.position.y,
+        z: npc.mesh.position.z,
+        visible: npc.mesh.visible,
+      })
+      npc.stopMoving()
+    }
+
+    this.deps.npcManager.moveNpcsToScene(uniqueIds, scene)
+    uniqueIds.forEach((id, index) => {
+      const npc = this.deps.npcManager.get(id)
+      if (!npc) return
+      const position = getPosition(index, id)
+      npc.mesh.position.set(position.x, 0, position.z)
+      npc.setVisible(true)
+      npc.playAnim('idle')
+    })
+    return uniqueIds
+  }
+
+  private restoreVisitNpcs(): void {
+    for (const [id, snapshot] of this.visitNpcSnapshots) {
+      if (id === 'user') continue
+      const npc = this.deps.npcManager.get(id)
+      if (!npc) continue
+      npc.mesh.position.set(snapshot.x, snapshot.y, snapshot.z)
+      npc.setVisible(snapshot.visible)
+    }
+    this.visitNpcSnapshots.clear()
   }
 
   async switchScene(sceneType: SceneType): Promise<void> {
@@ -87,6 +136,10 @@ export class SceneSwitcher {
     const modeIndicator = this.deps.getModeIndicator()
     const activeOfficeNpcIds = this.deps.getActiveOfficeNpcIds()
     const workSubState = modeManager.getWorkSubState()
+    const isWorkMode = modeManager.isWorkMode()
+    const indoorNpcIds = !isWorkMode && sceneType !== 'town'
+      ? this.deps.getIndoorNpcIds()
+      : []
 
     getAudioSystem().play('scene_switch')
     await ui.fadeToBlack(300)
@@ -95,14 +148,11 @@ export class SceneSwitcher {
     modeIndicator?.setSceneType(sceneType)
     modeIndicator?.update(modeManager.getState())
     this.deps.onSyncTopHudLayout()
-    const isWorkMode = modeManager.isWorkMode()
 
     let targetScene: THREE.Scene
     if (sceneType === 'office') {
       if (isWorkMode) {
         this.deps.onStopBehaviorForNpcs(['steward', 'user', ...activeOfficeNpcIds])
-      } else {
-        this.deps.onStopDailyBehaviors()
       }
       targetScene = officeScene
       vfx.setScene(officeScene)
@@ -161,8 +211,14 @@ export class SceneSwitcher {
           // do not place steward/user here; startOfficeWork() owns their door entrance and walk animation
         }
       } else {
-        const visitNpcIds = ['steward', 'user', ...this.deps.getIndoorNpcIds()]
-        npcManager.moveNpcsToScene(visitNpcIds, officeScene)
+        const visitNpcIds = this.moveVisitNpcsToScene(
+          ['user', ...indoorNpcIds],
+          officeScene,
+          (_index, id) => ({
+            x: 15 + (id === 'user' ? 1.5 : -1.5),
+            z: 24,
+          }),
+        )
         this.deps.setInputEnabled(false)
 
         const OFFICE_DOOR = { x: 15, z: 24 }
@@ -190,12 +246,25 @@ export class SceneSwitcher {
       ui.showBackButton(!isWorkMode)
       cameraCtrl.enterOfficeMode()
     } else if (sceneType !== 'town') {
-      this.deps.onStopDailyBehaviors()
       gameClock?.pause()
       targetScene = museumScene
       vfx.setScene(museumScene)
       this.deps.weatherSystem?.setEnabled(false)
-      npcManager.moveNpcsToScene(['steward', 'user', ...this.deps.getIndoorNpcIds()], museumScene)
+      const roomSlots = [
+        { x: 8, z: 8 },
+        { x: 12, z: 8 },
+        { x: 16, z: 8 },
+        { x: 8, z: 12 },
+        { x: 12, z: 12 },
+        { x: 16, z: 12 },
+      ]
+      this.moveVisitNpcsToScene(
+        ['user', ...indoorNpcIds],
+        museumScene,
+        (index, id) => id === 'user'
+          ? { x: 12, z: 16 }
+          : roomSlots[(index - 1) % roomSlots.length],
+      )
       ui.showBackButton(true)
       cameraCtrl.setAutoPilot(false)
       cameraCtrl.follow(null)
@@ -214,6 +283,7 @@ export class SceneSwitcher {
         ui.showBackButton(false)
       } else {
         npcManager.setScene(townScene)
+        this.restoreVisitNpcs()
         ui.showBackButton(false)
         this.deps.setSummonPlayed(false)
         this.deps.getWorkingCitizens().clear()

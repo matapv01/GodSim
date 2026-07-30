@@ -146,4 +146,41 @@ describe('SceneSwitcher', () => {
     expect(deps.onRestoreOfficeSceneLayout).toHaveBeenCalled()
     expect(deps.onStopBehaviorForNpcs).toHaveBeenCalledWith(['steward', 'user', 'citizen_1'])
   })
+
+  it('moves only the player and actual occupants into a visited house', async () => {
+    deps.getIndoorNpcIds = vi.fn(() => ['citizen_1'])
+
+    await switcher.switchScene('house_a')
+
+    expect(deps.npcManager.moveNpcsToScene).toHaveBeenCalledWith(
+      ['user', 'citizen_1'],
+      deps.museumScene,
+    )
+    expect(deps.npcManager.moveNpcsToScene).not.toHaveBeenCalledWith(
+      expect.arrayContaining(['steward']),
+      expect.anything(),
+    )
+    expect(deps.onStopDailyBehaviors).not.toHaveBeenCalled()
+  })
+
+  it('restores an indoor resident to the same town position and visibility on exit', async () => {
+    const user = {
+      mesh: { position: { x: 10, y: 0, z: 10, set: vi.fn() }, visible: true },
+      playAnim: vi.fn(), stopMoving: vi.fn(), setVisible: vi.fn(),
+    }
+    const resident = {
+      mesh: { position: { x: 6, y: 0, z: 7.5, set: vi.fn() }, visible: false },
+      playAnim: vi.fn(), stopMoving: vi.fn(), setVisible: vi.fn(),
+    }
+    deps.npcManager.get = vi.fn(
+      (id: string) => id === 'user' ? user : id === 'citizen_1' ? resident : undefined,
+    ) as any
+    deps.getIndoorNpcIds = vi.fn(() => ['citizen_1'])
+
+    await switcher.switchScene('house_a')
+    await switcher.switchScene('town')
+
+    expect(resident.mesh.position.set).toHaveBeenLastCalledWith(6, 0, 7.5)
+    expect(resident.setVisible).toHaveBeenLastCalledWith(false)
+  })
 })

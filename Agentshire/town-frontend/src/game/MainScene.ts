@@ -1244,18 +1244,12 @@ __workflow 演出测试指令:
 
   private getIndoorNpcIdsForLastEntrance(): string[] {
     const doorKey = this.getDoorKeyForBuildingId(this.lastTownEntranceBuildingId)
-    const wp = WAYPOINTS[doorKey]
-    const doorPos = wp ? new THREE.Vector3(wp.x, 0, wp.z) : null
     const ids: string[] = []
 
     for (const npc of this.npcManager.getAll()) {
       if (npc.id === 'user' || npc.id === 'steward') continue
-      const recent = this.dailyScheduler.getActivityJournals().get(npc.id)?.getRecentActivities(3) ?? []
-      const loggedHere = recent.some(entry =>
-        entry.location === doorKey && (entry.action === 'arrived' || entry.action === 'staying' || entry.action === 'chatted')
-      )
-      const nearDoor = doorPos ? npc.getPosition().distanceTo(doorPos) < 4.2 : false
-      if (loggedHere || nearDoor) ids.push(npc.id)
+      const behavior = this.dailyScheduler.getDailyBehaviors().get(npc.id)
+      if (behavior?.getCurrentBuilding() === doorKey) ids.push(npc.id)
     }
 
     return ids
@@ -2152,7 +2146,7 @@ __workflow 演出测试指令:
   }
 
   private resolveTownSpeechTarget(): string {
-    if (this.sceneSwitcher?.getSceneType() !== 'town') return this.dialogTarget
+    const sceneType = this.sceneSwitcher?.getSceneType()
     const user = this.npcManager.get('user')
     if (!user || !user.mesh.visible) return this.dialogTarget
     const selected = this.dialogTarget && this.dialogTarget !== 'steward'
@@ -2164,7 +2158,7 @@ __workflow 演出测试指令:
     const nearestCitizen = this.findNearestSpeechTarget(user, 6, false)
     if (nearestCitizen) return nearestCitizen.id
     const nearestAny = this.findNearestSpeechTarget(user, 2.2, true)
-    return nearestAny?.id ?? 'steward'
+    return nearestAny?.id ?? (sceneType === 'town' ? 'steward' : this.dialogTarget)
   }
 
   private findNearestSpeechTarget(user: NPC, maxDistance: number, includeSteward: boolean): NPC | null {

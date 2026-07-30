@@ -41,7 +41,7 @@ export class NPCManager {
     for (const npc of this.npcs.values()) {
       npc.isInActiveScene = !activeScene || npc.mesh.parent === activeScene
       npc.mesh.userData.isInActiveScene = npc.isInActiveScene
-      npc.update(dt)
+      if (npc.isInActiveScene) npc.update(dt)
       npc.updateLabel(camera, renderer)
     }
   }

@@ -213,6 +213,11 @@ export class DailyBehavior {
     return this.profile.homeBuilding
   }
 
+  getCurrentBuilding(): string | null {
+    if (this.state === 'sleeping') return this.profile.homeBuilding
+    return this.currentBuilding
+  }
+
   goHomeNow(detail = 'Về nhà theo lời vừa nói'): void {
     this._inDialogue = false
     this._dialoguePausedState = null
