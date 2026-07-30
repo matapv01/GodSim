@@ -104,7 +104,8 @@ async function main() {
   let dataSource: IWorldDataSource
   const hasExplicitWs = params.has('ws')
   const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
-  const useMock = params.get('mock') === 'true' || (!hasExplicitWs && !isLocalHost)
+  const configuredWsUrl = import.meta.env.VITE_AGENTSHIRE_WS_URL?.trim()
+  const useMock = params.get('mock') === 'true' || (!hasExplicitWs && !configuredWsUrl && !isLocalHost)
 
   let bridgeModule: any = null
   let townWs: WebSocket | null = null
@@ -120,7 +121,7 @@ async function main() {
   if (!useMock) {
     // @ts-ignore -- resolved by Vite alias at runtime
     bridgeModule = await import('agentshire_bridge')
-    const wsUrl = params.get('ws') || 'ws://localhost:55211'
+    const wsUrl = params.get('ws') || configuredWsUrl || 'ws://localhost:55211'
 
     const { DirectorBridge } = bridgeModule
     const director = new DirectorBridge()

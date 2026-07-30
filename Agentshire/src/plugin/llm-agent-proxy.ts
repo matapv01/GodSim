@@ -5,8 +5,6 @@
  * and makes direct HTTP calls. Falls back to process.env for QClaw compatibility.
  */
 
-import { getTownRuntime } from "./runtime.js";
-
 export interface LLMChatRequest {
   system: string;
   user: string;
@@ -64,11 +62,12 @@ function loadProviderFromEnv(): ProviderConfig | null {
   };
 }
 
-function loadProvider(): ProviderConfig | null {
+async function loadProvider(): Promise<ProviderConfig | null> {
   const envProvider = loadProviderFromEnv();
   if (envProvider) return envProvider;
 
   try {
+    const { getTownRuntime } = await import("./runtime.js");
     const rt = getTownRuntime();
     const cfg = rt.config.loadConfig() as any;
     const env: Record<string, string> = cfg?.env ?? {};
@@ -228,7 +227,7 @@ function drainQueue(): void {
 async function executeChat(req: LLMChatRequest): Promise<LLMChatResult> {
   activeRequests++;
   try {
-    const config = loadProvider();
+    const config = await loadProvider();
     if (!config) {
       const msg = "No LLM provider configured. Set AGENTSHIRE_LLM_BASE_URL and AGENTSHIRE_LLM_API_KEY.";
       console.warn(`[llm-agent-proxy] ${msg}`);

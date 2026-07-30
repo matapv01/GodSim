@@ -4,7 +4,6 @@
  * to the citizen's own session via SessionKey = "agent:{agentId}:{townSessionId}".
  */
 
-import { getTownRuntime } from "./runtime.js";
 import { pushCitizenChatDelta, pushCitizenMessages } from "./ws-server.js";
 import { sanitizeTownSessionId } from "./town-session.js";
 import { readFileSync, existsSync } from "node:fs";
@@ -165,13 +164,21 @@ export async function routeCitizenMessage(params: {
   const { npcId, label, message, townSessionId, accountId, cfg, mediaPaths } = params;
 
   const agentId = findCitizenAgentId(npcId);
-  if (!agentId) {
+  if (!agentId || process.env.AGENTSHIRE_STANDALONE === "1") {
     console.log(`[citizen-chat] No active agent for ${label} (${npcId}), using shared Qwen fallback`);
     await routeFallbackCitizenMessage({ npcId, label, message, townSessionId });
     return;
   }
 
-  const rt = getTownRuntime();
+  let rt: any;
+  try {
+    const mod = await import("./runtime.js");
+    rt = mod.getTownRuntime();
+  } catch {
+    console.log(`[citizen-chat] Runtime unavailable for ${label} (${npcId}), using shared Qwen fallback`);
+    await routeFallbackCitizenMessage({ npcId, label, message, townSessionId });
+    return;
+  }
   const sanitizedSession = sanitizeTownSessionId(townSessionId);
   const sessionKey = `agent:${agentId}:${sanitizedSession}`;
 

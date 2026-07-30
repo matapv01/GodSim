@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
+import type { Server as HttpServer } from "node:http";
 import type { AgentEvent } from "../contracts/events.js";
 import { sanitizeTownSessionId } from "./town-session.js";
 import { getActivityLogForAgent, type ActivityLogEntry } from "./subagent-tracker.js";
@@ -13,6 +14,8 @@ import { stateDir } from "./paths.js";
 
 export interface TownWsServerOptions {
   port: number;
+  server?: HttpServer;
+  path?: string;
   customAssetManager?: CustomAssetManager;
   onAction?: (payload: {
     action: Record<string, unknown>;
@@ -351,8 +354,14 @@ export function startTownWsServer(opts: TownWsServerOptions): void {
   if (wss) return;
   customAssetMgr = opts.customAssetManager;
 
-  wss = new WebSocketServer({ port: opts.port });
-  console.log(`[agentshire] WebSocket server listening on ws://localhost:${opts.port}`);
+  wss = opts.server
+    ? new WebSocketServer({ server: opts.server, path: opts.path ?? "/ws" })
+    : new WebSocketServer({ port: opts.port });
+  console.log(
+    opts.server
+      ? `[agentshire] WebSocket server attached at ${opts.path ?? "/ws"}`
+      : `[agentshire] WebSocket server listening on ws://localhost:${opts.port}`,
+  );
 
   wss.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {

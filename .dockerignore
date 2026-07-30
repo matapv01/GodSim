@@ -1,0 +1,17 @@
+.git
+.vercel
+.runtime
+.browser-profile
+.browsers
+.tools
+.agentshire-git-backup
+node_modules
+Agentshire/node_modules
+Agentshire/town-frontend/node_modules
+LLM_Env.ps1
+.env
+.env.*
+*.log
+*.lnk
+Agentshire/town-frontend/dist
+Agentshire/town-frontend/**/*.map

@@ -38,13 +38,13 @@ export function ChatView({ visible, selectedAgent, onAgentChange, onConnectedCha
   const lastAgentSyncRef = useRef('')
 
   const wsUrl = useMemo(() => {
-    return new URLSearchParams(window.location.search).get('ws') || 'ws://localhost:55211'
+    return new URLSearchParams(window.location.search).get('ws') || import.meta.env.VITE_AGENTSHIRE_WS_URL?.trim() || 'ws://localhost:55211'
   }, [])
 
   const isLive = useMemo(() => {
     const params = new URLSearchParams(window.location.search)
     const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
-    return params.get('mock') !== 'true' && (params.has('ws') || isLocalHost)
+    return params.get('mock') !== 'true' && (params.has('ws') || !!import.meta.env.VITE_AGENTSHIRE_WS_URL?.trim() || isLocalHost)
   }, [])
 
   const townSessionId = useMemo(() => {

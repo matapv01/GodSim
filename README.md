@@ -69,6 +69,29 @@ Nếu repo có Chromium local tại `.browsers`, game sẽ dùng bản đó. N�
 
 Gateway tự nạp `LLM_Env.ps1` khi chạy `Start_Game.bat`. File chứa key thật không được đưa lên Git. Trên máy mới, sao chép `LLM_Env.example.ps1` thành `LLM_Env.ps1`, sau đó điền endpoint, model và key của máy đó.
 
+## Deploy Public Đầy Đủ
+
+Frontend chạy trên Vercel. Backend/gateway đầy đủ chạy tốt nhất bằng Docker trên Hugging Face Spaces hoặc server riêng.
+
+Biến cần đặt cho backend HF Space, đặt trong Secrets/Variables của Space, không commit vào Git:
+
+```text
+AGENTSHIRE_LLM_BASE_URL
+AGENTSHIRE_LLM_API_KEY
+AGENTSHIRE_LLM_MODEL
+AGENTSHIRE_LLM_API_FORMAT=openai
+AGENTSHIRE_LLM_BODY_MODE=minimal
+AGENTSHIRE_LLM_THINKING=false
+```
+
+Sau khi backend HF có URL, đặt biến build cho Vercel:
+
+```text
+VITE_AGENTSHIRE_WS_URL=wss://<ten-space>.hf.space/ws
+```
+
+Nếu Vercel chưa có `VITE_AGENTSHIRE_WS_URL`, bản public sẽ tự chạy demo/mock để người xem vẫn mở được game.
+
 ```text
 http://your-llm-host:8080/v1/chat/completions
 Qwen/Qwen3-32B-AWQ
