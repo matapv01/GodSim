@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { AssetLoader } from '../visual/AssetLoader'
+import type { CollisionObstacle } from '../physics/CollisionWorld'
 
 interface WindowDef {
   pos: [number, number, number]
@@ -152,6 +153,7 @@ export class TownBuilder {
   private doorMarkers: Map<string, THREE.Mesh> = new Map()
   private townGroup = new THREE.Group()
   private lightingRefs: TownLightingRefs | null = null
+  private collisionObstacles: CollisionObstacle[] = []
 
   constructor(scene: THREE.Scene) {
     this.scene = scene
@@ -162,6 +164,7 @@ export class TownBuilder {
   }
 
   build(assets: AssetLoader): void {
+    this.collisionObstacles = []
     this.townGroup.name = 'town'
     this.scene.add(this.townGroup)
 
@@ -187,6 +190,10 @@ export class TownBuilder {
     return this.doorMarkers
   }
 
+  getCollisionObstacles(): CollisionObstacle[] {
+    return [...this.collisionObstacles]
+  }
+
   clear(): void {
     this.townGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
@@ -208,6 +215,7 @@ export class TownBuilder {
     this.scene.remove(this.townGroup)
     this.townGroup = new THREE.Group()
     this.doorMarkers.clear()
+    this.collisionObstacles = []
   }
 
   /* ───── Helpers ───── */
@@ -387,6 +395,15 @@ export class TownBuilder {
 
     for (const def of BUILDINGS) {
       const [bx, , bz] = def.pos
+      const [width, , depth] = def.size
+      this.collisionObstacles.push({
+        type: 'box',
+        id: `building_${def.id}`,
+        minX: bx - width / 2,
+        maxX: bx + width / 2,
+        minZ: bz - depth / 2,
+        maxZ: bz + depth / 2,
+      })
 
       const model = assets.getBuildingModel(def.modelKey)
       if (model) {
@@ -571,6 +588,13 @@ export class TownBuilder {
 
     for (const def of lightDefs) {
       const rotY = def.rotY
+      this.collisionObstacles.push({
+        type: 'circle',
+        id: `streetlight_${def.x}_${def.z}`,
+        x: def.x,
+        z: def.z,
+        radius: 0.16,
+      })
 
       const model = assets.getPropModel('streetlight')
       if (model) {
@@ -620,6 +644,13 @@ export class TownBuilder {
     const smallCrownGeo = new THREE.SphereGeometry(0.5, 6, 5)
 
     for (const [x, z, small] of treePositions) {
+      this.collisionObstacles.push({
+        type: 'circle',
+        id: `tree_${x}_${z}`,
+        x,
+        z,
+        radius: small ? 0.48 : 0.68,
+      })
       const model = assets.getPropModel('bush')
       if (model) {
         this.placeModel(model, x, 0, z, small ? 5.0 : 7.0)
@@ -656,6 +687,14 @@ export class TownBuilder {
     const backGeo = new THREE.BoxGeometry(1.2, 0.5, 0.06)
 
     for (const [x, , z] of [...plazaBenches, ...parkBenches]) {
+      this.collisionObstacles.push({
+        type: 'box',
+        id: `bench_${x}_${z}`,
+        minX: x - 0.65,
+        maxX: x + 0.65,
+        minZ: z - 0.25,
+        maxZ: z + 0.25,
+      })
       const model = assets.getPropModel('bench')
       if (model) {
         this.placeModel(model, x, 0, z, 6.0)
@@ -685,6 +724,13 @@ export class TownBuilder {
 
   private buildFountain(assets: AssetLoader): void {
     const stoneMat = new THREE.MeshLambertMaterial({ color: 0xbbbbbb })
+    this.collisionObstacles.push({
+      type: 'circle',
+      id: 'plaza_fountain',
+      x: 25.6,
+      z: 19.25,
+      radius: 1.6,
+    })
 
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.6, 0.3, 12), stoneMat)
     base.position.set(25.6, 0.15, 19.25)
@@ -767,6 +813,13 @@ export class TownBuilder {
     for (const [x, z] of positions) {
       const model = assets.getPropModel('firehydrant')
       if (model) {
+        this.collisionObstacles.push({
+          type: 'circle',
+          id: `firehydrant_${x}_${z}`,
+          x,
+          z,
+          radius: 0.2,
+        })
         this.placeModel(model, x, 0, z, 3.5)
       }
     }

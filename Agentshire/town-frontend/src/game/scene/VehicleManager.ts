@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { AssetLoader } from '../visual/AssetLoader'
 import { GameClock } from '../GameClock'
+import { t } from '../../i18n'
 
 const CAR_MODELS = ['car_sedan', 'car_hatchback', 'car_taxi'] as const
 
@@ -19,11 +20,33 @@ interface VehicleRoute {
   points: RoadPoint[]
 }
 
+export interface VehiclePedestrian {
+  id: string
+  x: number
+  z: number
+}
+
+export interface VehicleIncident {
+  vehicle: THREE.Object3D
+  vehicleId: string
+  victimNpcId: string
+  driverName: string
+  ownerName: string
+  position: RoadPoint
+  speed: number
+}
+
 interface VehicleCallbacks {
   canBoard?: (npcId: string, position: RoadPoint) => boolean
   onBoard?: (npcId: string) => void
   onLeave?: (npcId: string, position: RoadPoint) => void
+  getPedestrians?: () => VehiclePedestrian[]
+  onPedestrianHit?: (incident: VehicleIncident) => boolean
 }
+
+export const TRAFFIC_INCIDENT_DURATION_MS = 18_000
+const VEHICLE_HIT_RADIUS = 1.05
+const VICTIM_HIT_COOLDOWN_MS = 60_000
 
 const VEHICLE_ROUTES: VehicleRoute[] = [
   {
@@ -111,9 +134,12 @@ function getSpawnInterval(hour: number): number {
 }
 
 interface PooledVehicle {
+  id: string
   wrapper: THREE.Group
   active: boolean
-  phase: 'driving' | 'visiting' | 'returning' | 'parked'
+  phase: 'driving' | 'visiting' | 'returning' | 'incident' | 'parked'
+  incidentResumePhase: 'driving' | 'returning'
+  incidentTimer: number
   occupantNpcId?: string
   distance: number
   duration: number
@@ -138,6 +164,7 @@ export class VehicleManager {
   private spawnTimer = 4
   private yOffsets: number[] = [] // per-template Y offset to fix wheel sinking
   private ridingNpcIds = new Set<string>()
+  private victimHitAt = new Map<string, number>()
 
   private static readonly POOL_SIZE = PRIVATE_ROUTE_COUNT
 
@@ -246,9 +273,12 @@ export class VehicleManager {
       wrapper.add(label)
 
       this.pool.push({
+        id: `vehicle_${i}`,
         wrapper,
         active: false,
         phase: 'parked',
+        incidentResumePhase: 'driving',
+        incidentTimer: 0,
         occupantNpcId: undefined,
         distance: 0,
         duration: 0,
@@ -290,6 +320,8 @@ export class VehicleManager {
     vehicle.duration = Math.max(12, vehicle.totalLength / (2.2 + Math.random() * 0.8))
     vehicle.parkTimer = 0
     vehicle.phase = 'driving'
+    vehicle.incidentResumePhase = 'driving'
+    vehicle.incidentTimer = 0
     vehicle.active = true
     this.boardOccupant(vehicle)
 
@@ -337,6 +369,7 @@ export class VehicleManager {
     vehicle.totalLength = 0
     vehicle.distance = 0
     vehicle.parkTimer = 0
+    vehicle.incidentTimer = 0
   }
 
   private boardOccupant(vehicle: PooledVehicle): void {
@@ -377,6 +410,21 @@ export class VehicleManager {
         continue
       }
 
+      if (v.phase === 'incident') {
+        v.incidentTimer -= delta
+        v.headlight.intensity = needLights ? 0.65 : 0
+        v.taillightMat.opacity = 1
+        if (v.incidentTimer > 0) continue
+        v.phase = v.incidentResumePhase
+        v.taillightMat.opacity = needLights ? 0.9 : 0
+        this.setVehicleLabel(
+          v,
+          v.route,
+          Math.max(2, Math.round((v.totalLength - v.distance) / Math.max(0.1, v.totalLength / v.duration) / 2)),
+          v.phase === 'returning' ? 'returning' : 'driving',
+        )
+      }
+
       if (v.phase === 'visiting') {
         v.parkTimer -= delta
         v.headlight.intensity = 0
@@ -415,6 +463,7 @@ export class VehicleManager {
         continue
       }
 
+      const previous = { x: v.wrapper.position.x, z: v.wrapper.position.z }
       const pose = this.sampleRoute(v.routePoints, v.segmentLengths, v.distance)
       const bump = Math.sin(time * 12 + v.distance) * 0.015
       v.wrapper.position.x = pose.x
@@ -424,7 +473,44 @@ export class VehicleManager {
 
       v.headlight.intensity = needLights ? 1.5 : 0
       v.taillightMat.opacity = needLights ? 0.9 : 0
+
+      const victim = this.findHitPedestrian(v, previous, pose)
+      if (victim && this.callbacks.onPedestrianHit?.({
+        vehicle: v.wrapper,
+        vehicleId: v.id,
+        victimNpcId: victim.id,
+        driverName: v.route.driver,
+        ownerName: v.route.owner,
+        position: { x: pose.x, z: pose.z },
+        speed: v.totalLength / Math.max(0.1, v.duration),
+      }) !== false) {
+        this.victimHitAt.set(victim.id, Date.now())
+        v.incidentResumePhase = v.phase === 'returning' ? 'returning' : 'driving'
+        v.phase = 'incident'
+        v.incidentTimer = TRAFFIC_INCIDENT_DURATION_MS / 1000
+        v.taillightMat.opacity = 1
+        this.setVehicleLabel(v, v.route, Math.ceil(v.incidentTimer / 2), 'incident')
+      }
     }
+  }
+
+  private findHitPedestrian(
+    vehicle: PooledVehicle,
+    from: RoadPoint,
+    to: RoadPoint,
+  ): VehiclePedestrian | null {
+    const now = Date.now()
+    let best: VehiclePedestrian | null = null
+    let bestDistanceSq = VEHICLE_HIT_RADIUS * VEHICLE_HIT_RADIUS
+    for (const pedestrian of this.callbacks.getPedestrians?.() ?? []) {
+      if (pedestrian.id === vehicle.occupantNpcId) continue
+      if (now - (this.victimHitAt.get(pedestrian.id) ?? 0) < VICTIM_HIT_COOLDOWN_MS) continue
+      const distanceSq = distancePointToSegmentSquared(pedestrian, from, to)
+      if (distanceSq >= bestDistanceSq) continue
+      best = pedestrian
+      bestDistanceSq = distanceSq
+    }
+    return best
   }
 
   private applyLaneOffset(points: RoadPoint[]): RoadPoint[] {
@@ -477,7 +563,12 @@ export class VehicleManager {
     }
   }
 
-  private setVehicleLabel(vehicle: PooledVehicle, route: VehicleRoute, minutes: number, state: 'driving' | 'returning' | 'parking' = 'driving'): void {
+  private setVehicleLabel(
+    vehicle: PooledVehicle,
+    route: VehicleRoute,
+    minutes: number,
+    state: 'driving' | 'returning' | 'parking' | 'incident' = 'driving',
+  ): void {
     if (vehicle.labelTexture) {
       vehicle.labelTexture.dispose()
       vehicle.labelTexture = null
@@ -506,12 +597,18 @@ export class VehicleManager {
     ctx.fillRect(18, 22, 476, 94)
     ctx.fillStyle = '#fff7dc'
     ctx.font = '700 28px "Segoe UI", Arial, sans-serif'
-    const title = state === 'parking' ? `Xe nha ${route.owner} dang do` : `Xe nha ${route.owner}`
+    const title = state === 'incident'
+      ? t('traffic_incident.vehicle_title', { owner: route.owner })
+      : state === 'parking'
+        ? `Xe nha ${route.owner} dang do`
+        : `Xe nha ${route.owner}`
     ctx.fillText(title, 256, 54)
     ctx.fillStyle = 'rgba(255,255,255,0.76)'
     ctx.font = '600 22px "Segoe UI", Arial, sans-serif'
     const detail = state === 'returning'
       ? `Dang quay ve nha cat xe - ~${minutes} phut`
+      : state === 'incident'
+        ? t('traffic_incident.vehicle_detail')
       : state === 'parking'
         ? `Dang do tai diem den - lat nua quay ve`
         : `Dang tren duong den diem hen - ~${minutes} phut`
@@ -536,7 +633,33 @@ export class VehicleManager {
     this.templates = []
     this.yOffsets = []
     this.ridingNpcIds.clear()
+    this.victimHitAt.clear()
     this.group.clear()
     this.scene.remove(this.group)
   }
+}
+
+export function distancePointToSegmentSquared(
+  point: RoadPoint,
+  start: RoadPoint,
+  end: RoadPoint,
+): number {
+  const dx = end.x - start.x
+  const dz = end.z - start.z
+  const lengthSq = dx * dx + dz * dz
+  if (lengthSq <= 1e-10) {
+    const px = point.x - start.x
+    const pz = point.z - start.z
+    return px * px + pz * pz
+  }
+  const t = THREE.MathUtils.clamp(
+    ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSq,
+    0,
+    1,
+  )
+  const closestX = start.x + dx * t
+  const closestZ = start.z + dz * t
+  const px = point.x - closestX
+  const pz = point.z - closestZ
+  return px * px + pz * pz
 }

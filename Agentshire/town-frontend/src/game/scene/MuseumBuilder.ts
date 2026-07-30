@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { AssetLoader } from '../visual/AssetLoader'
+import type { CollisionObstacle } from '../physics/CollisionWorld'
 
 export interface ExhibitStand {
   index: number
@@ -16,15 +17,21 @@ export class MuseumBuilder {
   private objects: THREE.Object3D[] = []
   public stands: ExhibitStand[] = []
   public doorPos = new THREE.Vector3(12, 0, 18)
+  private collisionObstacles: CollisionObstacle[] = []
 
   constructor(scene: THREE.Scene) { this.scene = scene }
 
   build(assets: AssetLoader): void {
+    this.collisionObstacles = []
     this.buildFloor()
     this.buildWalls()
     this.buildStands()
     this.addLighting()
     this.addFurniture(assets)
+  }
+
+  getCollisionObstacles(): CollisionObstacle[] {
+    return [...this.collisionObstacles]
   }
 
   private add(obj: THREE.Object3D): void {
@@ -86,6 +93,11 @@ export class MuseumBuilder {
 
     this.box(t, h, 18, c, 0, h / 2, 9)
     this.box(t, h, 18, c, 24, h / 2, 9)
+    this.addBoxObstacle('museum_wall_north', 12, 0, 24, t)
+    this.addBoxObstacle('museum_wall_south_left', 5.25, 18, 10.5, t)
+    this.addBoxObstacle('museum_wall_south_right', 18.75, 18, 10.5, t)
+    this.addBoxObstacle('museum_wall_west', 0, 9, t, 18)
+    this.addBoxObstacle('museum_wall_east', 24, 9, t, 18)
 
     const trim = 0xf5f5f5
     this.box(24, 0.15, 0.05, trim, 12, 0.075, 0.15)
@@ -101,6 +113,7 @@ export class MuseumBuilder {
 
     for (let i = 0; i < positions.length; i++) {
       const [x, z] = positions[i]
+      this.addBoxObstacle(`museum_stand_${i}`, x, z, 1.6, 1.6)
 
       const pedestalMesh = this.box(1.5, 1, 1.5, 0xffffff, x, 0.5, z)
 
@@ -179,6 +192,11 @@ export class MuseumBuilder {
   }
 
   private addFurniture(assets: AssetLoader): void {
+    this.addBoxObstacle('museum_center_table', 12, 16, 3.2, 1.2)
+    this.addBoxObstacle('museum_armchair_west', 4, 9, 0.9, 0.9)
+    this.addBoxObstacle('museum_armchair_east', 20, 9, 0.9, 0.9)
+    this.addBoxObstacle('museum_shelf_west', 4, 1, 1.8, 0.75)
+    this.addBoxObstacle('museum_shelf_east', 20, 1, 1.8, 0.75)
     this.placeFurniture(assets, 'table_medium_long', 12, 0, 16, 0, 1.5)
 
     this.placeFurniture(assets, 'armchair', 4, 0, 9, Math.PI, 1)
@@ -220,5 +238,17 @@ export class MuseumBuilder {
     for (const obj of this.objects) this.scene.remove(obj)
     this.objects = []
     this.stands = []
+    this.collisionObstacles = []
+  }
+
+  private addBoxObstacle(id: string, x: number, z: number, width: number, depth: number): void {
+    this.collisionObstacles.push({
+      type: 'box',
+      id,
+      minX: x - width / 2,
+      maxX: x + width / 2,
+      minZ: z - depth / 2,
+      maxZ: z + depth / 2,
+    })
   }
 }

@@ -7,7 +7,12 @@ import { AssetLoader } from './visual/AssetLoader'
 import { TownBuilder } from './scene/TownBuilder'
 import { OfficeBuilder } from './scene/OfficeBuilder'
 import { MuseumBuilder } from './scene/MuseumBuilder'
-import { VehicleManager } from './scene/VehicleManager'
+import {
+  TRAFFIC_INCIDENT_DURATION_MS,
+  VehicleManager,
+  type VehicleIncident,
+  type VehiclePedestrian,
+} from './scene/VehicleManager'
 import { CameraController } from './visual/CameraController'
 import { Effects } from './visual/Effects'
 import { VFXSystem } from './visual/VFXSystem'
@@ -50,6 +55,7 @@ import { installDebugBindings, removeDebugBindings } from './DebugBindings'
 import { detectProfile } from '../engine/Performance'
 import type { MinigameSlot } from './minigame/MinigameSlot'
 import { BanweiGame } from './minigame/BanweiGame'
+import { CollisionWorld } from './physics/CollisionWorld'
 
 type SocialAppointment = {
   id: string
@@ -70,6 +76,15 @@ type SocialAppointment = {
   lastPromptMs?: number
 }
 
+type ActiveTrafficIncident = {
+  event: VehicleIncident
+  victim: NPC
+  audience: NPC[]
+  elapsedMs: number
+  nextBeat: number
+  baseVehicleRotationY: number
+}
+
 export class MainScene implements GameScene {
   private engine: Engine
   private ui: UIManager
@@ -82,6 +97,7 @@ export class MainScene implements GameScene {
   private effects!: Effects
   private vfx!: VFXSystem
   private npcManager!: NPCManager
+  private collisionWorld!: CollisionWorld
   private debugCharacterAssignments = new Map<string, string>()
 
   private townScene!: THREE.Scene
@@ -93,6 +109,7 @@ export class MainScene implements GameScene {
   private museumBuilder!: MuseumBuilder
   private vehicleManager!: VehicleManager
   private vehiclePassengerNpcIds = new Set<string>()
+  private trafficIncident: ActiveTrafficIncident | null = null
 
   private gameClock!: GameClock
   private timeOfDayLighting!: TimeOfDayLighting
@@ -239,6 +256,8 @@ export class MainScene implements GameScene {
       canBoard: (npcId, position) => this.canNpcBoardVehicle(npcId, position),
       onBoard: (npcId) => this.onNpcBoardVehicle(npcId),
       onLeave: (npcId, position) => this.onNpcLeaveVehicle(npcId, position),
+      getPedestrians: () => this.getVehiclePedestrians(),
+      onPedestrianHit: incident => this.startTrafficIncident(incident),
     })
     this.vehicleManager.build(this.assets)
 
@@ -326,6 +345,11 @@ export class MainScene implements GameScene {
 
     this.bubbles = new ChatBubbleSystem(this.ui.getGameContainer(), this.engine.camera, this.engine.renderer)
     this.npcManager = new NPCManager(this.townScene, this.ui.getGameContainer())
+    this.collisionWorld = new CollisionWorld()
+    this.collisionWorld.registerScene(this.townScene, this.townBuilder.getCollisionObstacles())
+    this.collisionWorld.registerScene(this.officeScene, this.officeBuilder.getCollisionObstacles())
+    this.collisionWorld.registerScene(this.museumScene, this.museumBuilder.getCollisionObstacles())
+    this.npcManager.setCollisionWorld(this.collisionWorld)
 
     this.initSubModules()
     this.initEncounterManager()
@@ -2097,9 +2121,15 @@ __workflow 演出测试指令:
 
     const len = Math.sqrt(dx * dx + dz * dz)
     const speed = 4.4
-    const next = this.clampPlayerPosition(
+    const clamped = this.clampPlayerPosition(
       user.mesh.position.x + (dx / len) * speed * deltaTime,
       user.mesh.position.z + (dz / len) * speed * deltaTime,
+    )
+    const next = this.collisionWorld.moveActor(
+      user,
+      user.mesh.position,
+      clamped,
+      { allowDetour: false },
     )
     user.mesh.position.x = next.x
     user.mesh.position.z = next.z
@@ -2114,6 +2144,193 @@ __workflow 演出测试指令:
   private getPlayerName(): string {
     const user = this.npcManager.get('user')
     return user?.label ?? user?.name ?? t('mayor')
+  }
+
+  private getVehiclePedestrians(): VehiclePedestrian[] {
+    if (!this.npcManager || this.trafficIncident) return []
+    return this.npcManager.getAll()
+      .filter(npc =>
+        npc.mesh.visible
+        && npc.isInActiveScene
+        && npc.mesh.parent === this.townScene
+        && !this.vehiclePassengerNpcIds.has(npc.id),
+      )
+      .map(npc => ({
+        id: npc.id,
+        x: npc.mesh.position.x,
+        z: npc.mesh.position.z,
+      }))
+  }
+
+  private startTrafficIncident(event: VehicleIncident): boolean {
+    if (this.trafficIncident || this.sceneSwitcher?.getSceneType() !== 'town') return false
+    const victim = this.npcManager.get(event.victimNpcId)
+    if (!victim || !victim.mesh.visible || this.vehiclePassengerNpcIds.has(victim.id)) return false
+
+    const victimBehavior = this.dailyScheduler.getDailyBehaviors().get(victim.id)
+    victimBehavior?.pauseForDialogue()
+    victim.stopMoving()
+
+    // Move the pedestrian just outside the car body so the argument is readable
+    // and the next collision frame cannot immediately retrigger the impact.
+    let dx = victim.mesh.position.x - event.position.x
+    let dz = victim.mesh.position.z - event.position.z
+    let len = Math.sqrt(dx * dx + dz * dz)
+    if (len < 0.05) {
+      dx = Math.cos(event.vehicle.rotation.y + Math.PI / 2)
+      dz = Math.sin(event.vehicle.rotation.y + Math.PI / 2)
+      len = 1
+    }
+    const displaced = this.clampPlayerPosition(
+      event.position.x + (dx / len) * 1.35,
+      event.position.z + (dz / len) * 1.35,
+    )
+    victim.mesh.position.x = displaced.x
+    victim.mesh.position.z = displaced.z
+    victim.smoothLookAt(event.position)
+    victim.playAnim('frustrated')
+
+    const audience = this.npcManager.getAll()
+      .filter(npc =>
+        npc.id !== victim.id
+        && npc.id !== 'user'
+        && npc.mesh.visible
+        && npc.isInActiveScene
+        && npc.mesh.parent === this.townScene
+        && !this.vehiclePassengerNpcIds.has(npc.id)
+        && this.dailyScheduler.getDailyBehaviors().has(npc.id),
+      )
+      .map(npc => ({
+        npc,
+        distance: Math.hypot(
+          npc.mesh.position.x - event.position.x,
+          npc.mesh.position.z - event.position.z,
+        ),
+      }))
+      .filter(item => item.distance <= 10)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 5)
+      .map(item => item.npc)
+
+    audience.forEach((npc, index) => {
+      this.dailyScheduler.getDailyBehaviors().get(npc.id)?.pauseForDialogue()
+      npc.stopMoving()
+      const angle = (index / Math.max(1, audience.length)) * Math.PI * 2
+        + (event.vehicleId.length % 5) * 0.18
+      const radius = 2.7 + (index % 2) * 0.4
+      npc.moveTo({
+        x: event.position.x + Math.cos(angle) * radius,
+        z: event.position.z + Math.sin(angle) * radius,
+      }, 3.4).then(status => {
+        if (status !== 'arrived' || this.trafficIncident?.event.vehicleId !== event.vehicleId) return
+        npc.smoothLookAt(event.position)
+        npc.playAnim(index % 2 === 0 ? 'wave' : 'frustrated')
+      })
+    })
+
+    this.trafficIncident = {
+      event,
+      victim,
+      audience,
+      elapsedMs: 0,
+      nextBeat: 1,
+      baseVehicleRotationY: event.vehicle.rotation.y,
+    }
+
+    const victimName = victim.label ?? victim.name
+    this.bubbles.show(
+      victim.mesh,
+      t('traffic_incident.victim_start', { driver: event.driverName }),
+      3200,
+    )
+    this.effects.exclamation(victim.mesh)
+    this.effects.errorSparks(new THREE.Vector3(event.position.x, 0, event.position.z))
+    this.ui.showToast(t('traffic_incident.toast', { victim: victimName }))
+    this.townJournal.record(
+      'encounter_start',
+      [victimName, event.driverName],
+      t('traffic_incident.location'),
+      t('traffic_incident.log_start', {
+        victim: victimName,
+        driver: event.driverName,
+      }),
+    )
+    this.recordNpcActivity(victim.id, 'chatted', t('traffic_incident.activity'))
+    return true
+  }
+
+  private updateTrafficIncident(deltaMs: number): void {
+    const incident = this.trafficIncident
+    if (!incident) return
+    incident.elapsedMs += deltaMs
+
+    const { event, victim, audience } = incident
+    const fighting = incident.elapsedMs >= 6_200 && incident.elapsedMs <= 14_500
+    event.vehicle.rotation.y = incident.baseVehicleRotationY
+      + (fighting ? Math.sin(incident.elapsedMs * 0.026) * 0.025 : 0)
+
+    const thresholds = [0, 2_200, 4_400, 6_400, 8_600, 10_800, 13_200, 15_500]
+    while (incident.nextBeat < thresholds.length && incident.elapsedMs >= thresholds[incident.nextBeat]) {
+      const beat = incident.nextBeat++
+      if (beat === 1) {
+        this.bubbles.show(
+          event.vehicle,
+          t('traffic_incident.driver_reply', { victim: victim.label ?? victim.name }),
+          3200,
+        )
+      } else if (beat === 2) {
+        victim.playAnim('frustrated')
+        this.bubbles.show(victim.mesh, t('traffic_incident.victim_escalate'), 3000)
+      } else if (beat === 3) {
+        victim.playAnim('dancing')
+        this.effects.errorSparks(new THREE.Vector3(event.position.x, 0.2, event.position.z))
+        this.bubbles.show(event.vehicle, t('traffic_incident.fight_start'), 3000)
+      } else if (beat === 4 && audience[0]) {
+        audience[0].playAnim('wave')
+        this.bubbles.show(audience[0].mesh, t('traffic_incident.crowd_gather'), 3000)
+      } else if (beat === 5) {
+        victim.playAnim('dancing')
+        this.effects.errorSparks(new THREE.Vector3(event.position.x, 0.4, event.position.z))
+        this.bubbles.show(victim.mesh, t('traffic_incident.victim_fight'), 2800)
+      } else if (beat === 6 && audience.length > 0) {
+        const mediator = audience[Math.min(1, audience.length - 1)]
+        mediator.playAnim('frustrated')
+        this.bubbles.show(mediator.mesh, t('traffic_incident.crowd_stop'), 3200)
+      } else if (beat === 7) {
+        this.bubbles.show(event.vehicle, t('traffic_incident.driver_end'), 2400)
+      }
+    }
+
+    if (incident.elapsedMs >= TRAFFIC_INCIDENT_DURATION_MS) {
+      this.finishTrafficIncident()
+    }
+  }
+
+  private finishTrafficIncident(): void {
+    const incident = this.trafficIncident
+    if (!incident) return
+    this.trafficIncident = null
+
+    const participants = [incident.victim, ...incident.audience]
+    for (const npc of participants) {
+      npc.stopMoving()
+      npc.transitionTo('idle')
+      const behavior = this.dailyScheduler.getDailyBehaviors().get(npc.id)
+      if (behavior) {
+        behavior.walkAwayFrom(incident.event.position, t('traffic_incident.disperse'))
+      }
+    }
+
+    const victimName = incident.victim.label ?? incident.victim.name
+    this.townJournal.record(
+      'encounter_end',
+      [victimName, incident.event.driverName, ...incident.audience.map(npc => npc.label ?? npc.name)],
+      t('traffic_incident.location'),
+      t('traffic_incident.log_end', {
+        victim: victimName,
+        count: String(incident.audience.length),
+      }),
+    )
   }
 
   private canNpcBoardVehicle(npcId: string, position: { x: number; z: number }): boolean {
@@ -2880,6 +3097,7 @@ __workflow 演出测试指令:
       this.timeOfDayLighting?.update(this.gameClock)
       this.weatherSystem?.update(deltaTime, this.gameClock)
       this.vehicleManager?.update(this.gameClock, deltaTime)
+      this.updateTrafficIncident(deltaTime * 1000)
     } else if (curScene === 'office') {
       this.cameraCtrl.updateOfficePan(deltaTime)
     } else {
@@ -2927,12 +3145,14 @@ __workflow 演出测试指令:
         b.update(deltaTime, allNpcs)
       }
       this.updateSocialAppointments()
-      this.encounterManager?.update(deltaTime * 1000, allNpcs)
-      this.casualEncounter?.update(
-        deltaTime * 1000, allNpcs,
-        this.weatherSystem?.getDisplayWeather(),
-        this.gameClock?.getPeriod(),
-      )
+      if (!this.trafficIncident) {
+        this.encounterManager?.update(deltaTime * 1000, allNpcs)
+        this.casualEncounter?.update(
+          deltaTime * 1000, allNpcs,
+          this.weatherSystem?.getDisplayWeather(),
+          this.gameClock?.getPeriod(),
+        )
+      }
     }
     this.vfx?.update(deltaTime)
     this.bubbles?.update()

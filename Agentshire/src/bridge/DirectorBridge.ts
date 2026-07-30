@@ -235,7 +235,7 @@ export class DirectorBridge {
           const totalCount = this.agents.size
           this.emit([
             { type: 'mode_change', mode: 'work', workSubState: 'working' },
-            { type: 'progress', current: doneCount, total: totalCount, label: `${doneCount}/${totalCount} 完成` },
+            { type: 'progress', current: doneCount, total: totalCount, label: `${doneCount}/${totalCount} hoàn thành` },
           ])
         } else if (completedPhase === 'publishing' && this.phase === 'publishing') {
           this.phase = 'returning'
@@ -669,7 +669,7 @@ export class DirectorBridge {
       }
 
       if (!citizenNpcId && this.citizens.looksLikeIdFragment(displayName)) {
-        displayName = `临时工 ${this.agents.size + 1}`
+        displayName = `Cư dân tạm ${this.agents.size + 1}`
       }
 
       const PROTECTED_IDS = new Set(['steward', 'user'])
@@ -682,7 +682,7 @@ export class DirectorBridge {
       if (isTempWorker) {
         this.tempWorkerNpcIds.add(npcId)
         if (!displayName || this.citizens.looksLikeIdFragment(rawName)) {
-          displayName = `临时工 ${this.tempWorkerNpcIds.size}`
+          displayName = `Cư dân tạm ${this.tempWorkerNpcIds.size}`
         }
       }
 
@@ -697,7 +697,7 @@ export class DirectorBridge {
           { type: 'npc_phase', npcId: this.stewardName, phase: 'idle' },
           { type: 'npc_emoji', npcId: this.stewardName, emoji: null },
           { type: 'mode_change', mode: 'work', workSubState: 'summoning' },
-          { type: 'dialog_message', npcId: this.stewardName, text: '好，我来召唤团队！', isStreaming: false },
+          { type: 'dialog_message', npcId: this.stewardName, text: 'Được, tôi sẽ gọi mọi người tới!', isStreaming: false },
         ])
         const RIPPLE_COUNT = 5
         const RIPPLE_INTERVAL = 350
@@ -718,7 +718,7 @@ export class DirectorBridge {
         const doneCount = [...this.agents.values()].filter(a => a.status === 'completed' || a.status === 'failed').length
         const totalCount = this.agents.size
         this.emit([
-          { type: 'progress', current: doneCount, total: totalCount, label: `${doneCount}/${totalCount} 完成` },
+          { type: 'progress', current: doneCount, total: totalCount, label: `${doneCount}/${totalCount} hoàn thành` },
         ])
         return
       }
@@ -821,7 +821,7 @@ export class DirectorBridge {
             break
           case 'error': {
             this.activity.flushThinking(npcId)
-            this.activity.emitActivity(npcId, 'alert-circle', '出错')
+            this.activity.emitActivity(npcId, 'alert-circle', 'Có lỗi')
             q.flush()
             const errStation = this.tracker.getAllNpcStates().find(s => s.npcId === npcId)?.stationId
             this.emit([
@@ -861,7 +861,7 @@ export class DirectorBridge {
       const doneCount = [...this.agents.values()].filter(a => a.status === 'completed' || a.status === 'failed').length
       const totalCount = this.agents.size
       this.emit([
-        { type: 'progress', current: doneCount, total: totalCount, label: `${doneCount}/${totalCount} 完成` },
+        { type: 'progress', current: doneCount, total: totalCount, label: `${doneCount}/${totalCount} hoàn thành` },
       ])
 
       if (this.allAgentsDone()) {
@@ -1005,7 +1005,7 @@ export class DirectorBridge {
     const agents = this.agentOrder.map(id => this.agents.get(id)!).filter(Boolean)
     this.emit([{
       type: 'workflow_publish',
-      summary: summary || '任务完成了！',
+      summary: summary || 'Nhiệm vụ đã hoàn thành!',
       deliverableCards: deliverableCards as unknown[],
       agents: agents.map(a => ({ npcId: a.npcId, displayName: a.displayName, status: a.status })),
     } as GameEvent])

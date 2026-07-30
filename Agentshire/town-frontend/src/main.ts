@@ -307,7 +307,7 @@ async function main() {
           system: req.system,
           user: req.user,
           maxTokens: req.maxTokens ?? 200,
-          temperature: 0.85,
+          temperature: 0.62,
           stop: ['\n\n', ...(req.extraStop ?? [])],
         }))
       })

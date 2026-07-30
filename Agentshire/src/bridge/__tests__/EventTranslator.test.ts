@@ -21,7 +21,7 @@ describe('EventTranslator', () => {
       expect(result).toHaveLength(1)
       expect(result[0]).toMatchObject({
         type: 'world_init',
-        config: { townName: '夏尔', stewardName: 'OpenClaw', citizenCount: 5 },
+        config: { townName: 'Agentshire', stewardName: 'OpenClaw', citizenCount: 5 },
       })
     })
   })

@@ -229,7 +229,7 @@ export class ActivityJournal {
   getRelationshipsForPrompt(): Record<string, string> {
     const result: Record<string, string> = {}
     for (const rel of this.relationships.values()) {
-      const sentiment = rel.sentiment > 0.3 ? '，关系不错' : rel.sentiment < -0.3 ? '，关系一般' : ''
+      const sentiment = rel.sentiment > 0.3 ? ', quan hệ khá tốt' : rel.sentiment < -0.3 ? ', quan hệ hơi xa cách' : ''
       result[rel.name] = `${rel.label}${sentiment}`
     }
     return result
@@ -254,7 +254,7 @@ export class ActivityJournal {
 
   getYesterdaySummary(currentDayCount: number): string {
     const yesterday = this.reflections.find(r => r.dayCount === currentDayCount - 1)
-    return yesterday?.text ?? '没什么特别的'
+    return yesterday?.text ?? 'Không có gì đặc biệt.'
   }
 
   // ── Daily Plan ──
@@ -346,7 +346,7 @@ export class ActivityJournal {
     const nearby = options.nearbyNpcs?.map(n => ({
       name: n.name,
       distance: n.distance,
-      relationship: this.relationships.get(n.npcId)?.label ?? '不认识',
+      relationship: this.relationships.get(n.npcId)?.label ?? 'chưa quen',
     }))
 
     return {
