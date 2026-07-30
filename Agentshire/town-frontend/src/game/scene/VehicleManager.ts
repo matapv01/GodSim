@@ -13,8 +13,10 @@ interface VehicleRoute {
   ownerNpcId: string
   owner: string
   appearance: string
+  modelKey: typeof CAR_MODELS[number]
   homeParking: RoadPoint
   travelHours: [number, number]
+  automatic: boolean
   from: string
   to: string
   purpose: string
@@ -25,16 +27,33 @@ interface VehicleCallbacks {
   canBoard?: (npcId: string, position: RoadPoint) => boolean
   onBoard?: (npcId: string) => void
   onLeave?: (npcId: string, position: RoadPoint) => void
+  onMove?: (npcIds: string[], position: RoadPoint) => void
 }
 
 const VEHICLE_ROUTES: VehicleRoute[] = [
+  {
+    id: 'user_sedan',
+    ownerNpcId: 'user',
+    owner: 'Người chơi',
+    appearance: 'sedan riêng',
+    modelKey: 'car_sedan',
+    homeParking: { x: 6.15, z: 30.2 },
+    travelHours: [0, 24],
+    automatic: false,
+    from: 'Nhà người chơi',
+    to: 'Quảng trường',
+    purpose: 'đi lại trong thị trấn',
+    points: [{ x: 7.6, z: 30.5 }, { x: 16, z: 30.5 }, { x: 16, z: 26.75 }, { x: 24, z: 26.75 }],
+  },
   {
     id: 'minh_sedan',
     ownerNpcId: 'citizen_1',
     owner: 'Minh',
     appearance: 'sedan',
+    modelKey: 'car_sedan',
     homeParking: { x: 4.65, z: 8.25 },
     travelHours: [6, 9],
+    automatic: true,
     from: 'Nhà Minh',
     to: 'Công ty chính',
     purpose: 'đi làm',
@@ -45,8 +64,10 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     ownerNpcId: 'citizen_2',
     owner: 'Lan',
     appearance: 'hatchback nhỏ',
+    modelKey: 'car_hatchback',
     homeParking: { x: 4.65, z: 13.75 },
     travelHours: [8, 11],
+    automatic: true,
     from: 'Nhà Lan',
     to: 'Khu chợ',
     purpose: 'mua đồ',
@@ -57,8 +78,10 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     ownerNpcId: 'citizen_6',
     owner: 'Vy',
     appearance: 'xe đô thị',
+    modelKey: 'car_taxi',
     homeParking: { x: 12.65, z: 19.25 },
     travelHours: [16, 21],
+    automatic: true,
     from: 'Nhà Vy',
     to: 'Quán cà phê',
     purpose: 'gặp người quen',
@@ -100,8 +123,9 @@ function getSpawnInterval(hour: number): number {
 interface PooledVehicle {
   wrapper: THREE.Group
   active: boolean
-  phase: 'driving' | 'visiting' | 'returning' | 'parked'
+  phase: 'driving' | 'visiting' | 'returning' | 'parked' | 'manual'
   occupantNpcId?: string
+  guestNpcIds: Set<string>
   distance: number
   duration: number
   parkTimer: number
@@ -202,7 +226,7 @@ export class VehicleManager {
   private buildPool() {
     for (let i = 0; i < VehicleManager.POOL_SIZE; i++) {
       const homeRoute = VEHICLE_ROUTES[i]
-      const templateIdx = i % this.templates.length
+      const templateIdx = Math.max(0, CAR_MODELS.indexOf(homeRoute.modelKey))
       const wrapper = this.templates[templateIdx].clone()
       wrapper.name = `vehicle_${homeRoute.id}`
       wrapper.userData.vehicleId = homeRoute.id
@@ -243,6 +267,7 @@ export class VehicleManager {
         active: false,
         phase: 'parked',
         occupantNpcId: undefined,
+        guestNpcIds: new Set<string>(),
         distance: 0,
         duration: 0,
         parkTimer: 0,
@@ -265,6 +290,7 @@ export class VehicleManager {
     return this.pool.find(v =>
       !v.active
       && v.phase === 'parked'
+      && v.homeRoute.automatic
       && v.lastTripDay !== dayCount
       && hour >= v.homeRoute.travelHours[0]
       && hour < v.homeRoute.travelHours[1]
@@ -277,8 +303,13 @@ export class VehicleManager {
     const vehicle = this.getAvailableParkedVehicle(hour, dayCount)
     if (!vehicle) return
 
+    this.startAutomaticTrip(vehicle, isNight, dayCount)
+  }
+
+  private startAutomaticTrip(vehicle: PooledVehicle, isNight: boolean, dayCount: number): void {
     const route = vehicle.homeRoute
-    const routed = [this.getHomeParkingPoint(route), ...this.applyLaneOffset(route.points)]
+    const start = { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z }
+    const routed = [start, ...this.applyLaneOffset(route.points)]
     vehicle.route = route
     vehicle.routePoints = routed
     vehicle.segmentLengths = this.getSegmentLengths(routed)
@@ -302,6 +333,153 @@ export class VehicleManager {
 
     vehicle.headlight.intensity = isNight ? 1.5 : 0
     vehicle.taillightMat.opacity = isNight ? 0.9 : 0
+    this.syncOccupants(vehicle)
+  }
+
+  getNearbyParkedVehicle(position: RoadPoint, maxDistance = 3.2): {
+    id: string
+    ownerNpcId: string
+    ownerName: string
+    appearance: string
+    destination: string
+    isPlayerVehicle: boolean
+  } | null {
+    let nearest: PooledVehicle | null = null
+    let nearestDistance = maxDistance
+    for (const vehicle of this.pool) {
+      if (vehicle.phase !== 'parked' || vehicle.active) continue
+      const dx = vehicle.wrapper.position.x - position.x
+      const dz = vehicle.wrapper.position.z - position.z
+      const distance = Math.sqrt(dx * dx + dz * dz)
+      if (distance >= nearestDistance) continue
+      nearest = vehicle
+      nearestDistance = distance
+    }
+    if (!nearest) return null
+    return {
+      id: nearest.homeRoute.id,
+      ownerNpcId: nearest.homeRoute.ownerNpcId,
+      ownerName: nearest.homeRoute.owner,
+      appearance: nearest.homeRoute.appearance,
+      destination: nearest.homeRoute.to,
+      isPlayerVehicle: nearest.homeRoute.ownerNpcId === 'user',
+    }
+  }
+
+  getPlayerOwnedVehicleNear(position: RoadPoint, maxDistance = 6): { id: string; distance: number } | null {
+    const vehicle = this.pool.find(v => v.homeRoute.ownerNpcId === 'user' && v.phase === 'parked' && !v.active)
+    if (!vehicle) return null
+    const dx = vehicle.wrapper.position.x - position.x
+    const dz = vehicle.wrapper.position.z - position.z
+    const distance = Math.sqrt(dx * dx + dz * dz)
+    return distance <= maxDistance ? { id: vehicle.homeRoute.id, distance } : null
+  }
+
+  boardPlayer(vehicleId: string, isNight: boolean, dayCount: number): {
+    ok: boolean
+    ownerNpcId?: string
+    ownerName?: string
+    destination?: string
+  } {
+    const vehicle = this.pool.find(v => v.homeRoute.id === vehicleId)
+    if (!vehicle || vehicle.phase !== 'parked' || vehicle.active) return { ok: false }
+
+    if (vehicle.homeRoute.ownerNpcId === 'user') {
+      vehicle.active = true
+      vehicle.phase = 'manual'
+      this.boardNpc(vehicle, 'user', true)
+      this.setVehicleLabel(vehicle, vehicle.homeRoute, 0, 'manual')
+      return { ok: true, ownerNpcId: 'user', ownerName: vehicle.homeRoute.owner }
+    }
+
+    this.boardNpc(vehicle, 'user', false)
+    this.startAutomaticTrip(vehicle, isNight, dayCount)
+    return {
+      ok: true,
+      ownerNpcId: vehicle.homeRoute.ownerNpcId,
+      ownerName: vehicle.homeRoute.owner,
+      destination: vehicle.homeRoute.to,
+    }
+  }
+
+  addGuestToPlayerVehicle(npcId: string): boolean {
+    const vehicle = this.pool.find(v =>
+      v.homeRoute.ownerNpcId === 'user'
+      && v.phase === 'manual'
+      && v.occupantNpcId === 'user'
+    )
+    if (!vehicle || vehicle.guestNpcIds.has(npcId)) return false
+    this.boardNpc(vehicle, npcId, false)
+    return true
+  }
+
+  hasPlayerAboard(): boolean {
+    return this.pool.some(v => v.occupantNpcId === 'user' || v.guestNpcIds.has('user'))
+  }
+
+  isPlayerDriving(): boolean {
+    return this.pool.some(v => v.phase === 'manual' && v.occupantNpcId === 'user')
+  }
+
+  canPlayerExit(): boolean {
+    const vehicle = this.pool.find(v => v.occupantNpcId === 'user' || v.guestNpcIds.has('user'))
+    if (!vehicle) return false
+    return vehicle.occupantNpcId === 'user'
+      || (vehicle.phase !== 'driving' && vehicle.phase !== 'returning')
+  }
+
+  getPlayerVehicleObject(): THREE.Object3D | null {
+    return this.pool.find(v => v.occupantNpcId === 'user' || v.guestNpcIds.has('user'))?.wrapper ?? null
+  }
+
+  getPlayerVehicleInfo(): { id: string; position: RoadPoint; ownerNpcId: string } | null {
+    const vehicle = this.pool.find(v => v.occupantNpcId === 'user' || v.guestNpcIds.has('user'))
+    if (!vehicle) return null
+    return {
+      id: vehicle.homeRoute.id,
+      position: { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z },
+      ownerNpcId: vehicle.homeRoute.ownerNpcId,
+    }
+  }
+
+  movePlayerVehicle(dx: number, dz: number, delta: number, clamp: (x: number, z: number) => RoadPoint): boolean {
+    const vehicle = this.pool.find(v => v.phase === 'manual' && v.occupantNpcId === 'user')
+    if (!vehicle) return false
+    const len = Math.sqrt(dx * dx + dz * dz)
+    if (len <= 0.001) return true
+    const speed = 8.2
+    const next = clamp(
+      vehicle.wrapper.position.x + (dx / len) * speed * delta,
+      vehicle.wrapper.position.z + (dz / len) * speed * delta,
+    )
+    vehicle.wrapper.position.x = next.x
+    vehicle.wrapper.position.z = next.z
+    vehicle.wrapper.rotation.y = Math.atan2(dx / len, dz / len) - Math.PI / 2
+    this.syncOccupants(vehicle)
+    return true
+  }
+
+  exitPlayer(): RoadPoint | null {
+    const vehicle = this.pool.find(v => v.occupantNpcId === 'user' || v.guestNpcIds.has('user'))
+    if (!vehicle) return null
+    if (vehicle.guestNpcIds.has('user') && (vehicle.phase === 'driving' || vehicle.phase === 'returning')) {
+      return null
+    }
+    const exit = { x: vehicle.wrapper.position.x + 1.4, z: vehicle.wrapper.position.z + 0.8 }
+    if (vehicle.occupantNpcId === 'user') {
+      this.leaveOccupant(vehicle, exit)
+      for (const guestId of [...vehicle.guestNpcIds]) this.leaveGuest(vehicle, guestId, exit)
+      vehicle.active = false
+      vehicle.phase = 'parked'
+      vehicle.routePoints = []
+      vehicle.segmentLengths = []
+      vehicle.totalLength = 0
+      vehicle.distance = 0
+      this.setVehicleLabel(vehicle, vehicle.homeRoute, 0, 'parking')
+    } else {
+      this.leaveGuest(vehicle, 'user', exit)
+    }
+    return exit
   }
 
   private placeParkedAtHome(vehicle: PooledVehicle): void {
@@ -340,7 +518,13 @@ export class VehicleManager {
   private boardOccupant(vehicle: PooledVehicle): void {
     const npcId = vehicle.route?.ownerNpcId
     if (!npcId) return
-    vehicle.occupantNpcId = npcId
+    this.boardNpc(vehicle, npcId, true)
+  }
+
+  private boardNpc(vehicle: PooledVehicle, npcId: string, driver: boolean): void {
+    if (this.ridingNpcIds.has(npcId)) return
+    if (driver) vehicle.occupantNpcId = npcId
+    else vehicle.guestNpcIds.add(npcId)
     this.ridingNpcIds.add(npcId)
     this.callbacks.onBoard?.(npcId)
   }
@@ -351,6 +535,28 @@ export class VehicleManager {
     vehicle.occupantNpcId = undefined
     this.ridingNpcIds.delete(npcId)
     this.callbacks.onLeave?.(npcId, position)
+  }
+
+  private leaveGuest(vehicle: PooledVehicle, npcId: string, position: RoadPoint): void {
+    if (!vehicle.guestNpcIds.delete(npcId)) return
+    this.ridingNpcIds.delete(npcId)
+    this.callbacks.onLeave?.(npcId, position)
+  }
+
+  private leaveAllGuests(vehicle: PooledVehicle, position: RoadPoint): void {
+    for (const npcId of [...vehicle.guestNpcIds]) this.leaveGuest(vehicle, npcId, position)
+  }
+
+  private syncOccupants(vehicle: PooledVehicle): void {
+    const ids = [
+      ...(vehicle.occupantNpcId ? [vehicle.occupantNpcId] : []),
+      ...vehicle.guestNpcIds,
+    ]
+    if (!ids.length) return
+    this.callbacks.onMove?.(ids, {
+      x: vehicle.wrapper.position.x,
+      z: vehicle.wrapper.position.z,
+    })
   }
 
   update(gameClock: GameClock, delta: number) {
@@ -370,6 +576,7 @@ export class VehicleManager {
     // Update active vehicles
     for (const v of this.pool) {
       if (!v.active) continue
+      if (v.phase === 'manual') continue
 
       if (!v.route) {
         this.parkAtHome(v)
@@ -406,6 +613,7 @@ export class VehicleManager {
           v.wrapper.position.set(last.x, ROAD_Y, last.z)
           v.wrapper.rotation.y = this.sampleRoute(v.routePoints, v.segmentLengths, v.totalLength).rotationY
           this.leaveOccupant(v, last)
+          this.leaveAllGuests(v, last)
           v.label.visible = true
           this.setVehicleLabel(v, v.route, Math.max(1, Math.round(v.parkTimer / 2)), 'parking')
         } else {
@@ -420,6 +628,7 @@ export class VehicleManager {
       v.wrapper.position.z = pose.z
       v.wrapper.position.y = ROAD_Y + bump
       v.wrapper.rotation.y = pose.rotationY
+      this.syncOccupants(v)
 
       v.headlight.intensity = needLights ? 1.5 : 0
       v.taillightMat.opacity = needLights ? 0.9 : 0
@@ -476,7 +685,7 @@ export class VehicleManager {
     }
   }
 
-  private setVehicleLabel(vehicle: PooledVehicle, route: VehicleRoute, minutes: number, state: 'driving' | 'returning' | 'parking' | 'home' = 'driving'): void {
+  private setVehicleLabel(vehicle: PooledVehicle, route: VehicleRoute, minutes: number, state: 'driving' | 'returning' | 'parking' | 'home' | 'manual' = 'driving'): void {
     if (vehicle.labelTexture) {
       vehicle.labelTexture.dispose()
       vehicle.labelTexture = null
@@ -508,12 +717,15 @@ export class VehicleManager {
     ctx.font = '700 28px "Segoe UI", Arial, sans-serif'
     const title = state === 'home'
       ? `Xe của ${route.owner}`
+      : state === 'manual' ? `${route.owner} đang lái`
       : state === 'parking' ? `Xe nhà ${route.owner} đang đỗ` : `Xe nhà ${route.owner}`
     ctx.fillText(title, 256, 54)
     ctx.fillStyle = 'rgba(255,255,255,0.76)'
     ctx.font = '600 22px "Segoe UI", Arial, sans-serif'
     const detail = state === 'home'
       ? `${route.appearance} · đỗ cạnh ${route.from}`
+      : state === 'manual'
+        ? `${route.appearance} · W A S D để lái · E để xuống`
       : state === 'returning'
       ? `Đang về nhà cất xe · ~${minutes} phút`
       : state === 'parking'

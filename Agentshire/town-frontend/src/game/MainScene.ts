@@ -162,6 +162,14 @@ export class MainScene implements GameScene {
   private playerWasKeyboardMoving = false
   private pendingDoorInteraction: { scene: SceneType; doorPos: THREE.Vector3 } | null = null
   private nearbyDoorInteraction: { buildingId: string; scene: SceneType; doorPos: THREE.Vector3; label: string } | null = null
+  private nearbyVehicleInteraction: {
+    id: string
+    ownerNpcId: string
+    ownerName: string
+    appearance: string
+    destination: string
+    isPlayerVehicle: boolean
+  } | null = null
   private interactionPromptEl: HTMLDivElement | null = null
   private lastTownEntranceBuildingId = 'office'
   private postTownReturnDebugFrames = 0
@@ -244,6 +252,7 @@ export class MainScene implements GameScene {
       canBoard: (npcId, position) => this.canNpcBoardVehicle(npcId, position),
       onBoard: (npcId) => this.onNpcBoardVehicle(npcId),
       onLeave: (npcId, position) => this.onNpcLeaveVehicle(npcId, position),
+      onMove: (npcIds, position) => this.onVehicleOccupantsMove(npcIds, position),
     })
     this.vehicleManager.build(this.assets)
 
@@ -1037,13 +1046,34 @@ __workflow 演出测试指令:
       const journal = this.dailyScheduler.getActivityJournals().get(targetNpcId)
       journal?.updateRelationship(
         { npcId: 'user', name: this.getPlayerName() },
-        { topic: text.slice(0, 80), sentimentDelta: 0.05, trustDelta: 0.03 },
+        this.classifyPlayerMessageRelationship(text),
       )
       this.socialFeedPanel?.refresh()
       this.saveSnapshot()
     }
     this.citizenChat.onUserMessage(targetNpcId)
     if (!skipLocalCitizenReply) this.replyFromLocalCitizenIfNeeded(text, targetNpcId)
+  }
+
+  private classifyPlayerMessageRelationship(text: string): {
+    topic: string
+    sentimentDelta?: number
+    romanceDelta?: number
+    trustDelta?: number
+    tensionDelta?: number
+  } {
+    const normalized = this.normalizeText(text)
+    const topic = text.slice(0, 80)
+    if (/(do ngu|con dien|khon nan|cut|bien di|ep|bat buoc|de doa|danh)/i.test(normalized)) {
+      return { topic, sentimentDelta: -0.12, trustDelta: -0.08, tensionDelta: 0.12 }
+    }
+    if (/(thich|yeu|xinh|dep|quyen ru|tan tinh|hen ho|hon|om|ngu voi|qua dem)/i.test(normalized)) {
+      return { topic, sentimentDelta: 0.01, romanceDelta: 0.04, tensionDelta: 0.02 }
+    }
+    if (/(cam on|xin loi|tin tuong|tam su|giup|quan tam)/i.test(normalized)) {
+      return { topic, sentimentDelta: 0.05, trustDelta: 0.05 }
+    }
+    return { topic, sentimentDelta: 0.01 }
   }
 
   private initTownMapOverlay(): void {
@@ -1367,7 +1397,7 @@ __workflow 演出测试指令:
       const dx = userPos.x - npcPos.x
       const dz = userPos.z - npcPos.z
       const length = Math.sqrt(dx * dx + dz * dz) || 1
-      void npc.moveTo({
+      await npc.moveTo({
         x: userPos.x - (dx / length) * 2.2,
         z: userPos.z - (dz / length) * 2.2,
       }, 2.4)
@@ -1377,6 +1407,7 @@ __workflow 演出测试指令:
         if (npc.mesh.visible && npc.isInActiveScene) npc.playAnim('idle')
       }, 900)
     }
+    this.citizenChat.startChat(npcId)
 
     try {
       const text = await this.buildUserReaction(npcId, context)
@@ -1420,6 +1451,8 @@ __workflow 演出测试指令:
           ? 'Người chơi vừa tự nhiên xông vào nhà riêng của bạn. Bạn phải phản ứng ngay, không được im lặng.'
           : 'Người chơi vừa đi sát tới trước mặt bạn. Hãy chủ động phản ứng tự nhiên.',
         'Phản ứng theo đúng quan hệ: người lạ thì dè chừng hoặc khó chịu; quen biết thì hỏi chuyện; thân thiết thì tự nhiên hơn.',
+        'Chỉ nhắc chuyện cũ, lời hứa, cuộc hẹn hoặc tình cảm nếu chúng có trong dữ liệu gần đây. Không tự bịa "tối gặp", "chuyện hôm trước" hay một mức thân thiết chưa tồn tại.',
+        'Không nói rằng bạn hoặc người chơi sắp đi đâu nếu dữ liệu không có kế hoạch đó.',
         'Nói đời thường, trực tiếp, có cảm xúc; tránh khách sáo và tránh văn phong trợ lý.',
         'Chỉ trả về đúng 1 câu thoại tiếng Việt, tối đa 22 từ, không markdown.',
       ].join('\n'),
@@ -1432,7 +1465,10 @@ __workflow 演出测试指令:
           sentiment: relation.sentiment,
           trust: relation.trust,
           interactionCount: relation.interactionCount,
+          recentTopics: relation.recentTopics?.slice(-3),
         } : { status: 'stranger', interactionCount: 0 },
+        recent_activity: journal?.getRecentActivities(3) ?? [],
+        recent_dialogues: journal?.getRecentDialogueSummaries(2) ?? [],
       }),
     })
 
@@ -1451,7 +1487,9 @@ __workflow 演出测试指令:
   }
 
   private buildFallbackUserReaction(npcId: string, isIntrusion: boolean): string {
-    const relation = this.dailyScheduler.getActivityJournals().get(npcId)?.getRelationship('user')
+    const journal = this.dailyScheduler.getActivityJournals().get(npcId)
+    const relation = journal?.getRelationship('user')
+    const topic = relation?.recentTopics?.slice(-1)[0]
     if (isIntrusion) {
       if (relation?.status === 'lover' || relation?.status === 'crush' || relation?.status === 'close_friend') {
         return 'Tới rồi à? Ít nhất cũng phải nhắn tôi một tiếng chứ, làm tôi giật cả mình.'
@@ -1462,9 +1500,10 @@ __workflow 演出测试指令:
       return 'Khoan đã, ai cho bạn tự tiện vào nhà tôi vậy? Bạn cần gì?'
     }
     if (relation?.status === 'strained' || relation?.status === 'rival') return 'Lại có chuyện gì với tôi nữa đây?'
-    if (relation?.status === 'friend' || relation?.status === 'close_friend') return 'Ê, đi đâu đấy? Lại đây nói chuyện chút.'
-    if (relation?.status === 'lover' || relation?.status === 'crush') return 'Thấy tôi mà định đi lướt qua luôn à?'
-    return 'Chào bạn, hình như mình chưa nói chuyện tử tế với nhau bao giờ nhỉ?'
+    if (topic && (relation?.interactionCount ?? 0) > 0) return `Chào bạn. Chuyện "${topic}" lần trước, bạn còn muốn nói tiếp không?`
+    if (relation?.status === 'friend' || relation?.status === 'close_friend') return 'Chào bạn. Tôi đang rảnh một chút, có chuyện gì mới không?'
+    if (relation?.status === 'lover' || relation?.status === 'crush') return 'Bạn tới rồi à? Lại đây, nói tôi nghe hôm nay bạn thế nào.'
+    return 'Chào bạn. Mình chưa quen rõ, nhưng nếu bạn muốn nói chuyện thì tôi đang nghe.'
   }
 
   private isUserIntrudingOnNpcHome(npcId: string): boolean {
@@ -1565,9 +1604,14 @@ __workflow 演出测试指令:
       ? requestedTargetNpcId
       : this.resolveTownSpeechTarget()
     this.syncDialogTarget(speechTarget)
+    const isVehicleInvite = this.isVehicleInvitationText(text)
     const mayBeAppointment = this.isPlayerAppointmentText(text)
-    this.showUserBubble(text, mayBeAppointment, speechTarget)
-    this.capturePlayerAppointment(text, speechTarget)
+    this.showUserBubble(text, mayBeAppointment || isVehicleInvite, speechTarget)
+    if (isVehicleInvite && speechTarget !== 'steward') {
+      void this.handleVehicleInvitation(speechTarget)
+      return
+    }
+    if (mayBeAppointment && this.capturePlayerAppointment(text, speechTarget)) return
     this.dataSource.sendAction({ type: 'user_message', targetNpcId: speechTarget, text })
   }
 
@@ -2151,6 +2195,90 @@ __workflow 演出测试指令:
     return labels[buildingId] ?? 'địa điểm'
   }
 
+  private tryUseNearbyInteraction(): void {
+    if (this.sceneSwitcher.getSceneType() !== 'town') {
+      this.tryEnterNearbyDoor()
+      return
+    }
+
+    if (this.vehicleManager.hasPlayerAboard()) {
+      const exit = this.vehicleManager.exitPlayer()
+      this.ui.showToast(exit ? 'Bạn đã xuống xe' : 'Xe đang chạy, hãy chờ chủ xe dừng lại rồi mới xuống')
+      return
+    }
+
+    this.updateNearbyDoorInteraction()
+    const vehicle = this.nearbyVehicleInteraction
+    if (!vehicle) {
+      this.tryEnterNearbyDoor()
+      return
+    }
+
+    if (!vehicle.isPlayerVehicle) {
+      const owner = this.npcManager.get(vehicle.ownerNpcId)
+      const user = this.npcManager.get('user')
+      const ownerNearby = !!owner?.mesh.visible
+        && !!user
+        && owner.isInActiveScene
+        && owner.getPosition().distanceTo(user.getPosition()) <= 5
+      if (!ownerNearby) {
+        this.ui.showToast(`Đây là xe của ${vehicle.ownerName}; chủ xe không ở đây để cho phép bạn lên`)
+        return
+      }
+
+      const permission = this.getVehiclePermission(vehicle.ownerNpcId)
+      owner.stopMoving()
+      owner.smoothLookAt({ x: user!.mesh.position.x, z: user!.mesh.position.z })
+      this.dialogManager.onDialogMessage(vehicle.ownerNpcId, permission.text, false)
+      this.recordDirectNpcMessage(vehicle.ownerNpcId, permission.text)
+      if (!permission.accepted) return
+      this.dailyScheduler.getDailyBehaviors().get(vehicle.ownerNpcId)?.pauseForDialogue()
+    }
+
+    const clock = this.gameClock.getState()
+    const boarded = this.vehicleManager.boardPlayer(
+      vehicle.id,
+      clock.period === 'night' || clock.period === 'dusk' || clock.period === 'dawn',
+      clock.dayCount,
+    )
+    if (!boarded.ok) {
+      this.ui.showToast('Chiếc xe này hiện không thể sử dụng')
+      return
+    }
+    this.nearbyVehicleInteraction = null
+    this.nearbyDoorInteraction = null
+    this.updateInteractionPrompt()
+    this.ui.showToast(boarded.ownerNpcId === 'user'
+      ? 'Bạn đã lên xe của mình. Dùng W A S D để lái, bấm E để xuống'
+      : `${boarded.ownerName} đồng ý chở bạn tới ${boarded.destination}`)
+  }
+
+  private getVehiclePermission(ownerNpcId: string): { accepted: boolean; text: string } {
+    const owner = this.npcManager.get(ownerNpcId)
+    const name = owner?.label ?? owner?.name ?? 'tôi'
+    const relation = this.dailyScheduler.getActivityJournals().get(ownerNpcId)?.getRelationship('user')
+    const status = relation?.status ?? 'stranger'
+    const accepted = status === 'lover'
+      || status === 'crush'
+      || status === 'close_friend'
+      || status === 'friend'
+      || (status === 'neighbor' && (relation?.sentiment ?? 0) >= 0.15)
+
+    if (accepted) {
+      if (status === 'lover' || status === 'crush') {
+        return { accepted: true, text: 'Lên đi, ngồi cạnh tôi. Nhưng đã lên xe thì đừng im lặng cả đường đấy.' }
+      }
+      return { accepted: true, text: `Được, lên xe đi. Tôi đang định chạy tới chỗ của mình, tiện đường thì chở bạn.` }
+    }
+    if (status === 'strained' || status === 'rival') {
+      return { accepted: false, text: 'Không. Quan hệ giữa chúng ta đang thế nào bạn biết rõ, tôi không muốn ngồi chung xe.' }
+    }
+    return {
+      accepted: false,
+      text: `${name} chưa thân với bạn đến mức cho lên xe riêng. Muốn đi cùng thì ít nhất hãy hỏi chuyện tử tế trước.`,
+    }
+  }
+
   private tryEnterNearbyDoor(): void {
     const sceneType = this.sceneSwitcher.getSceneType()
     if (sceneType !== 'town') {
@@ -2176,13 +2304,32 @@ __workflow 演出测试指令:
 
   private updateNearbyDoorInteraction(): void {
     const user = this.npcManager.get('user')
-    if (!user || !user.mesh.visible || this.sceneSwitcher.getSceneType() !== 'town') {
+    if (!user || this.sceneSwitcher.getSceneType() !== 'town') {
       this.nearbyDoorInteraction = null
+      this.nearbyVehicleInteraction = null
+      this.updateInteractionPrompt()
+      return
+    }
+
+    if (this.vehicleManager.hasPlayerAboard()) {
+      this.nearbyDoorInteraction = null
+      this.nearbyVehicleInteraction = null
+      this.updateInteractionPrompt()
+      return
+    }
+
+    if (!user.mesh.visible) {
+      this.nearbyDoorInteraction = null
+      this.nearbyVehicleInteraction = null
       this.updateInteractionPrompt()
       return
     }
 
     const userPos = user.getPosition()
+    this.nearbyVehicleInteraction = this.vehicleManager.getNearbyParkedVehicle(
+      { x: userPos.x, z: userPos.z },
+      3.2,
+    )
     let best: typeof this.nearbyDoorInteraction = null
     let bestDist = 2.8
     for (const [buildingId, marker] of this.townBuilder.getDoorMarkers()) {
@@ -2209,6 +2356,23 @@ __workflow 演出测试指令:
 
   private updateInteractionPrompt(): void {
     const el = this.ensureInteractionPrompt()
+    if (this.vehicleManager.hasPlayerAboard()) {
+      el.textContent = this.vehicleManager.isPlayerDriving()
+        ? 'W A S D - lái xe · E - xuống xe'
+        : this.vehicleManager.canPlayerExit() ? 'E - xuống xe' : 'Đang đi cùng chủ xe · chờ xe dừng'
+      el.style.opacity = '1'
+      el.style.pointerEvents = 'none'
+      return
+    }
+    if (this.nearbyVehicleInteraction) {
+      const vehicle = this.nearbyVehicleInteraction
+      el.textContent = vehicle.isPlayerVehicle
+        ? `E - lên ${vehicle.appearance} của bạn`
+        : `E - xin lên ${vehicle.appearance} của ${vehicle.ownerName}`
+      el.style.opacity = '1'
+      el.style.pointerEvents = 'none'
+      return
+    }
     if (!this.nearbyDoorInteraction) {
       el.style.opacity = '0'
       el.style.pointerEvents = 'none'
@@ -2258,7 +2422,7 @@ __workflow 演出测试指令:
     if (this.isTextInputFocused()) return
     if (key === 'e') {
       event.preventDefault()
-      this.tryEnterNearbyDoor()
+      this.tryUseNearbyInteraction()
       return
     }
     if (!this.isPlayerMoveKey(key)) return
@@ -2296,7 +2460,7 @@ __workflow 演出测试指令:
     }
 
     const user = this.npcManager.get('user')
-    if (!user || !user.mesh.visible) {
+    if (!user) {
       this.stopKeyboardMoveAnim()
       return
     }
@@ -2307,6 +2471,25 @@ __workflow 演出测试指令:
     if (this.playerKeys.has('s') || this.playerKeys.has('arrowdown')) dz += 1
     if (this.playerKeys.has('a') || this.playerKeys.has('arrowleft')) dx -= 1
     if (this.playerKeys.has('d') || this.playerKeys.has('arrowright')) dx += 1
+
+    if (this.vehicleManager.hasPlayerAboard()) {
+      if (this.vehicleManager.isPlayerDriving() && (dx !== 0 || dz !== 0)) {
+        this.vehicleManager.movePlayerVehicle(dx, dz, deltaTime, (x, z) => this.clampPlayerPosition(x, z))
+        const vehicle = this.vehicleManager.getPlayerVehicleObject()
+        if (vehicle) {
+          user.mesh.position.x = vehicle.position.x
+          user.mesh.position.z = vehicle.position.z
+          this.cameraCtrl.follow(vehicle)
+        }
+      }
+      this.stopKeyboardMoveAnim()
+      return
+    }
+
+    if (!user.mesh.visible) {
+      this.stopKeyboardMoveAnim()
+      return
+    }
 
     if (dx === 0 && dz === 0) {
       this.stopKeyboardMoveAnim()
@@ -2348,17 +2531,19 @@ __workflow 演出测试指令:
   }
 
   private onNpcBoardVehicle(npcId: string): void {
-    if (npcId === 'user') return
     const npc = this.npcManager.get(npcId)
     if (!npc) return
     npc.stopMoving()
     npc.transitionTo('idle')
     npc.setVisible(false)
     this.vehiclePassengerNpcIds.add(npcId)
+    if (npcId === 'user') {
+      const vehicle = this.vehicleManager.getPlayerVehicleObject()
+      if (vehicle) this.cameraCtrl.follow(vehicle)
+    }
   }
 
   private onNpcLeaveVehicle(npcId: string, position: { x: number; z: number }): void {
-    if (npcId === 'user') return
     const npc = this.npcManager.get(npcId)
     if (!npc) return
     npc.stopMoving()
@@ -2366,6 +2551,17 @@ __workflow 演出测试指令:
     npc.transitionTo('idle')
     npc.setVisible(true)
     this.vehiclePassengerNpcIds.delete(npcId)
+    this.dailyScheduler.getDailyBehaviors().get(npcId)?.resumeFromDialogue()
+    if (npcId === 'user') this.cameraCtrl.follow(npc.mesh)
+  }
+
+  private onVehicleOccupantsMove(npcIds: string[], position: { x: number; z: number }): void {
+    for (const npcId of npcIds) {
+      const npc = this.npcManager.get(npcId)
+      if (!npc) continue
+      npc.mesh.position.x = position.x
+      npc.mesh.position.z = position.z
+    }
   }
 
   private getDialogTargetName(targetNpcId = this.dialogTarget): string | undefined {
@@ -2435,9 +2631,15 @@ __workflow 演出测试指令:
     const npcName = npc?.label ?? npc?.name ?? npcId
     this.townJournal?.recordEncounterMessage(npcName, text, 'town')
     const journal = this.dailyScheduler.getActivityJournals().get(npcId)
+    const normalized = this.normalizeText(text)
+    const update = /(khong|tu choi|dung ep|khong muon|khong thoai mai|chua than)/i.test(normalized)
+      ? { topic: text.slice(0, 80), sentimentDelta: -0.03, tensionDelta: 0.03 }
+      : /(thich|yeu|cam tinh|ngoi canh|nho ban|hen ho)/i.test(normalized)
+        ? { topic: text.slice(0, 80), sentimentDelta: 0.04, romanceDelta: 0.04 }
+        : { topic: text.slice(0, 80), sentimentDelta: 0.01 }
     journal?.updateRelationship(
       { npcId: 'user', name: this.getPlayerName() },
-      { topic: text.slice(0, 80), sentimentDelta: 0.04 },
+      update,
     )
     this.socialFeedPanel?.refresh()
     this.saveSnapshot()
@@ -2446,7 +2648,7 @@ __workflow 演出测试指令:
   private replyFromLocalCitizenIfNeeded(text: string, targetId: string): void {
     if (!targetId || targetId === 'steward') return
     const npc = this.npcManager.get(targetId)
-    if (!npc || !npc.mesh.visible) return
+    if (!npc || (!npc.mesh.visible && !this.vehiclePassengerNpcIds.has(targetId))) return
     const agentConfigured = this.bootstrap.agentConfigMap.get(targetId)
     if (agentConfigured?.agentEnabled) return
 
@@ -2454,7 +2656,7 @@ __workflow 演出测试指令:
       if (!reply) return
       this.dialogManager.onDialogMessage(targetId, reply, false)
     }).catch(() => {
-      this.dialogManager.onDialogMessage(targetId, this.buildFallbackCitizenReply(targetId), false)
+      this.dialogManager.onDialogMessage(targetId, this.buildFallbackCitizenReply(targetId, text), false)
     })
   }
 
@@ -2474,7 +2676,10 @@ __workflow 演出测试指令:
       system: [
         `Bạn là ${npcName}, một cư dân trong thị trấn.`,
         'Trả lời người chơi bằng tiếng Việt, 1 câu ngắn tự nhiên.',
-        'Có thể nhắc tới đời sống thị trấn, việc đang làm, nhu cầu, hoặc quan hệ với người chơi.',
+        'Trả lời trực tiếp đúng nội dung người chơi vừa nói và giữ đúng tính cách, quan hệ, hoạt động hiện tại.',
+        'Chỉ nhắc chuyện cũ, lời hứa, cuộc hẹn hoặc cảm xúc đã có nếu chúng xuất hiện trong recent_activity, recent_dialogues hoặc relationship.recentTopics.',
+        'Không tự bịa chuyện hôm trước, cuộc hẹn tối nay, người thứ ba, ghen tuông hay mức độ thân thiết.',
+        'Nếu đang nói chuyện trực tiếp thì đứng lại nói; không tuyên bố sẽ đi đâu nếu không thật sự có kế hoạch tương ứng trong dữ liệu.',
         'Không dùng markdown. Không tự xưng là AI.',
       ].join('\n'),
       user: JSON.stringify({
@@ -2485,6 +2690,8 @@ __workflow 演出测试指令:
         personality: profile.personality,
         needs: profile.needs,
         recent_activity: recent,
+        recent_dialogues: journal?.getRecentDialogueSummaries(3) ?? [],
+        current_location: this.dailyScheduler.getDailyBehaviors().get(npcId)?.getCurrentBuilding() ?? 'town',
         relationship: relation ? {
           label: relation.label,
           interactionCount: relation.interactionCount,
@@ -2494,17 +2701,28 @@ __workflow 演出测试指令:
     })
 
     const reply = result.text.trim()
-    return result.fallback || !reply ? this.buildFallbackCitizenReply(npcId) : reply.slice(0, 180)
+    return result.fallback || !reply ? this.buildFallbackCitizenReply(npcId, userText) : reply.slice(0, 180)
   }
 
-  private buildFallbackCitizenReply(npcId: string): string {
+  private buildFallbackCitizenReply(npcId: string, userText: string): string {
     const npc = this.npcManager.get(npcId)
-    const name = npc?.label ?? npc?.name ?? 'tôi'
+    const normalized = this.normalizeText(userText)
     const profile = getGodSimNpcProfile(npcId)
-    if (profile.needs.social > 70) return 'Tôi cũng đang muốn nói chuyện với ai đó. Đi cùng tôi một đoạn nhé?'
-    if (profile.needs.energy < 45) return 'Tôi nghe đây, nhưng hôm nay hơi mệt nên nói chậm một chút.'
-    if (profile.needs.hunger < 45) return 'Tôi đang định ghé chợ, vừa đi vừa nói chuyện được không?'
-    return `${name} nghe rồi. Chuyện này để tôi nghĩ thêm một chút.`
+    const journal = this.dailyScheduler.getActivityJournals().get(npcId)
+    const relation = journal?.getRelationship('user')
+    const current = journal?.getRecentActivities(1)[0]?.detail
+    if (/(chao|hello|xin chao|hey|alo)\b/i.test(normalized)) {
+      return relation && relation.interactionCount > 1 ? 'Chào bạn. Tôi đang nghe đây, có chuyện gì vậy?' : 'Chào bạn. Mình cứ nói chuyện từ từ để biết nhau nhé.'
+    }
+    if (/(dang lam gi|di dau|o dau|the nao)/i.test(normalized)) {
+      return current ? `Tôi đang ${current.toLowerCase()}. Bạn hỏi có việc gì không?` : 'Tôi đang ở đây và chưa có việc gì đặc biệt. Bạn cần nói gì?'
+    }
+    if (/(thich|yeu|tan tinh|hen ho)/i.test(normalized)) {
+      if (relation?.status === 'lover' || relation?.status === 'crush') return 'Tôi có cảm tình, nhưng cứ nói rõ bạn muốn gì để tôi còn trả lời thật.'
+      return 'Mình chưa đủ thân để nói như thể đã có tình cảm. Cứ tìm hiểu nhau trước đã.'
+    }
+    if (profile.needs.energy < 45) return 'Tôi nghe rõ rồi. Hôm nay tôi hơi mệt, nhưng vẫn có thể đứng đây nói với bạn một lúc.'
+    return 'Tôi nghe rồi. Bạn nói cụ thể thêm đi, tôi không muốn tự đoán sai ý bạn.'
   }
 
   private stopKeyboardMoveAnim(): void {
@@ -2614,7 +2832,6 @@ __workflow 演出测试指令:
       return null
     }
 
-    let scheduled = false
     let sentHome = false
     const fullText = `${event.summary ?? ''} ${event.turns.map(t => t.text).join(' ')}`
 
@@ -2626,37 +2843,53 @@ __workflow 演出测试指令:
           ?.goHomeNow(`${speakerNpc.label ?? speakerNpc.name} nói sẽ về nhà nên rời cuộc trò chuyện`)
         sentHome = true
       }
-
-      const appointment = this.extractAppointment(`${text} ${fullText}`, event.npcA, event.npcB, nameA, nameB)
-      if (appointment) {
-        this.addSocialAppointment(appointment)
-        scheduled = true
-      }
     }
 
-    if (!scheduled) {
-      const appointment = this.extractAppointment(fullText, event.npcA, event.npcB, nameA, nameB)
-      if (appointment) {
-        this.addSocialAppointment(appointment)
-        scheduled = true
-      }
-    }
-
-    if (!scheduled && this.saysGoTogetherNow(fullText)) {
-      const place = this.resolveSocialPlace(this.normalizeText(fullText)) ?? this.inferDefaultSocialPlace(this.normalizeText(fullText))
-      if (place) {
-        this.dailyScheduler.getDailyBehaviors().get(event.npcA.id)
-          ?.goToPlaceNow(place.key, `Đi cùng ${nameB} sau cuộc trò chuyện`)
-        this.dailyScheduler.getDailyBehaviors().get(event.npcB.id)
-          ?.goToPlaceNow(place.key, `Đi cùng ${nameA} sau cuộc trò chuyện`)
-        this.townJournal.record('encounter_start', [nameA, nameB], place.name, `${nameA} và ${nameB} quyết định đi cùng nhau tới ${place.name}`)
-        scheduled = true
-      }
+    const appointment = this.extractAgreedAppointment(event.turns, event.npcA, event.npcB, nameA, nameB)
+    if (appointment) {
+      this.addSocialAppointment(appointment)
     }
 
     if (!sentHome && this.saysGoodbye(fullText)) {
       this.splitAfterGoodbye(event.npcA, event.npcB, 'Tạm biệt xong mỗi người đi một hướng')
     }
+  }
+
+  private extractAgreedAppointment(
+    turns: Array<{ speaker: string; text: string }>,
+    npcA: NPC,
+    npcB: NPC,
+    nameA: string,
+    nameB: string,
+  ): SocialAppointment | null {
+    const isProposal = (text: string) => {
+      const normalized = this.normalizeText(text)
+      return /(hen nhau|gap nhau|di cung|di voi|di cafe|di ca phe|ra cong vien|ra cho|ghe quan|toi muon ru|moi ban)/i.test(normalized)
+        && !!(this.resolveSocialPlace(normalized) ?? this.inferDefaultSocialPlace(normalized))
+    }
+    const isAcceptance = (text: string) => {
+      const normalized = this.normalizeText(text)
+      if (/(khong|chua|de khi khac|khong muon|khong di|tu choi|thoi)/i.test(normalized)) return false
+      return /(dong y|duoc|ok|uh|ừ|di thoi|toi se den|toi se ra|hen o|gap o|cung di)/i.test(normalized)
+    }
+
+    for (let i = 0; i < turns.length - 1; i++) {
+      const proposal = turns[i]
+      if (!isProposal(proposal.text)) continue
+      const acceptance = turns.slice(i + 1).find(turn =>
+        this.normalizeText(turn.speaker) !== this.normalizeText(proposal.speaker)
+        && isAcceptance(turn.text),
+      )
+      if (!acceptance) continue
+      return this.extractAppointment(
+        `${proposal.text} ${acceptance.text}`,
+        npcA,
+        npcB,
+        nameA,
+        nameB,
+      )
+    }
+    return null
   }
 
   private addSocialAppointment(appointment: SocialAppointment): void {
@@ -2723,18 +2956,25 @@ __workflow 演出测试指令:
     const distBetween = this.distanceBetweenNpcs(npcA, npcB)
     if (distBetween <= 3.0) {
       appt.completed = true
-      if (appt.npcAId !== 'user') this.dailyScheduler.getDailyBehaviors().get(appt.npcAId)?.resumeFromDialogue()
-      if (appt.npcBId !== 'user') this.dailyScheduler.getDailyBehaviors().get(appt.npcBId)?.resumeFromDialogue()
+      if (appt.npcAId !== 'user') this.dailyScheduler.getDailyBehaviors().get(appt.npcAId)?.pauseForDialogue()
+      if (appt.npcBId !== 'user') this.dailyScheduler.getDailyBehaviors().get(appt.npcBId)?.pauseForDialogue()
       npcA.smoothLookAt({ x: npcB.mesh.position.x, z: npcB.mesh.position.z })
       npcB.smoothLookAt({ x: npcA.mesh.position.x, z: npcA.mesh.position.z })
       const line = appt.userInitiated
-        ? `${appt.npcAName === this.getPlayerName() ? appt.npcBName : appt.npcAName} nói: "Anh tới rồi à, em đang đợi ở ${appt.placeName}."`
+        ? `${appt.npcAName === this.getPlayerName() ? appt.npcBName : appt.npcAName} nói: "Bạn tới rồi à, tôi đang đợi ở ${appt.placeName}."`
         : `${appt.npcAName} và ${appt.npcBName} đã gặp nhau đúng hẹn ở ${appt.placeName}`
       this.townJournal.record('encounter_end', [appt.npcAName, appt.npcBName], appt.placeName, line)
       const speaker = appt.npcAId === 'user' ? npcB : npcA
       if (appt.userInitiated && speaker.id !== 'user') {
-        this.bubbles.show(speaker.mesh, `Anh tới rồi à, em đang đợi ở ${appt.placeName}.`, 3600)
-        this.recordDirectNpcMessage(speaker.id, `Anh tới rồi à, em đang đợi ở ${appt.placeName}.`)
+        const text = `Bạn tới rồi à, tôi đang đợi ở ${appt.placeName}.`
+        this.bubbles.show(speaker.mesh, text, 3600)
+        this.recordDirectNpcMessage(speaker.id, text)
+        this.citizenChat.startChat(speaker.id)
+      } else {
+        window.setTimeout(() => {
+          this.dailyScheduler.getDailyBehaviors().get(appt.npcAId)?.resumeFromDialogue()
+          this.dailyScheduler.getDailyBehaviors().get(appt.npcBId)?.resumeFromDialogue()
+        }, 12_000)
       }
       return
     }
@@ -2745,7 +2985,7 @@ __workflow 演出测试指令:
     const waitedMs = Date.now() - appt.arrivedAtMs
     if (waitedMs > 18_000 && !appt.complained) {
       appt.complained = true
-      const text = `Em tới ${appt.placeName} rồi. Anh đang ở đâu vậy, đừng để em chờ một mình lâu quá.`
+      const text = `Tôi tới ${appt.placeName} rồi. Bạn đang ở đâu vậy? Đừng để tôi chờ một mình lâu quá.`
       this.bubbles.show(waitingNpc.mesh, text, 5200)
       this.recordDirectNpcMessage(waitingNpc.id, text)
       this.townJournal.record('encounter_message', [waitingNpc.label ?? waitingNpc.id], appt.placeName, `${waitingNpc.label ?? waitingNpc.id} nhắn cho ${this.getPlayerName()}: "${text}"`)
@@ -2762,7 +3002,7 @@ __workflow 演出测试指令:
         z: this.clampPlayerZ(user.mesh.position.z + (dz / len) * 1.4),
       }, 3)
       waitingNpc.smoothLookAt({ x: user.mesh.position.x, z: user.mesh.position.z })
-      const text = 'Em thấy anh gần đây rồi, qua chỗ hẹn đi.'
+      const text = 'Tôi thấy bạn ở gần rồi, qua đúng chỗ hẹn đi.'
       this.bubbles.show(waitingNpc.mesh, text, 3600)
       this.recordDirectNpcMessage(waitingNpc.id, text)
     }
@@ -2808,23 +3048,121 @@ __workflow 演出测试指令:
 
   private isPlayerAppointmentText(text: string): boolean {
     const normalized = this.normalizeText(text)
-    return /(hen|gap|ra|toi|qua|ghe|di|cho|doi|cho em|cho anh|gap em|gap anh|ra cho|di cafe|di ca phe)/i.test(normalized)
-      && !!(this.resolveSocialPlace(normalized) ?? this.inferDefaultSocialPlace(normalized))
+    const explicitInvite = /(hen nhau|gap nhau|di cung|di voi|di cafe|di ca phe|ra cong vien|ra cho|ghe quan|toi muon ru|moi ban|hen ban|gap ban)/i.test(normalized)
+    return explicitInvite && !!(this.resolveSocialPlace(normalized) ?? this.inferDefaultSocialPlace(normalized))
   }
 
-  private capturePlayerAppointment(text: string, targetNpcId: string): void {
-    if (!targetNpcId || targetNpcId === 'steward') return
+  private isVehicleInvitationText(text: string): boolean {
+    const normalized = this.normalizeText(text)
+    return /(len xe|vao xe|ngoi xe|len o to|vao o to|ngoi o to|di xe voi|di cung xe|anh cho|em cho|cho di|qua dem tren xe)/i.test(normalized)
+  }
+
+  private async handleVehicleInvitation(npcId: string): Promise<void> {
+    const npc = this.npcManager.get(npcId)
+    const user = this.npcManager.get('user')
+    if (!npc || !user || !npc.mesh.visible || !npc.isInActiveScene) return
+    if (npc.getPosition().distanceTo(user.getPosition()) > 6.2) {
+      this.dialogManager.onDialogMessage(npcId, 'Đứng xa thế mà rủ lên xe gì? Lại đây nói chuyện trực tiếp đã.', false)
+      return
+    }
+
+    let playerVehicleReady = this.vehicleManager.isPlayerDriving()
+    if (!playerVehicleReady) {
+      const nearbyCar = this.vehicleManager.getPlayerOwnedVehicleNear(
+        { x: user.mesh.position.x, z: user.mesh.position.z },
+        6,
+      )
+      if (nearbyCar) {
+        const clock = this.gameClock.getState()
+        playerVehicleReady = this.vehicleManager.boardPlayer(
+          nearbyCar.id,
+          clock.period === 'night' || clock.period === 'dusk' || clock.period === 'dawn',
+          clock.dayCount,
+        ).ok
+      }
+    }
+
+    if (!playerVehicleReady) {
+      this.dialogManager.onDialogMessage(
+        npcId,
+        'Xe của bạn có ở đây đâu. Khi nào lái xe lại gần rồi hãy rủ tôi lên.',
+        false,
+      )
+      return
+    }
+
+    const journal = this.dailyScheduler.getActivityJournals().get(npcId)
+    const relation = journal?.getRelationship('user')
+    const status = relation?.status ?? 'stranger'
+    const profile = getGodSimNpcProfile(npcId)
+    const sentiment = relation?.sentiment ?? 0
+    const trust = relation?.trust ?? 0
+    const accepted = status === 'lover'
+      || status === 'crush'
+      || status === 'close_friend'
+      || (status === 'friend' && sentiment >= 0)
+      || (status === 'neighbor' && trust >= 0.3 && profile.personality.confidence >= 55)
+
+    let reply: string
+    let didBoard = false
+    if (accepted) {
+      const boarded = this.vehicleManager.addGuestToPlayerVehicle(npcId)
+      if (!boarded) {
+        reply = 'Xe đang không tiện để tôi lên. Đừng nói một đằng rồi để xe một nẻo chứ.'
+      } else {
+        didBoard = true
+        this.dailyScheduler.getDailyBehaviors().get(npcId)?.pauseForDialogue()
+        if (status === 'lover' || status === 'crush') {
+          reply = 'Được, tôi lên. Nhưng tôi ngồi cạnh bạn đấy, đừng có giả vờ chỉ muốn chở đi cho tiện.'
+        } else if (profile.personality.confidence >= 70) {
+          reply = 'Lên thì lên. Lái cho tử tế nhé, tôi không thích người nói hay mà cầm lái ẩu đâu.'
+        } else {
+          reply = 'Ừ, tôi đi cùng. Có gì muốn nói thì nói trên đường, đừng vòng vo.'
+        }
+      }
+    } else if (status === 'strained' || sentiment < -0.2) {
+      reply = 'Không, tôi không muốn ngồi riêng trên xe với bạn. Đừng ép, tôi đang không thoải mái.'
+    } else if (status === 'stranger') {
+      reply = 'Mình còn chưa biết nhau rõ mà bạn đã rủ tôi lên xe riêng à? Không, cảm ơn.'
+    } else {
+      reply = 'Tôi chưa thấy đủ tin tưởng để lên xe với bạn. Đi bộ nói chuyện trước đã.'
+    }
+
+    this.dialogManager.onDialogMessage(npcId, reply, false)
+    this.recordDirectNpcMessage(npcId, reply)
+    journal?.updateRelationship(
+      { npcId: 'user', name: this.getPlayerName() },
+      didBoard
+        ? { topic: 'Đồng ý lên xe đi cùng người chơi', sentimentDelta: 0.08, trustDelta: 0.05, romanceDelta: status === 'crush' || status === 'lover' ? 0.04 : 0 }
+        : { topic: 'Từ chối lời rủ lên xe của người chơi', sentimentDelta: -0.04, tensionDelta: 0.03 },
+    )
+    this.socialFeedPanel?.refresh()
+    this.saveSnapshot()
+  }
+
+  private capturePlayerAppointment(text: string, targetNpcId: string): boolean {
+    if (!targetNpcId || targetNpcId === 'steward') return false
     const user = this.npcManager.get('user')
     const target = this.npcManager.get(targetNpcId)
-    if (!user || !target) return
+    if (!user || !target) return false
 
-    if (!this.isPlayerAppointmentText(text)) return
+    if (!this.isPlayerAppointmentText(text)) return false
     const appointment = this.extractAppointment(text, user, target, this.getPlayerName(), target.label ?? target.name ?? target.id)
-    if (!appointment) return
+    if (!appointment) return false
+    const consent = this.getAppointmentConsent(target.id, appointment)
+    if (!consent.accepted) {
+      this.bubbles.show(target.mesh, consent.text, 4200)
+      this.recordDirectNpcMessage(target.id, consent.text)
+      this.dailyScheduler.getActivityJournals().get(target.id)?.updateRelationship(
+        { npcId: 'user', name: this.getPlayerName() },
+        { topic: `Từ chối lời hẹn tới ${appointment.placeName}`, sentimentDelta: -0.02 },
+      )
+      return true
+    }
     appointment.userInitiated = true
     this.addSocialAppointment(appointment)
 
-    const reply = this.buildAppointmentAck(target, appointment)
+    const reply = consent.text
     this.bubbles.show(target.mesh, reply, 4200)
     this.recordDirectNpcMessage(target.id, reply)
     const now = this.gameClock.getState()
@@ -2835,23 +3173,45 @@ __workflow 演出测试指令:
       )
       appointment.activated = true
     }
+    return true
+  }
+
+  private getAppointmentConsent(npcId: string, appointment: SocialAppointment): { accepted: boolean; text: string } {
+    const relation = this.dailyScheduler.getActivityJournals().get(npcId)?.getRelationship('user')
+    const profile = getGodSimNpcProfile(npcId)
+    const status = relation?.status ?? 'stranger'
+    const accepted = status === 'lover'
+      || status === 'crush'
+      || status === 'close_friend'
+      || status === 'friend'
+      || (status === 'neighbor'
+        && (relation?.sentiment ?? 0) >= 0.1
+        && profile.personality.friendliness >= 55)
+
+    if (!accepted) {
+      if (status === 'strained' || status === 'rival') {
+        return { accepted: false, text: `Không, tôi chưa muốn đi ${appointment.placeName} riêng với bạn. Quan hệ của chúng ta đang không ổn.` }
+      }
+      return { accepted: false, text: `Mình chưa đủ thân để hẹn riêng ở ${appointment.placeName}. Nói chuyện thêm đã rồi tính.` }
+    }
+    return { accepted: true, text: this.buildAppointmentAck(this.npcManager.get(npcId)!, appointment) }
   }
 
   private buildAppointmentAck(npc: NPC, appointment: SocialAppointment): string {
     const period = appointment.period === this.gameClock.getPeriod()
       ? 'bây giờ'
       : this.periodLabel(appointment.period)
-    const name = npc.label ?? npc.name ?? 'em'
+    const name = npc.label ?? npc.name ?? 'tôi'
     if (appointment.period === this.gameClock.getPeriod()) {
-      return `${name} ra ${appointment.placeName} ngay đây. Anh tới thì nhắn em hoặc lại gần em nhé.`
+      return `${name} đồng ý. Tôi sẽ ra ${appointment.placeName} ngay; bạn tới thì lại gần tôi nhé.`
     }
-    return `${name} nhớ rồi, ${period} em sẽ ra ${appointment.placeName}. Đừng hẹn xong để em chờ một mình đấy.`
+    return `${name} đồng ý, ${period} tôi sẽ ra ${appointment.placeName}. Nếu đổi ý thì báo, đừng để tôi chờ.`
   }
 
   private resolveSocialPlace(text: string): { key: string; name: string } | null {
     const options: Array<{ key: string; patterns: RegExp[] }> = [
       { key: 'cafe_door', patterns: [/cafe|cà phê|ca phe|quán cà phê|quan ca phe/] },
-      { key: 'restaurant_door', patterns: [/quán ăn|quan an|ăn|an|bữa|bua|cơm|com/] },
+      { key: 'restaurant_door', patterns: [/quán ăn|quan an|\băn\b|\ban\b|\bbữa\b|\bbua\b|\bcơm\b|\bcom\b/] },
       { key: 'park_center', patterns: [/công viên|cong vien|đi dạo|di dao|dạo|dao|ghế|ghe/] },
       { key: 'market_door', patterns: [/chợ|cho|mua|tin đồn|tin don/] },
       { key: 'office_door', patterns: [/công ty|cong ty|văn phòng|van phong|làm việc|lam viec/] },
@@ -2898,11 +3258,6 @@ __workflow 演出测试指令:
   private saysGoodbye(text: string): boolean {
     const normalized = this.normalizeText(text)
     return /(tạm biệt|tam biet|mai gặp|mai gap|lát gặp|lat gap|gặp sau|gap sau|về nhé|ve nhe|bye|goodbye)/i.test(normalized)
-  }
-
-  private saysGoTogetherNow(text: string): boolean {
-    const normalized = this.normalizeText(text)
-    return /(di thoi|di cung|di voi|di mot doan|qua do|ghe do|ra do|minh di|ta di|di rieng|vua di vua noi)/i.test(normalized)
   }
 
   private splitAfterGoodbye(a?: NPC, b?: NPC, detail = 'Tạm biệt rồi rời đi'): void {

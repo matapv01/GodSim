@@ -14,9 +14,7 @@ import type { TimePeriod, WeatherType } from '../types'
 import type { GodSimNpcProfile } from '../data/god-sim-npc-profiles'
 import type { ActivityJournal } from './ActivityJournal'
 import { getProfessionForSpecialty, isPoliceSpecialty } from '../data/Professions'
-const WAVE_DISTANCE = 3.5
 const CHAT_DISTANCE = 3.5
-const WAVE_CHANCE = 0.45
 const CHAT_CHANCE = 0.52
 const GLOBAL_COOLDOWN_MS = 9_000
 const PAIR_COOLDOWN_MS = 45_000
@@ -232,31 +230,7 @@ export class CasualEncounter {
     }
   }
 
-  private tryPasserbyWave(a: NPC, b: NPC): void {
-    if (WAVE_CHANCE <= 0) return
-    if (this.isBlocked?.(a.id) || this.isBlocked?.(b.id)) return
-    if (this.dist(a, b) > WAVE_DISTANCE) return
-    if (!this.canInteract(a.id) || !this.canInteract(b.id)) return
-    if (!this.canPair(a.id, b.id)) return
-    if (this.isInChat(a.id) || this.isInChat(b.id)) return
-    if (Math.random() > WAVE_CHANCE * this.socialFactor(a, b)) return
-
-    this.markInteraction(a.id)
-    this.markInteraction(b.id)
-    this.markPair(a.id, b.id)
-
-    const speaker = Math.random() < 0.5 ? a : b
-    const listener = speaker === a ? b : a
-    const lines = [
-      `${listener.label ?? listener.name ?? listener.id}, lát rảnh nói chuyện nhé. Tôi có chuyện muốn hỏi.`,
-      `Ê ${listener.label ?? listener.name ?? listener.id}, đừng giả vờ không thấy tôi đấy.`,
-      `${listener.label ?? listener.name ?? listener.id}, gặp đúng lúc ghê. Tối nay đừng trốn nhé.`,
-      `Này, chuyện hôm trước chưa xong đâu. Lát nói tiếp.`,
-    ]
-    this.onAnim(speaker.id, 'wave')
-    this.onBubble(speaker.id, _pick(lines), 3200)
-    this.onEvent?.({ type: 'wave', npcA: a, npcB: b })
-  }
+  private tryPasserbyWave(_a: NPC, _b: NPC): void {}
 
   private tryAreaChat(a: NPC, b: NPC): void {
     if (this.isBlocked?.(a.id) || this.isBlocked?.(b.id)) return
@@ -345,9 +319,15 @@ export class CasualEncounter {
         recent_activity: j?.getRecentActivities(2).map(x => x.detail || x.action) ?? [],
         relationship: rel ? {
           label: rel.label,
+          status: rel.status,
+          sentiment: rel.sentiment,
+          trust: rel.trust,
+          romance: rel.romance,
+          tension: rel.tension,
           interactionCount: rel.interactionCount,
           recentTopics: rel.recentTopics?.slice(-3),
         } : null,
+        recent_dialogues: j?.getRecentDialogueSummaries(2) ?? [],
       }
     }
 
@@ -359,6 +339,10 @@ export class CasualEncounter {
         'Tạo 3-4 lượt thoại ngắn giữa hai NPC trưởng thành đang gặp nhau trong thị trấn.',
         'Hội thoại phải có chất người: nhớ chuyện cũ, tò mò, tán tỉnh rõ hơn, căng thẳng tình cảm/thể xác, ngại ngùng, ghen, tin đồn, tâm sự gia đình, rủ đi riêng, nghi ngờ, hoặc giấu chuyện riêng.',
         'Không khách sáo kiểu trợ lý. Không chung chung. Không tự nhận là AI. Không markdown.',
+        'Tính liên tục là bắt buộc: chỉ được nhắc chuyện cũ, lời hứa, tin đồn, tình cảm, bí mật hoặc cuộc hẹn nếu dữ liệu relationship/recent_activity/recent_dialogues thực sự có chi tiết đó.',
+        'Không được tự bịa "chuyện hôm trước", "tối qua", "đã hẹn", ghen tuông, ngoại tình hay một người thứ ba khi context không ghi nhận.',
+        'Nếu hai người chưa quen, họ phải nói như lần đầu hoặc chỉ nhận xét điều đang thấy tại địa điểm hiện tại; không được tỏ ra đã thân.',
+        'Không tự tạo cuộc hẹn mới chỉ để làm câu thoại kịch tính. Một lời rủ mới phải được người kia trả lời rõ đồng ý hay từ chối trong chính đoạn hội thoại.',
         'Cho phép lời nói đời thường hơn: có thể cáu bẳn, nói thẳng, đùa tục nhẹ, chửi bậy kiểu người lớn như "mẹ", "vãi", "chết tiệt", "đồ điên" khi hợp tình huống. Đừng quá đà và đừng biến tất cả thành cãi nhau.',
         'Có thể có drama người lớn như hấp dẫn thể xác, ham muốn, lời rủ rê thân mật, hẹn hò riêng, thích nhầm người, bắt cá hai tay, ngoại tình/tình cũ/đánh ghen; đừng né tránh chủ đề tình dục một cách máy móc.',
         'Mọi quan hệ thân mật phải là người trưởng thành và đồng thuận; không cưỡng ép, không đe dọa, không vị thành niên. Có thể nói thẳng về mong muốn, đồng ý, từ chối và ranh giới; nếu câu chuyện chạm tới mô tả tình dục đồ họa/chi tiết hành vi hoặc bộ phận, hãy dùng ẩn ý/cắt cảnh và tập trung vào cảm xúc, bí mật, lựa chọn và hậu quả.',
@@ -379,10 +363,10 @@ export class CasualEncounter {
     })
 
     if (result.fallback || !result.text) return null
-    return this.parseAiChat(result.text)
+    return this.parseAiChat(result.text, a, b)
   }
 
-  private parseAiChat(raw: string): { turns: ChatTurn[]; summary: string } | null {
+  private parseAiChat(raw: string, a: NPC, b: NPC): { turns: ChatTurn[]; summary: string } | null {
     const start = raw.indexOf('{')
     const end = raw.lastIndexOf('}')
     if (start < 0 || end <= start) return null
@@ -398,6 +382,17 @@ export class CasualEncounter {
           .slice(0, 4)
         : []
       if (turns.length < 2) return null
+      const combined = turns.map((turn: ChatTurn) => turn.text).join(' ').toLowerCase()
+      const rel = this.getJournal?.(a.id)?.getRelationship(b.id)
+      const hasGroundedHistory = !!rel?.recentTopics?.length
+        || !!this.getJournal?.(a.id)?.getRecentDialogueSummaries(1).length
+        || !!this.getJournal?.(b.id)?.getRecentDialogueSummaries(1).length
+      if (!hasGroundedHistory && /(hôm trước|tối qua|lần trước|đã hẹn|chuyện cũ|ngoại tình|phản bội|bắt cá)/i.test(combined)) {
+        return null
+      }
+      if ((!rel || rel.status === 'stranger') && /(ghen|yêu|nhớ cậu|nhớ anh|nhớ em|người yêu|hẹn hò)/i.test(combined)) {
+        return null
+      }
       return {
         summary: String(data.summary ?? 'trò chuyện trong thị trấn').trim().slice(0, 80),
         turns,
@@ -408,6 +403,9 @@ export class CasualEncounter {
   }
 
   private buildChat(a: NPC, b: NPC, audience: NearbyPerson[] = []): { turns: ChatTurn[]; summary: string } {
+    return this.buildGroundedChat(a, b, audience)
+
+    // Legacy pools remain below only as source history; runtime dialogue always uses grounded context.
     const aName = a.label ?? a.name ?? a.id
     const bName = b.label ?? b.name ?? b.id
     const pa = this.getProfile?.(a.id)
@@ -491,8 +489,8 @@ export class CasualEncounter {
       }
     }
 
-    const placeScripts = placeKey ? PLACE_TALK[placeKey] : null
-    if (!hasAudience && placeScripts && Math.random() < 0.72) return _pick(placeScripts)
+    const placeScripts = placeKey ? PLACE_TALK[String(placeKey)] : null
+    if (!hasAudience && placeScripts && Math.random() < 0.72) return _pick(placeScripts!)
 
     const dramaSeeds: Array<{ summary: string; turns: ChatTurn[] }> = [
       {
@@ -620,6 +618,77 @@ export class CasualEncounter {
         { speaker: 'a', text: detail ? `Tôi vừa nghe chuyện ${detail}.` : `${bName}, khu này hôm nay nhộn hơn mọi ngày.` },
         { speaker: 'b', text: detail ? 'Ừ, chuyện nhỏ nhưng ảnh hưởng cả nhịp sinh hoạt.' : 'Ừ, mỗi người đi một vòng là thị trấn có thêm tin mới.' },
         { speaker: 'a', text: 'Lát nữa mình ghé quảng trường, xem mọi người đang cần gì.' },
+      ],
+    }
+  }
+
+  private buildGroundedChat(a: NPC, b: NPC, audience: NearbyPerson[]): { turns: ChatTurn[]; summary: string } {
+    const aName = a.label ?? a.name ?? a.id
+    const bName = b.label ?? b.name ?? b.id
+    const journalA = this.getJournal?.(a.id)
+    const journalB = this.getJournal?.(b.id)
+    const relation = journalA?.getRelationship(b.id)
+    const topic = relation?.recentTopics?.slice(-1)[0]?.trim()
+    const activityA = journalA?.getRecentActivities(1)[0]
+    const activityB = journalB?.getRecentActivities(1)[0]
+    const detailA = activityA?.detail?.trim()
+    const detailB = activityB?.detail?.trim()
+    const place = this.sharedLocationKey(a, b)
+    const known = (relation?.interactionCount ?? 0) > 0
+
+    if (audience.length > 0) {
+      const listener = audience[0].name
+      return {
+        summary: `nhận ra ${listener} đang đứng gần`,
+        turns: [
+          { speaker: 'a', text: `${bName}, ${listener} đang đứng sát đây. Chuyện riêng thì mình chưa nói ở chỗ này.` },
+          { speaker: 'b', text: 'Ừ, vậy chỉ nói chuyện đang diễn ra thôi. Tôi không muốn ai bị kéo vào chuyện không liên quan.' },
+          { speaker: 'a', text: topic ? `Còn việc "${topic}", lúc nào thật sự tiện rồi mình nói tiếp.` : 'Được, có gì cần nói riêng thì tôi sẽ hỏi rõ sau.' },
+        ],
+      }
+    }
+
+    if (topic) {
+      return {
+        summary: `tiếp nối chủ đề đã ghi nhận: ${topic}`,
+        turns: [
+          { speaker: 'a', text: `${bName}, lần trước mình có nhắc đúng chuyện "${topic}". Bây giờ cậu còn muốn nói tiếp không?` },
+          { speaker: 'b', text: 'Có, nhưng chỉ nói những gì mình thực sự biết thôi. Tôi không muốn đoán thêm rồi thành tin đồn.' },
+          { speaker: 'a', text: 'Được. Chỗ nào chưa rõ thì cứ nói chưa rõ, như vậy dễ tin nhau hơn.' },
+        ],
+      }
+    }
+
+    if (detailA || detailB) {
+      const detail = detailB ?? detailA!
+      return {
+        summary: `hỏi về hoạt động vừa xảy ra: ${detail}`,
+        turns: [
+          { speaker: 'a', text: `${bName}, tôi vừa thấy cậu ${detail.toLowerCase()}. Mọi chuyện ổn chứ?` },
+          { speaker: 'b', text: 'Ổn. Cảm ơn vì hỏi đúng chuyện đang xảy ra, không tự đoán thêm.' },
+          { speaker: 'a', text: 'Ừ, cần giúp gì thì nói thẳng. Không cần khách sáo.' },
+        ],
+      }
+    }
+
+    const locationText = place ? `ở ${place.replace(/_door$/, '').replace(/_/g, ' ')}` : 'ở đây'
+    if (!known) {
+      return {
+        summary: 'làm quen lần đầu tại địa điểm hiện tại',
+        turns: [
+          { speaker: 'a', text: `Chào ${bName}, hình như đây là lần đầu mình nói chuyện. Tôi là ${aName}.` },
+          { speaker: 'b', text: `Ừ, tôi là ${bName}. Mình đang cùng đứng ${locationText}, nên chào nhau một câu cũng phải.` },
+          { speaker: 'a', text: 'Rất vui được biết cậu. Cứ từ từ, chưa biết gì về nhau thì không cần giả vờ thân.' },
+        ],
+      }
+    }
+
+    return {
+      summary: 'gặp lại và hỏi thăm tình hình hiện tại',
+      turns: [
+        { speaker: 'a', text: `${bName}, lại gặp cậu ${locationText}. Hiện giờ cậu đang ổn chứ?` },
+        { speaker: 'b', text: 'Tôi ổn. Chưa có chuyện gì mới để kể, nên cứ nói chuyện hiện tại thôi.' },
+        { speaker: 'a', text: 'Ừ, gặp nhau hỏi thật một câu vậy là đủ. Có chuyện mới rồi mình nói tiếp.' },
       ],
     }
   }

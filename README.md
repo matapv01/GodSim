@@ -54,6 +54,9 @@ Nếu repo có Chromium local tại `.browsers`, game sẽ dùng bản đó. N�
 - Click NPC để chọn, mở thẻ thông tin và cho camera theo dõi NPC đó.
 - Click xuống đất để nhân vật của bạn đi tới vị trí đó; camera sẽ theo nhân vật.
 - Dùng `WASD` hoặc phím mũi tên để điều khiển nhân vật trực tiếp. Khi đang gõ trong ô chat, các phím này vẫn nhập chữ bình thường.
+- Xe sedan của bạn đỗ cạnh `Nhà người chơi`. Đi sát xe và bấm `E` để lên; dùng `WASD` để lái và bấm `E` lần nữa để xuống.
+- Muốn rủ cư dân lên xe, hãy lái xe tới gần họ rồi chat trực tiếp, ví dụ `Lên xe đi cùng tôi`. Họ sẽ đồng ý hoặc từ chối dựa trên quan hệ, tin tưởng và tính cách.
+- Muốn lên xe của cư dân, đi sát xe và bấm `E`. Chủ xe phải ở gần và đủ tin tưởng bạn; nếu đồng ý, chính chủ xe sẽ lái tới điểm đến của họ.
 - Góc trên bên phải có nút tạm dừng và tốc độ `1x`, `5x`, `20x`.
 - Khung `Nhật ký thị trấn` ở góc phải ghi sự kiện và hội thoại gần đây; click tiêu đề để thu gọn/mở lại.
 - Nút `Xã hội` ở góc phải mở social feed:
@@ -77,7 +80,7 @@ Server hiện yêu cầu API key. Mở `LLM_Env.ps1` và điền:
 $env:AGENTSHIRE_LLM_API_KEY = "key-that-cua-ban"
 ```
 
-Khi có key hợp lệ, hội thoại casual giữa NPC sẽ ưu tiên gọi AI để tạo câu riêng theo tên, tính cách, nhu cầu, ký ức gần đây, quan hệ, thời tiết và thời điểm trong ngày. Nếu AI lỗi hoặc hết thời gian chờ, game tự dùng hội thoại fallback.
+Khi có key hợp lệ, hội thoại casual giữa NPC sẽ ưu tiên gọi AI để tạo câu riêng theo tên, tính cách, nhu cầu, ký ức gần đây, quan hệ, thời tiết và thời điểm trong ngày. AI chỉ được nhắc chuyện cũ, cuộc hẹn hoặc tình cảm đã có trong ký ức; nếu AI lỗi, bịa dữ kiện hoặc hết thời gian chờ, game dùng hội thoại fallback bám hoạt động thực tế.
 
 Chat với quản gia/cư dân fallback được lưu dài hạn ở:
 

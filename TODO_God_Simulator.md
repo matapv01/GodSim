@@ -125,6 +125,10 @@
 ## Mở rộng xã hội đời thường
 
 - [x] Chuẩn hóa xe tư nhân: mỗi xe có đúng một chủ kiêm người lái, kiểu dáng cố định và chỗ đỗ sát đúng nhà; mỗi xe chỉ chạy một chuyến hợp lý trong khung giờ riêng mỗi ngày, khi quay về chủ xuống ở cửa còn xe về đúng vị trí đỗ.
+- [x] Thêm xe riêng cho người chơi: bấm E để lên/xuống, WASD để lái, camera và vị trí nhân vật đồng bộ theo xe.
+- [x] Cho người chơi rủ cư dân lên xe hoặc xin lên xe cư dân; quyết định đồng ý/từ chối dựa trên khoảng cách, quan hệ, tin tưởng và tính cách, hành khách được gắn vào đúng xe.
+- [x] Siết tính liên tục xã hội: bỏ câu gặp lại/hẹn hò/tin đồn cố định không có căn cứ, chỉ nhắc dữ kiện có trong ký ức và chỉ tạo lịch hẹn khi cả hai bên đồng ý rõ ràng.
+- [x] Giữ NPC đứng lại và quay mặt khi đang phản ứng/hội thoại hoặc vừa gặp đúng lịch hẹn; chỉ tiếp tục lịch sinh hoạt sau khi cuộc nói chuyện kết thúc.
 
 - [x] Cho chat steward dùng trực tiếp Qwen chung thay vì embedded agent không tương thích.
 - [x] Cho mọi cư dân trong chat tab đều nhắn được, kể cả chưa bật sub-agent riêng.
