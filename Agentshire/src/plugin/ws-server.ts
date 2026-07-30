@@ -3,8 +3,8 @@ import type { AgentEvent } from "../contracts/events.js";
 import { sanitizeTownSessionId } from "./town-session.js";
 import { getActivityLogForAgent, type ActivityLogEntry } from "./subagent-tracker.js";
 import type { CustomAssetManager } from "./custom-asset-manager.js";
-import { loadChatHistory, loadNewMessages, getCurrentSessionId, invalidateSessionCache, loadCitizenHistory, loadCitizenNewMessages, loadSubagentFinalMessage, loadChatItemHistory, loadCitizenItemHistory } from "./session-history.js";
-import { appendChatItems } from "./longterm-log.js";
+import { loadChatHistory, loadNewMessages, getCurrentSessionId, invalidateSessionCache, loadCitizenHistory, loadCitizenNewMessages, loadSubagentFinalMessage, loadChatItemHistory, loadCitizenItemHistory, clearAllChatHistoryFiles } from "./session-history.js";
+import { appendChatItems, clearLongTermChatLogs } from "./longterm-log.js";
 import { ChatSessionWatcher } from "./chat-session-watcher.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -368,7 +368,7 @@ export function startTownWsServer(opts: TownWsServerOptions): void {
     clients.add(ws);
     console.log(`[agentshire] Town frontend connected (${clients.size} total)`);
 
-    ws.on("message", (raw) => {
+    ws.on("message", async (raw) => {
       try {
         const msg = JSON.parse(String(raw));
 
@@ -448,6 +448,30 @@ export function startTownWsServer(opts: TownWsServerOptions): void {
           const townSessionId = getClientSessionId(ws);
           console.log(`${sessionLogPrefix(townSessionId)} WS ← topic_end`);
           opts.onTopicEnd?.({ townSessionId });
+        } else if (msg.type === "chat_clear_all") {
+          const townSessionId = getClientSessionId(ws);
+          const transcriptCount = clearAllChatHistoryFiles();
+          const longTermCount = clearLongTermChatLogs();
+          let fallbackCount = 0;
+          try {
+            const mod = await import("./citizen-chat-router.js");
+            fallbackCount = mod.clearCitizenFallbackMemory(townSessionId);
+          } catch {
+            // Router may not be loaded yet.
+          }
+          invalidateSessionCache();
+          for (const [client, watcher] of clientChatWatchers.entries()) {
+            watcher.stop();
+            clientChatWatchers.delete(client);
+            clearChatWatcherRetry(client);
+          }
+          console.log(`${sessionLogPrefix(townSessionId)} WS ← chat_clear_all removed transcripts=${transcriptCount} longterm=${longTermCount} fallback=${fallbackCount}`);
+          const payload = JSON.stringify({ type: "chat_cleared", scope: "all" });
+          for (const client of clients) {
+            if (client.readyState === WebSocket.OPEN && getClientSessionId(client) === townSessionId) {
+              client.send(payload);
+            }
+          }
         } else if (msg.type === "implicit_chat_request" && typeof msg.id === "string" && opts.onImplicitChat) {
           const townSessionId = getClientSessionId(ws);
           opts.onImplicitChat({

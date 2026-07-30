@@ -3560,6 +3560,12 @@ __workflow 演出测试指令:
     }
     this.eventLogPanel?.restore([])
     this.socialFeedPanel?.refresh()
+    this.dataSource.sendAction({ type: 'chat_clear_all' })
+    try {
+      window.dispatchEvent(new CustomEvent('agentshire:chat-cleared'))
+    } catch {
+      // Browser event unavailable
+    }
     this.ui.showToast('Đã xóa toàn bộ log và ký ức xã hội của thị trấn')
   }
 

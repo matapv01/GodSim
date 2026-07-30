@@ -249,6 +249,8 @@ async function main() {
           }
         } else if (action.type === 'direct_speech') {
           director.onUserMessage(action.text)
+        } else if (action.type === 'chat_clear_all') {
+          wsSend({ type: 'chat_clear_all' })
         } else if (action.type === 'abort_requested') {
           wsSend({ type: 'abort' })
         } else {

@@ -2,7 +2,7 @@
  * Reads steward session JSONL files and extracts user/assistant text messages.
  * Supports cross-session aggregation: reads from multiple sessions sorted by time.
  */
-import { readFileSync, readdirSync, existsSync, statSync, openSync, closeSync, fstatSync, readSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, statSync, openSync, closeSync, fstatSync, readSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { stateDir } from "./paths.js";
 
@@ -436,6 +436,31 @@ export function loadNewMessages(
 export function getCurrentSessionId(): string | null {
   const sessions = getSessions();
   return sessions.length > 0 ? sessions[0].sessionId : null;
+}
+
+export function clearAllChatHistoryFiles(): number {
+  const agentsDir = join(stateDir(), "agents");
+  let removed = 0;
+  try {
+    if (!existsSync(agentsDir)) return 0;
+    for (const agentDirName of readdirSync(agentsDir)) {
+      const sessDir = join(agentsDir, agentDirName, "sessions");
+      if (!existsSync(sessDir)) continue;
+      for (const file of readdirSync(sessDir)) {
+        if (!file.endsWith(".jsonl") && !file.includes(".jsonl.reset.")) continue;
+        try {
+          unlinkSync(join(sessDir, file));
+          removed++;
+        } catch {
+          // Keep clearing the remaining files.
+        }
+      }
+    }
+  } catch {
+    // Best effort clear.
+  }
+  invalidateSessionCache();
+  return removed;
 }
 
 export function loadCitizenHistory(

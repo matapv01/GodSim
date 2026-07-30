@@ -14,6 +14,16 @@ import { fileURLToPath } from "node:url";
 const CHANNEL_ID = "agentshire";
 const fallbackMemory = new Map<string, Array<{ role: "user" | "assistant"; text: string }>>();
 
+export function clearCitizenFallbackMemory(townSessionId?: string): number {
+  let removed = 0;
+  for (const key of Array.from(fallbackMemory.keys())) {
+    if (townSessionId && !key.startsWith(`${townSessionId}:`)) continue;
+    fallbackMemory.delete(key);
+    removed++;
+  }
+  return removed;
+}
+
 function getPublishedConfigPath(): string {
   const pluginDir = join(fileURLToPath(import.meta.url), "..", "..", "..");
   return join(pluginDir, "town-data", "citizen-config.json");

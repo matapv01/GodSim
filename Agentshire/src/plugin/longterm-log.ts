@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { stateDir } from "./paths.js";
 import type { ChatItem } from "../contracts/chat.js";
@@ -37,11 +37,11 @@ export function appendChatItems(params: {
 }): void {
   for (const item of params.items) {
     appendJsonl("chat", params.agentId, {
+      ...item,
       kind: "chat",
       townSessionId: params.townSessionId,
       agentId: params.agentId,
       npcId: params.npcId,
-      ...item,
     });
   }
 }
@@ -81,5 +81,24 @@ export function loadLongTermChatItems(agentId: string, limit: number = 80): Chat
     return items.slice(-Math.min(limit, MAX_HISTORY_ITEMS));
   } catch {
     return [];
+  }
+}
+
+export function clearLongTermChatLogs(): number {
+  try {
+    const dir = logDir();
+    let removed = 0;
+    for (const file of readdirSync(dir)) {
+      if (!file.startsWith("chat-") || !file.endsWith(".jsonl")) continue;
+      try {
+        unlinkSync(join(dir, file));
+        removed++;
+      } catch {
+        // Keep clearing the remaining files.
+      }
+    }
+    return removed;
+  } catch {
+    return 0;
   }
 }

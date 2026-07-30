@@ -45,22 +45,25 @@ interface UseWebSocketOptions {
   onDeltaItems?: (agentId: string, items: ChatItem[]) => void
   onNewMessages?: (agentId: string, messages: LegacyHistoryMessage[]) => void
   onAgentEvent?: (event: any) => void
+  onChatCleared?: () => void
 }
 
 const RECONNECT_DELAY = 3000
 const MAX_RECONNECTS = 10
 
-export function useWebSocket({ url, townSessionId, enabled, onHistoryItems, onDeltaItems, onNewMessages, onAgentEvent }: UseWebSocketOptions) {
+export function useWebSocket({ url, townSessionId, enabled, onHistoryItems, onDeltaItems, onNewMessages, onAgentEvent, onChatCleared }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null)
   const [connected, setConnected] = useState(false)
   const onHistoryItemsRef = useRef(onHistoryItems)
   const onDeltaItemsRef = useRef(onDeltaItems)
   const onNewMessagesRef = useRef(onNewMessages)
   const onAgentEventRef = useRef(onAgentEvent)
+  const onChatClearedRef = useRef(onChatCleared)
   onHistoryItemsRef.current = onHistoryItems
   onDeltaItemsRef.current = onDeltaItems
   onNewMessagesRef.current = onNewMessages
   onAgentEventRef.current = onAgentEvent
+  onChatClearedRef.current = onChatCleared
   const reconnectCount = useRef(0)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cleanedUp = useRef(false)
@@ -98,6 +101,8 @@ export function useWebSocket({ url, townSessionId, enabled, onHistoryItems, onDe
               onNewMessagesRef.current?.(data.agentId ?? 'steward', data.messages ?? [])
             } else if (data.type === 'agent_event' && data.event) {
               onAgentEventRef.current?.(data.event)
+            } else if (data.type === 'chat_cleared') {
+              onChatClearedRef.current?.()
             }
           } catch { /* ignore malformed */ }
         }

@@ -131,6 +131,18 @@ export function ChatView({ visible, selectedAgent, onAgentChange, onConnectedCha
     }
   }, [])
 
+  const clearChatLogs = useCallback(() => {
+    const clearedLoadedAgents = new Set(['steward', ...agents.map(getAgentRoutingKey).filter(Boolean)])
+    setItems(new Map())
+    setHistoryLoadedSet(clearedLoadedAgents)
+    historyLoadedRef.current = clearedLoadedAgents
+    setHasMoreMap(new Map())
+    setCursorMap(new Map())
+    setHistoryLoading(false)
+    loadingMoreRef.current = false
+    setThinking(false)
+  }, [agents])
+
   const { connected, sendChat, sendCitizenChat, sendMultimodal, sendAbort, sendCommand, requestHistory, bindChatAgent } = useWebSocket({
     url: wsUrl,
     townSessionId,
@@ -138,7 +150,13 @@ export function ChatView({ visible, selectedAgent, onAgentChange, onConnectedCha
     onHistoryItems: handleHistoryItems,
     onDeltaItems: handleDeltaItems,
     onAgentEvent: handleAgentEvent,
+    onChatCleared: clearChatLogs,
   })
+
+  useEffect(() => {
+    window.addEventListener('agentshire:chat-cleared', clearChatLogs)
+    return () => window.removeEventListener('agentshire:chat-cleared', clearChatLogs)
+  }, [clearChatLogs])
 
   useEffect(() => {
     onConnectedChange?.(connected)
