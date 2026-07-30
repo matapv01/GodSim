@@ -76,7 +76,9 @@ export class VirtualControls {
     this.joystickBase.addEventListener('pointerup', endJoystick)
     this.joystickBase.addEventListener('pointercancel', endJoystick)
 
-    const preventScroll = (e: TouchEvent) => { if (e.target && this.container.contains(e.target as Node)) e.preventDefault() }
+    const preventScroll = (e: TouchEvent) => {
+      if (e.target && this.container.contains(e.target as Node)) { e.preventDefault() }
+    }
     document.addEventListener('touchmove', preventScroll, { passive: false })
   }
 
