@@ -121,6 +121,12 @@ const TEMPLATES: RoutineTemplate[] = [
 ]
 
 const SPECIALTY_MATCH: Array<{ pattern: RegExp; templateId: string }> = [
+  { pattern: /nha\s*s[ĩi]|dentist|b[aá]c\s*s[ĩi]|doctor|y\s*t[aá]|clinic|ph[oò]ng\s*kh[aá]m/i, templateId: 'workaholic' },
+  { pattern: /c[ảa]nh\s*s[aá]t|c[oô]ng\s*an|police|an\s*ninh|security|tr[ậa]t\s*t[ựu]/i, templateId: 'explorer' },
+  { pattern: /ch[uủ]\s*s[ạa]p|b[aá]n\s*h[aà]ng|shopkeeper|seller|ch[oợ]/i, templateId: 'social' },
+  { pattern: /pha\s*ch[ếe]|barista|cafe|c[aà]\s*ph[eê]/i, templateId: 'social' },
+  { pattern: /[đd][ầa]u\s*b[ếe]p|cook|chef|qu[aá]n\s*[ăa]n|restaurant/i, templateId: 'workaholic' },
+  { pattern: /ph[oó]ng\s*vi[eê]n|journalist|s[aă]n\s*tin|tin\s*[đd][oồ]n/i, templateId: 'explorer' },
   { pattern: /架构|后端|开发|工程|服务端|kiến trúc|backend|hệ thống|kỹ thuật/i, templateId: 'workaholic' },
   { pattern: /产品|运营|内容|营销|自媒体|sản phẩm|vận hành|nội dung|marketing/i, templateId: 'social' },
   { pattern: /设计|UI|美术|创意|视觉|thiết kế|màu sắc|sáng tạo/i, templateId: 'creative' },

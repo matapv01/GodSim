@@ -1,5 +1,5 @@
 import type { TownConfig } from './TownConfig'
-import { createDefaultTownConfig } from './TownConfig'
+import { createDefaultTownConfig, ensureEssentialTownRoles } from './TownConfig'
 
 const CONFIG_KEY = 'agentshire_config'
 const ACTIVE_SESSION_KEY = 'agentshire_active_session'
@@ -43,7 +43,11 @@ export class TownConfigStore {
         this.clear()
         return null
       }
-      return config
+      const migrated = ensureEssentialTownRoles(config)
+      if (JSON.stringify(migrated) !== raw) {
+        this.save(migrated)
+      }
+      return migrated
     } catch {
       return null
     }
@@ -52,7 +56,7 @@ export class TownConfigStore {
   save(config: TownConfig): void {
     try {
       this.gcStaleEntries()
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(config))
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(ensureEssentialTownRoles(config)))
     } catch {
       console.warn('[TownConfigStore] Failed to save config')
     }

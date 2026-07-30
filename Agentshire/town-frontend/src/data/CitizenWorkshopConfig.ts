@@ -212,13 +212,13 @@ export function createDefaultWorkshopConfig(): CitizenWorkshopConfig {
       persona: 'SOUL',
     },
     citizens: [
-      { id: 'citizen_1', name: 'Minh', avatarId: 'char-male-b', modelSource: 'builtin', bio: 'Trầm tĩnh, logic, thích quan sát cấu trúc của mọi thứ', industry: 'Công nghệ', specialty: 'Kiến trúc hệ thống', persona: 'YAN', homeId: 'house_a' },
-      { id: 'citizen_2', name: 'Lan', avatarId: 'char-female-c', modelSource: 'builtin', bio: 'Nhanh nhạy, nhiều ý tưởng, hay để ý cảm xúc của người khác', industry: 'Thiết kế', specialty: 'Quản lý sản phẩm', persona: 'CHENGZI', homeId: 'house_b' },
-      { id: 'citizen_3', name: 'Hà', avatarId: 'char-female-e', modelSource: 'builtin', bio: 'Nhẹ nhàng, tinh tế, rất nhạy với màu sắc và không gian', industry: 'Thiết kế', specialty: 'Thiết kế UI', persona: 'HAITANG', homeId: 'house_c' },
-      { id: 'citizen_4', name: 'An', avatarId: 'char-female-f', modelSource: 'builtin', bio: 'Ấm áp, vui vẻ, thường làm bầu không khí nhẹ đi', industry: 'Công nghệ', specialty: 'Frontend', persona: 'DIANDIAN', homeId: 'house_d' },
-      { id: 'citizen_5', name: 'Khôi', avatarId: 'char-male-e', modelSource: 'builtin', bio: 'Thích hành động nhanh, không ngại việc khó, hơi nóng tính nhưng tốt bụng', industry: 'Công nghệ', specialty: 'Backend', persona: 'XIAOLIE', homeId: 'house_e' },
-      { id: 'citizen_6', name: 'Vy', avatarId: 'char-female-d', modelSource: 'builtin', bio: 'Giàu trí tưởng tượng, thích kể chuyện và bắt nhịp xu hướng', industry: 'Nội dung', specialty: 'Vận hành nội dung', persona: 'QIQI', homeId: 'house_f' },
-      { id: 'citizen_7', name: 'Bảo', avatarId: 'char-male-d', modelSource: 'builtin', bio: 'Điềm tĩnh, nói ít, thường nhìn vấn đề qua dữ kiện', industry: 'Dữ liệu', specialty: 'Phân tích dữ liệu', persona: 'CHEN', homeId: 'house_g' },
+      { id: 'citizen_1', name: 'Minh', avatarId: 'char-male-b', modelSource: 'builtin', bio: 'Trầm tĩnh, logic, làm nhân viên công ty và để ý quy trình vận hành của thị trấn', industry: 'Công nghệ', specialty: 'Nhân viên công ty', persona: 'YAN', homeId: 'house_a' },
+      { id: 'citizen_2', name: 'Lan', avatarId: 'char-female-c', modelSource: 'builtin', bio: 'Nhanh nhạy, nhiều ý tưởng, quản một sạp chợ và biết nhiều tin đời thường', industry: 'Thương mại điện tử', specialty: 'Chủ sạp chợ', persona: 'CHENGZI', homeId: 'house_b' },
+      { id: 'citizen_3', name: 'Hà', avatarId: 'char-female-e', modelSource: 'builtin', bio: 'Nhẹ nhàng, tinh tế, làm nha sĩ ở phòng khám và rất để ý sức khỏe của mọi người', industry: 'Tổng quát', specialty: 'Nha sĩ', persona: 'HAITANG', homeId: 'house_c' },
+      { id: 'citizen_4', name: 'An', avatarId: 'char-female-f', modelSource: 'builtin', bio: 'Ấm áp, vui vẻ, làm pha chế ở quán cafe nên hay nghe khách tâm sự', industry: 'Tổng quát', specialty: 'Pha chế', persona: 'DIANDIAN', homeId: 'house_d' },
+      { id: 'citizen_5', name: 'Khôi', avatarId: 'char-male-e', modelSource: 'builtin', bio: 'Thích hành động nhanh, là cảnh sát khu vực chuyên xử lý xe cộ, đậu sai chỗ và gây gổ', industry: 'Tổng quát', specialty: 'Cảnh sát', persona: 'XIAOLIE', homeId: 'house_e' },
+      { id: 'citizen_6', name: 'Vy', avatarId: 'char-female-d', modelSource: 'builtin', bio: 'Giàu trí tưởng tượng, làm đầu bếp quán ăn và bắt nhịp câu chuyện trong bữa cơm', industry: 'Tổng quát', specialty: 'Đầu bếp', persona: 'QIQI', homeId: 'house_f' },
+      { id: 'citizen_7', name: 'Bảo', avatarId: 'char-male-d', modelSource: 'builtin', bio: 'Điềm tĩnh, nói ít, làm phóng viên địa phương và ghi lại những chuyện đáng chú ý', industry: 'Nội dung', specialty: 'Phóng viên', persona: 'CHEN', homeId: 'house_g' },
     ],
   }
 }

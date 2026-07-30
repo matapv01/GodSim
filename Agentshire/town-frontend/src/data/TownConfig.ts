@@ -5,6 +5,7 @@ import refVi from './town-defaults.vi.json'
 import type { ModelTransform, AnimMapping, PublishedCitizenConfig } from './CitizenWorkshopConfig'
 import { createDefaultModelTransform } from './CitizenWorkshopConfig'
 import { getLocale } from '../i18n'
+import { getProfessionForSpecialty, type ProfessionId } from './Professions'
 
 export interface StewardConfig {
   name: string
@@ -58,6 +59,30 @@ const SPECIALTY_LABELS_ZH: Record<string, string> = {
 const SPECIALTY_LABELS_EN: Record<string, string> = {
   architecture: 'Architect', planning: 'Planner', design: 'Design', programming: 'Dev',
   writing: 'Content', data: 'Data', general: 'General',
+}
+
+const ESSENTIAL_TOWN_ROLES: Array<{
+  professionId: ProfessionId
+  fallbackCitizenId: string
+  specialty: string
+}> = [
+  { professionId: 'office_worker', fallbackCitizenId: 'citizen_1', specialty: 'Nhân viên công ty' },
+  { professionId: 'shopkeeper', fallbackCitizenId: 'citizen_2', specialty: 'Chủ sạp chợ' },
+  { professionId: 'dentist', fallbackCitizenId: 'citizen_3', specialty: 'Nha sĩ' },
+  { professionId: 'barista', fallbackCitizenId: 'citizen_4', specialty: 'Pha chế' },
+  { professionId: 'police', fallbackCitizenId: 'citizen_5', specialty: 'Cảnh sát' },
+  { professionId: 'cook', fallbackCitizenId: 'citizen_6', specialty: 'Đầu bếp' },
+  { professionId: 'journalist', fallbackCitizenId: 'citizen_7', specialty: 'Phóng viên' },
+]
+
+export function ensureEssentialTownRoles<T extends { citizens: CitizenConfig[] }>(config: T): T {
+  for (const role of ESSENTIAL_TOWN_ROLES) {
+    const hasRole = config.citizens.some(c => getProfessionForSpecialty(c.specialty).id === role.professionId)
+    if (hasRole) continue
+    const fallback = config.citizens.find(c => c.id === role.fallbackCitizenId)
+    if (fallback) fallback.specialty = role.specialty
+  }
+  return config
 }
 const SPECIALTY_LABELS_VI: Record<string, string> = {
   architecture: 'Kiến trúc', planning: 'Lập kế hoạch', design: 'Thiết kế', programming: 'Lập trình',
@@ -132,7 +157,7 @@ export function getHasPublished(): boolean { return _hasPublished }
 export function createDefaultTownConfig(): TownConfig {
   const locale = getLocale()
   const src = locale === 'vi' ? refVi : locale === 'en' ? refEn : townDefaults
-  return {
+  return ensureEssentialTownRoles({
     townName: src.townName,
     steward: {
       name: src.steward.name,
@@ -154,7 +179,7 @@ export function createDefaultTownConfig(): TownConfig {
     })),
     createdAt: Date.now(),
     version: 5,
-  }
+  })
 }
 
 export function publishedToTownView(published: PublishedCitizenConfig): TownConfig {
@@ -162,7 +187,7 @@ export function publishedToTownView(published: PublishedCitizenConfig): TownConf
   const userEntry = published.characters.find(c => c.role === 'user')
   const citizenEntries = published.characters.filter(c => c.role === 'citizen')
 
-  return {
+  return ensureEssentialTownRoles({
     townName: refVi.townName,
     steward: {
       name: stewardEntry?.name ?? 'Quản gia',
@@ -199,7 +224,7 @@ export function publishedToTownView(published: PublishedCitizenConfig): TownConf
     })),
     createdAt: Date.now(),
     version: 5,
-  }
+  })
 }
 
 export interface NPCProfile {

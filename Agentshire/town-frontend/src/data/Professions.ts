@@ -83,10 +83,10 @@ export const PROFESSIONS: ProfessionDef[] = [
   {
     id: 'police',
     label: 'Cảnh sát',
-    description: 'Đi tuần quanh công ty, chợ, công viên; người khác dè chừng khi đi qua.',
+    description: 'Đi tuần quanh công ty, chợ, công viên; xử lý xe đi sai đường, đậu sai chỗ, đánh nhau và gây gổ.',
     workplaceKeys: ['office_door'],
-    patrolKeys: ['market_door', 'park_center', 'cafe_door'],
-    affinity: { office_door: 3.8, market_door: 3.5, park_center: 3.2, cafe_door: 1.6, clinic_door: 1.2 },
+    patrolKeys: ['market_door', 'park_center', 'cafe_door', 'restaurant_door', 'office_door'],
+    affinity: { office_door: 3.8, market_door: 3.8, park_center: 3.5, cafe_door: 2.0, restaurant_door: 2.4, clinic_door: 1.2 },
     keywords: ['cảnh sát', 'canh sat', 'công an', 'cong an', 'police', 'an ninh', 'security'],
     authority: 90,
     fearAura: 80,
