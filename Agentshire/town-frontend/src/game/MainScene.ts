@@ -1138,7 +1138,7 @@ __workflow 演出测试指令:
     ]
     const sx = (x: number) => (x / 56) * 100
     const sz = (z: number) => (z / 34) * 100
-    const npcs = this.npcManager.getAll()
+    const npcs = (this.npcManager?.getAll() ?? [])
       .filter(n => n.mesh.visible && n.isInActiveScene)
       .map(n => {
         const p = n.getPosition()

@@ -12,6 +12,16 @@ $gatewayOut = Join-Path $runtime "openclaw-gateway.out.log"
 $gatewayErr = Join-Path $runtime "openclaw-gateway.err.log"
 $llmEnv = Join-Path $root "LLM_Env.ps1"
 
+if (-not (Test-Path -LiteralPath $npx)) {
+  $systemNpx = Get-Command npx.cmd -ErrorAction SilentlyContinue
+  if (-not $systemNpx) {
+    $systemNpx = Get-Command npx -ErrorAction SilentlyContinue
+  }
+  if ($systemNpx) {
+    $npx = $systemNpx.Source
+  }
+}
+
 function Test-PortListening {
   param([int] $Port)
   $client = New-Object System.Net.Sockets.TcpClient
