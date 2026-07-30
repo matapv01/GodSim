@@ -616,7 +616,10 @@ body.has-town-panel #input-bar,
 body.has-town-panel #tab-bar { display: none; }
 body.has-town-panel #game-root { padding-bottom: 0; }
 
-/* ── Virtual Controls (Mobile) ── */
+/* ── Virtual Controls (Mobile) ── 
+   All vc-* rules below are scoped under body.mobile-mode.
+   Collapsed/expanded layout controlled via #town-bottom-panel.collapsed.
+   ── */
 
 body.mobile-mode .vc-overlay {
   position: fixed; inset: 0; z-index: 50;
@@ -628,14 +631,13 @@ body.mobile-mode .vc-overlay {
 body.mobile-mode .vc-joystick-base {
   position: absolute;
   left: 24px;
-  bottom: calc(130px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(70px + env(safe-area-inset-bottom, 0px));
   width: 110px; height: 110px;
   border-radius: 50%;
   background: rgba(255,255,255,0.10);
   border: 2px solid rgba(255,255,255,0.20);
   pointer-events: auto;
   touch-action: none;
-  /* Improve iOS performance */
   -webkit-transform: translateZ(0);
   will-change: transform;
 }
@@ -655,29 +657,29 @@ body.mobile-mode .vc-joystick-knob {
 
 body.mobile-mode .vc-actions {
   position: absolute;
-  right: max(16px, env(safe-area-inset-right, 0px) + 8px);
-  bottom: calc(130px + env(safe-area-inset-bottom, 0px));
-  display: flex; flex-direction: column; gap: 12px;
+  right: max(12px, env(safe-area-inset-right, 0px) + 4px);
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
   pointer-events: none;
 }
 
 body.mobile-mode .vc-btn {
-  width: 60px; height: 60px;
+  width: 52px; height: 52px;
   border-radius: 50%;
   border: 2px solid rgba(255,255,255,0.25);
   background: rgba(0,0,0,0.5);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: #fff; font-size: 24px; font-weight: 700;
+  color: #fff; font-size: 20px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   pointer-events: auto;
   touch-action: manipulation;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  /* Prevent text selection on iOS */
   -webkit-user-select: none;
-  /* Smooth press */
   transition: transform 0.1s, background 0.1s;
 }
 
@@ -688,94 +690,79 @@ body.mobile-mode .vc-btn:active {
 }
 
 body.mobile-mode .vc-btn-e {
-  width: 68px; height: 68px;
-  font-size: 28px;
+  width: 60px; height: 60px;
+  font-size: 24px;
   background: rgba(212,165,116,0.25);
   border-color: rgba(212,165,116,0.5);
 }
 
 body.mobile-mode .vc-btn-cam {
-  font-size: 22px;
+  width: 42px; height: 42px;
+  font-size: 16px;
 }
 
 /* ═══════════════════════════════════════════
-   Mobile layout — micro chat bar + virtual controls
+   Mobile layout — micro chat + collapsible + controls
    ═══════════════════════════════════════════ */
 
-/* ── Target indicator: floats above input ── */
+/* ── Target indicator: tiny floating badge ── */
 
 body.mobile-mode #town-agent-status {
   position: absolute;
-  top: -22px;
-  left: 12px;
-  right: 12px;
-  z-index: 2;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  background: none;
-  border: none;
-  padding: 0;
+  top: -18px; left: 8px; right: 8px;
+  z-index: 2; height: 16px;
+  display: flex; align-items: center;
+  background: none; border: none; padding: 0;
   pointer-events: auto;
 }
 body.mobile-mode #town-agent-status .tas-meta {
-  flex-direction: row;
-  align-items: center;
+  flex-direction: row; align-items: center;
 }
 body.mobile-mode #town-agent-status .tas-line {
   align-items: center;
 }
 body.mobile-mode #town-agent-status .tas-session,
-body.mobile-mode #town-agent-status .tas-model {
-  display: none;
-}
+body.mobile-mode #town-agent-status .tas-model,
 body.mobile-mode #town-more-btn,
 body.mobile-mode #town-end-topic-btn {
   display: none !important;
 }
 body.mobile-mode .tas-name {
-  font-size: 10px;
-  color: rgba(255,255,255,0.6);
+  font-size: 9px; color: rgba(255,255,255,0.5);
 }
 body.mobile-mode .tas-avatar-wrap img,
 body.mobile-mode .tas-avatar-wrap .tas-avatar-fallback {
-  width: 14px; height: 14px;
-  font-size: 8px;
+  width: 12px; height: 12px; font-size: 7px;
 }
 body.mobile-mode .tas-click-wrap {
-  gap: 2px;
-  padding: 1px 5px 1px 2px;
-  border-radius: 4px;
-  background: rgba(0,0,0,0.3);
-  border: none;
+  gap: 2px; padding: 1px 4px 1px 2px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.3); border: none;
 }
 body.mobile-mode .tas-switch-arrow svg {
-  width: 9px; height: 9px;
+  width: 8px; height: 8px;
 }
 
-/* ── Input row: single-line ── */
+/* ── Input row: micro single-line ── */
 
 body.mobile-mode #town-input-row {
-  padding: 3px 6px;
-  gap: 4px;
+  padding: 2px 4px;
+  gap: 3px;
   border-top: none;
 }
 body.mobile-mode #town-input-text {
-  font-size: 12px;
-  padding: 3px 8px;
-  min-height: 24px;
-  max-height: 24px;
-  border-radius: 12px;
-  line-height: 18px;
+  font-size: 12px; padding: 2px 6px;
+  min-height: 22px; max-height: 22px;
+  border-radius: 11px; line-height: 18px;
 }
 body.mobile-mode #town-send-btn,
 body.mobile-mode #town-voice-btn {
-  width: 24px; height: 24px;
+  width: 22px; height: 22px;
   flex-shrink: 0;
 }
 body.mobile-mode #town-send-btn svg,
 body.mobile-mode #town-voice-btn svg {
-  width: 12px; height: 12px;
+  width: 11px; height: 11px;
 }
 body.mobile-mode #town-attach-btn,
 body.mobile-mode #town-image-preview,
@@ -783,87 +770,99 @@ body.mobile-mode #town-stt-interim {
   display: none;
 }
 
-/* Bottom panel: tiny pill */
+/* ── Bottom panel: micro pill with collapse ── */
+
 body.mobile-mode #town-bottom-panel {
-  bottom: 8px;
-  left: 8px;
-  right: 8px;
+  bottom: 8px; left: 8px; right: 8px;
   padding: 0;
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(20, 20, 30, 0.85);
   padding-bottom: max(2px, env(safe-area-inset-bottom, 0px));
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Collapsed: tiny floating button */
+body.mobile-mode #town-bottom-panel.collapsed {
+  transform: scale(0.45);
+  transform-origin: bottom right;
+  opacity: 0.7;
+  width: 44px; height: 44px;
+  left: auto; right: 8px;
+  bottom: 8px;
+  border-radius: 22px;
+  cursor: pointer;
+  z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+}
+body.mobile-mode #town-bottom-panel.collapsed #town-agent-status,
+body.mobile-mode #town-bottom-panel.collapsed #town-input-row,
+body.mobile-mode #town-bottom-panel.collapsed #town-stt-interim,
+body.mobile-mode #town-bottom-panel.collapsed #town-image-preview {
+  display: none;
+}
+body.mobile-mode #town-bottom-panel.collapsed::after {
+  content: "💬";
+  font-size: 18px;
+}
+
+/* Collapse toggle button */
+#town-collapse-btn {
+  display: none;
+}
+body.mobile-mode #town-collapse-btn {
+  display: flex;
+  position: absolute;
+  top: -10px; right: -4px;
+  width: 20px; height: 20px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.6);
+  font-size: 12px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  line-height: 1;
+  transition: background 0.15s;
+}
+body.mobile-mode #town-collapse-btn:hover {
+  background: rgba(255,255,255,0.25);
+}
+body.mobile-mode #town-bottom-panel.collapsed #town-collapse-btn {
+  display: none;
 }
 
 /* NPC card */
 body.mobile-mode #npc-card {
-  bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(140px + env(safe-area-inset-bottom, 0px));
 }
 
-/* ── Virtual controls ──
-   Joystick left, E button right (same band).
-   Camera above E on right side. */
-
-body.mobile-mode .vc-joystick-base {
-  left: 8px;
-  bottom: calc(70px + env(safe-area-inset-bottom, 0px));
-  width: 90px; height: 90px;
-}
-body.mobile-mode .vc-joystick-knob {
-  width: 40px; height: 40px;
-}
-body.mobile-mode .vc-actions {
-  right: max(8px, env(safe-area-inset-right, 0px) + 2px);
-  bottom: calc(85px + env(safe-area-inset-bottom, 0px));
-  gap: 10px;
-  flex-direction: column-reverse;
-}
-body.mobile-mode .vc-btn {
-  width: 50px; height: 50px;
-  font-size: 18px;
-}
-body.mobile-mode .vc-btn-e {
-  width: 58px; height: 58px;
-  font-size: 24px;
-}
-body.mobile-mode .vc-btn-cam {
-  width: 42px; height: 42px;
-  font-size: 16px;
-}
-
-/* ── iPhone SE / narrow (≤380px) ── */
+/* ── Responsive: narrow (≤380px) ── */
 
 @media (max-width: 380px) {
   body.mobile-mode .vc-joystick-base {
-    left: 6px;
-    width: 76px; height: 76px;
-    bottom: calc(65px + env(safe-area-inset-bottom, 0px));
+    left: 18px;
+    width: 96px; height: 96px;
   }
   body.mobile-mode .vc-joystick-knob {
-    width: 34px; height: 34px;
+    width: 42px; height: 42px;
   }
   body.mobile-mode .vc-actions {
-    right: max(6px, env(safe-area-inset-right, 0px) + 2px);
-    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px) + 2px);
     gap: 8px;
   }
   body.mobile-mode .vc-btn {
-    width: 44px; height: 44px;
-    font-size: 16px;
+    width: 46px; height: 46px; font-size: 18px;
   }
   body.mobile-mode .vc-btn-e {
-    width: 50px; height: 50px;
-    font-size: 20px;
+    width: 54px; height: 54px; font-size: 22px;
   }
   body.mobile-mode .vc-btn-cam {
-    width: 36px; height: 36px;
-    font-size: 14px;
+    width: 36px; height: 36px; font-size: 14px;
   }
   body.mobile-mode #town-bottom-panel {
-    left: 6px; right: 6px;
-    bottom: 6px;
-  }
-  body.mobile-mode #npc-card {
-    bottom: calc(130px + env(safe-area-inset-bottom, 0px));
+    left: 6px; right: 6px; bottom: 6px;
   }
 }
 
@@ -871,40 +870,34 @@ body.mobile-mode .vc-btn-cam {
 
 @media (max-height: 700px) {
   body.mobile-mode .vc-joystick-base {
-    width: 76px; height: 76px;
+    left: 18px;
+    width: 96px; height: 96px;
     bottom: calc(60px + env(safe-area-inset-bottom, 0px));
   }
   body.mobile-mode .vc-joystick-knob {
-    width: 34px; height: 34px;
+    width: 42px; height: 42px;
   }
   body.mobile-mode .vc-actions {
-    bottom: calc(75px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px));
     gap: 8px;
   }
   body.mobile-mode .vc-btn {
-    width: 42px; height: 42px;
-    font-size: 16px;
+    width: 44px; height: 44px; font-size: 16px;
   }
   body.mobile-mode .vc-btn-e {
-    width: 48px; height: 48px;
-    font-size: 20px;
+    width: 50px; height: 50px; font-size: 20px;
   }
   body.mobile-mode .vc-btn-cam {
-    width: 36px; height: 36px;
-    font-size: 14px;
+    width: 36px; height: 36px; font-size: 14px;
   }
   body.mobile-mode #town-bottom-panel {
-    bottom: 6px;
-    left: 6px; right: 6px;
+    bottom: 6px; left: 6px; right: 6px;
   }
   body.mobile-mode #town-input-text {
-    font-size: 12px; padding: 2px 6px; min-height: 22px; max-height: 22px;
+    font-size: 11px; min-height: 20px; max-height: 20px;
   }
   body.mobile-mode #town-input-row {
-    padding: 2px 5px;
-  }
-  body.mobile-mode #npc-card {
-    bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+    padding: 1px 3px;
   }
 }
 
@@ -912,47 +905,39 @@ body.mobile-mode .vc-btn-cam {
 
 @media (orientation: landscape) and (max-height: 450px) {
   body.mobile-mode .vc-joystick-base {
-    left: 6px;
-    width: 60px; height: 60px;
-    bottom: calc(50px + env(safe-area-inset-bottom, 0px));
+    left: 14px;
+    width: 70px; height: 70px;
+    bottom: calc(45px + env(safe-area-inset-bottom, 0px));
   }
   body.mobile-mode .vc-joystick-knob {
-    width: 28px; height: 28px;
+    width: 32px; height: 32px;
   }
   body.mobile-mode .vc-actions {
     right: max(6px, env(safe-area-inset-right, 0px) + 2px);
-    bottom: calc(55px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(45px + env(safe-area-inset-bottom, 0px));
     gap: 6px;
     flex-direction: row-reverse;
   }
   body.mobile-mode .vc-btn {
-    width: 36px; height: 36px;
-    font-size: 12px;
+    width: 36px; height: 36px; font-size: 12px;
   }
   body.mobile-mode .vc-btn-e {
-    width: 42px; height: 42px;
-    font-size: 16px;
+    width: 42px; height: 42px; font-size: 16px;
   }
   body.mobile-mode .vc-btn-cam {
-    width: 30px; height: 30px;
-    font-size: 11px;
+    width: 30px; height: 30px; font-size: 11px;
   }
   body.mobile-mode #town-bottom-panel {
-    bottom: 4px;
-    left: 4px; right: 4px;
+    bottom: 4px; left: 4px; right: 4px;
     border-radius: 12px;
   }
   body.mobile-mode #town-input-text {
-    font-size: 11px; min-height: 20px; max-height: 20px;
+    font-size: 11px; min-height: 18px; max-height: 18px;
   }
   body.mobile-mode #town-input-row {
-    padding: 2px 4px 2px;
+    padding: 1px 3px;
   }
   body.mobile-mode #town-agent-status {
-    top: -18px;
-    left: 8px;
-  }
-  body.mobile-mode #npc-card {
-    bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+    top: -16px; left: 6px;
   }
 }

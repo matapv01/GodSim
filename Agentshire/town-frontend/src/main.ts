@@ -584,6 +584,23 @@ async function main() {
       onInteract: () => scene.triggerVirtualInteraction(),
       onCamera: () => scene.focusOnSteward(),
     })
+    // Collapse toggle
+    const collapseBtn = document.getElementById('town-collapse-btn')
+    const bottomPanel = document.getElementById('town-bottom-panel')
+    if (collapseBtn && bottomPanel) {
+      collapseBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        bottomPanel.classList.toggle('collapsed')
+        collapseBtn.textContent = bottomPanel.classList.contains('collapsed') ? '+' : '−'
+      })
+      // Tap on collapsed panel re-expands
+      bottomPanel.addEventListener('click', () => {
+        if (bottomPanel.classList.contains('collapsed')) {
+          bottomPanel.classList.remove('collapsed')
+          collapseBtn.textContent = '−'
+        }
+      })
+    }
   }
 
   document.addEventListener('agentshire:music', (e: Event) => {
