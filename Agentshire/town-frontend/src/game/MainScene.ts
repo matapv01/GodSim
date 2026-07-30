@@ -347,7 +347,7 @@ export class MainScene implements GameScene {
     this.initDebugHelpers()
 
     this.ui.on(event => {
-      if (event.type === 'send_message') this.onUserMessage(event.text)
+      if (event.type === 'send_message') this.sendUserMessage(event.text)
       if (event.type === 'play_now') {
         this.dataSource.sendAction({ type: 'game_popup_action', action: 'play_now', gameUrl: event.gameUrl })
         if (event.gameUrl) window.open(event.gameUrl, '_blank', 'noopener')
@@ -1358,12 +1358,13 @@ __workflow 演出测试指令:
     this.lastUserProximityCheckAt = now
 
     const user = this.npcManager.get('user')
-    if (!user?.mesh.visible || !user.isInActiveScene) {
+    const userPos = this.getPlayerSocialPosition()
+    if (!user || !userPos || !user.isInActiveScene) {
       this.nearbyUserNpcId = null
       return
     }
 
-    const nearest = this.findNearestSpeechTarget(user, 3.1, false)
+    const nearest = this.findNearestSpeechTargetNear(userPos, 3.1, false)
     if (!nearest) {
       this.nearbyUserNpcId = null
       return
@@ -1382,17 +1383,17 @@ __workflow 演出测试指令:
 
     const npc = this.npcManager.get(npcId)
     const user = this.npcManager.get('user')
-    if (!npc || !user || !npc.mesh.visible || !npc.isInActiveScene || !user.isInActiveScene) return
+    const userPos = this.getPlayerSocialPosition()
+    if (!npc || !user || !userPos || !npc.mesh.visible || !npc.isInActiveScene || !user.isInActiveScene) return
 
     this.pendingUserReactions.add(cooldownKey)
     this.userReactionCooldowns.set(cooldownKey, now + (context === 'visit' ? 120_000 : 45_000))
 
     npc.stopMoving()
-    npc.smoothLookAt({ x: user.mesh.position.x, z: user.mesh.position.z })
+    npc.smoothLookAt({ x: userPos.x, z: userPos.z })
     user.smoothLookAt({ x: npc.mesh.position.x, z: npc.mesh.position.z })
 
-    if (context === 'visit' && npc.getPosition().distanceTo(user.getPosition()) > 3.2) {
-      const userPos = user.getPosition()
+    if (context === 'visit' && npc.getPosition().distanceTo(userPos) > 3.2) {
       const npcPos = npc.getPosition()
       const dx = userPos.x - npcPos.x
       const dz = userPos.z - npcPos.z
@@ -1408,11 +1409,11 @@ __workflow 演出测试指令:
       }, 900)
     }
     this.citizenChat.startChat(npcId)
+    this.syncDialogTarget(npcId)
 
     try {
       const text = await this.buildUserReaction(npcId, context)
       if (!text || !npc.mesh.visible || !npc.isInActiveScene) return
-      this.syncDialogTarget(npcId)
       this.dialogManager.onDialogMessage(npcId, text, false)
       if (context === 'visit' && this.isUserIntrudingOnNpcHome(npcId)) {
         this.dailyScheduler.getActivityJournals().get(npcId)?.updateRelationship(
@@ -2092,11 +2093,11 @@ __workflow 演出测试指令:
     if (npc.id === 'steward') {
       this.syncDialogTarget('steward')
     } else if (npc.id !== 'user') {
-      const user = this.npcManager.get('user')
-      const closeEnoughToTalk = !!user
+      const userPos = this.getPlayerSocialPosition()
+      const closeEnoughToTalk = !!userPos
         && npc.mesh.visible
         && npc.isInActiveScene
-        && npc.getPosition().distanceTo(user.getPosition()) <= 6
+        && npc.getPosition().distanceTo(userPos) <= 6
       if (closeEnoughToTalk) {
         this.syncDialogTarget(npc.id)
         this.citizenChat.startChat(npc.id)
@@ -2373,8 +2374,13 @@ __workflow 演出测试指令:
   private updateInteractionPrompt(): void {
     const el = this.ensureInteractionPrompt()
     if (this.vehicleManager.hasPlayerAboard()) {
+      const nearby = this.vehicleManager.isPlayerDriving()
+        ? this.findNearestSpeechTargetNear(this.getPlayerSocialPosition() ?? new THREE.Vector3(), 6.2, false)
+        : null
       el.textContent = this.vehicleManager.isPlayerDriving()
-        ? 'W A S D - lái xe · E - xuống xe'
+        ? nearby
+          ? `W A S D - lái xe · chat "mời ${nearby.label ?? nearby.name} lên xe" · E - xuống xe`
+          : 'W A S D - lái xe · E - xuống xe'
         : this.vehicleManager.canPlayerExit() ? 'E - xuống xe' : 'Đang đi cùng chủ xe · chờ xe dừng'
       el.style.opacity = '1'
       el.style.pointerEvents = 'none'
@@ -2588,21 +2594,29 @@ __workflow 演出测试指令:
 
   private resolveTownSpeechTarget(): string {
     const sceneType = this.sceneSwitcher?.getSceneType()
-    const user = this.npcManager.get('user')
+    const userPos = this.getPlayerSocialPosition()
     const cabinTarget = this.resolveCabinSpeechTarget()
     if (cabinTarget) return cabinTarget
-    if (!user || !user.mesh.visible) return this.dialogTarget
+    if (!userPos) return this.dialogTarget
     const selected = this.dialogTarget && this.dialogTarget !== 'steward'
       ? this.npcManager.get(this.dialogTarget)
       : null
     if (selected && this.isNpcInPlayerCabin(selected.id)) return selected.id
-    if (selected?.mesh.visible && selected.isInActiveScene && selected.getPosition().distanceTo(user.getPosition()) <= 6) {
+    if (selected?.mesh.visible && selected.isInActiveScene && selected.getPosition().distanceTo(userPos) <= 6) {
       return selected.id
     }
-    const nearestCitizen = this.findNearestSpeechTarget(user, 6, false)
+    const nearestCitizen = this.findNearestSpeechTargetNear(userPos, this.vehicleManager.hasPlayerAboard() ? 7.5 : 6, false)
     if (nearestCitizen) return nearestCitizen.id
-    const nearestAny = this.findNearestSpeechTarget(user, 2.2, true)
+    const nearestAny = this.findNearestSpeechTargetNear(userPos, 2.2, true)
     return nearestAny?.id ?? (sceneType === 'town' ? 'steward' : this.dialogTarget)
+  }
+
+  private getPlayerSocialPosition(): THREE.Vector3 | null {
+    const cabin = this.vehicleManager?.getPlayerCabinInfo()
+    if (cabin) return new THREE.Vector3(cabin.position.x, 0, cabin.position.z)
+    const user = this.npcManager.get('user')
+    if (!user || !user.mesh.visible) return null
+    return user.getPosition()
   }
 
   private resolveCabinSpeechTarget(): string | null {
@@ -2625,10 +2639,13 @@ __workflow 演出测试指令:
   }
 
   private findNearestSpeechTarget(user: NPC, maxDistance: number, includeSteward: boolean): NPC | null {
+    return this.findNearestSpeechTargetNear(user.getPosition(), maxDistance, includeSteward)
+  }
+
+  private findNearestSpeechTargetNear(userPos: THREE.Vector3, maxDistance: number, includeSteward: boolean): NPC | null {
     let best: NPC | null = null
     let bestDist = 3.8
     if (maxDistance > 0) bestDist = maxDistance
-    const userPos = user.getPosition()
     for (const npc of this.npcManager.getAll()) {
       if (npc.id === 'user' || !npc.mesh.visible || !npc.isInActiveScene) continue
       if (!includeSteward && npc.id === 'steward') continue

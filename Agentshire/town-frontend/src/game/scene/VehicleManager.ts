@@ -389,6 +389,7 @@ export class VehicleManager {
       vehicle.phase = 'manual'
       this.boardNpc(vehicle, 'user', true)
       this.setVehicleLabel(vehicle, vehicle.homeRoute, 0, 'manual')
+      this.syncOccupants(vehicle)
       return { ok: true, ownerNpcId: 'user', ownerName: vehicle.homeRoute.owner }
     }
 
@@ -410,6 +411,7 @@ export class VehicleManager {
     )
     if (!vehicle || vehicle.guestNpcIds.has(npcId)) return false
     this.boardNpc(vehicle, npcId, false)
+    this.syncOccupants(vehicle)
     return true
   }
 
