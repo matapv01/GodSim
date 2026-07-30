@@ -273,6 +273,7 @@ export class MainScene implements GameScene {
       onBoard: (npcId) => this.onNpcBoardVehicle(npcId),
       onLeave: (npcId, position) => this.onNpcLeaveVehicle(npcId, position),
       onMove: (npcIds, position) => this.onVehicleOccupantsMove(npcIds, position),
+      resolveVehicleMove: (vehicleId, vehicle, from, desired) => this.resolveVehicleMove(vehicleId, vehicle, from, desired),
       getPedestrians: () => this.getVehiclePedestrians(),
       onPedestrianHit: incident => this.startTrafficIncident(incident),
     })
@@ -368,6 +369,10 @@ export class MainScene implements GameScene {
     this.collisionWorld.registerScene(this.officeScene, this.officeBuilder.getCollisionObstacles())
     this.collisionWorld.registerScene(this.museumScene, this.museumBuilder.getCollisionObstacles())
     this.npcManager.setCollisionWorld(this.collisionWorld)
+    this.collisionWorld.setActorsProvider(() => [
+      ...this.npcManager.getAll(),
+      ...(this.vehicleManager?.getCollisionActors() ?? []),
+    ])
 
     this.initSubModules()
     this.initEncounterManager()
@@ -2600,6 +2605,26 @@ __workflow 演出测试指令:
         x: npc.mesh.position.x,
         z: npc.mesh.position.z,
       }))
+  }
+
+  private resolveVehicleMove(
+    vehicleId: string,
+    vehicle: THREE.Object3D,
+    from: { x: number; z: number },
+    desired: { x: number; z: number },
+  ): { x: number; z: number } {
+    if (!this.collisionWorld) return desired
+    return this.collisionWorld.moveActor(
+      {
+        id: `vehicle:${vehicleId}`,
+        mesh: vehicle,
+        collisionRadius: 0.95,
+        isInActiveScene: this.sceneSwitcher?.getSceneType() === 'town',
+      },
+      from,
+      desired,
+      { allowDetour: false },
+    )
   }
 
   private startTrafficIncident(event: VehicleIncident): boolean {

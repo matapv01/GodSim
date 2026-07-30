@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { AssetLoader } from '../visual/AssetLoader'
 import { GameClock } from '../GameClock'
 import { t } from '../../i18n'
+import type { CollisionActor } from '../physics/CollisionWorld'
 
 const CAR_MODELS = ['car_sedan', 'car_hatchback', 'car_taxi'] as const
 
@@ -45,12 +46,19 @@ interface VehicleCallbacks {
   onBoard?: (npcId: string) => void
   onLeave?: (npcId: string, position: RoadPoint) => void
   onMove?: (npcIds: string[], position: RoadPoint) => void
+  resolveVehicleMove?: (
+    vehicleId: string,
+    vehicle: THREE.Object3D,
+    from: RoadPoint,
+    desired: RoadPoint,
+  ) => RoadPoint
   getPedestrians?: () => VehiclePedestrian[]
   onPedestrianHit?: (incident: VehicleIncident) => boolean
 }
 
 export const TRAFFIC_INCIDENT_DURATION_MS = 18_000
 const VEHICLE_HIT_RADIUS = 1.05
+const VEHICLE_COLLISION_RADIUS = 0.95
 const VICTIM_HIT_COOLDOWN_MS = 60_000
 
 const VEHICLE_ROUTES: VehicleRoute[] = [
@@ -466,6 +474,17 @@ export class VehicleManager {
     return this.pool.find(v => v.occupantNpcId === 'user' || v.guestNpcIds.has('user'))?.wrapper ?? null
   }
 
+  getCollisionActors(): CollisionActor[] {
+    return this.pool
+      .filter(vehicle => vehicle.wrapper.visible)
+      .map(vehicle => ({
+        id: `vehicle:${vehicle.id}`,
+        mesh: vehicle.wrapper,
+        collisionRadius: VEHICLE_COLLISION_RADIUS,
+        isInActiveScene: true,
+      }))
+  }
+
   getPlayerVehicleInfo(): { id: string; position: RoadPoint; ownerNpcId: string } | null {
     const vehicle = this.pool.find(v => v.occupantNpcId === 'user' || v.guestNpcIds.has('user'))
     if (!vehicle) return null
@@ -534,14 +553,29 @@ export class VehicleManager {
     const len = Math.sqrt(dx * dx + dz * dz)
     if (len <= 0.001) return true
     const speed = 8.2
+    const previous = { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z }
     const next = clamp(
       vehicle.wrapper.position.x + (dx / len) * speed * delta,
       vehicle.wrapper.position.z + (dz / len) * speed * delta,
     )
-    vehicle.wrapper.position.x = next.x
-    vehicle.wrapper.position.z = next.z
+    const resolved = this.callbacks.resolveVehicleMove?.(vehicle.id, vehicle.wrapper, previous, next) ?? next
+    vehicle.wrapper.position.x = resolved.x
+    vehicle.wrapper.position.z = resolved.z
     vehicle.wrapper.rotation.y = Math.atan2(dx / len, dz / len) - Math.PI / 2
     this.syncOccupants(vehicle)
+
+    const victim = this.findHitPedestrian(vehicle, previous, resolved)
+    if (victim && this.callbacks.onPedestrianHit?.({
+      vehicle: vehicle.wrapper,
+      vehicleId: vehicle.id,
+      victimNpcId: victim.id,
+      driverName: vehicle.homeRoute.owner,
+      ownerName: vehicle.homeRoute.owner,
+      position: { x: resolved.x, z: resolved.z },
+      speed,
+    }) !== false) {
+      this.victimHitAt.set(victim.id, Date.now())
+    }
     return true
   }
 
