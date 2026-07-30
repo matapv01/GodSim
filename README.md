@@ -14,9 +14,9 @@ Mục tiêu hiện tại:
 ```text
 E:\God_Simulator
 |-- Agentshire\                         Source Agentshire
-|-- .tools\                             Node.js portable
-|-- .browsers\                          Chromium local do Playwright tải
-|-- .browser-profile\                   Profile riêng cho Chromium local
+|-- .tools\                             Node.js/OpenClaw tự tạo ở lần chạy đầu
+|-- .browsers\                          Chromium local tùy chọn, không nằm trong Git
+|-- .browser-profile\                   Profile browser riêng, tự tạo khi chạy
 |-- Ke_hoach_God_Simulator_3D_Agentshire_VN.md
 |-- TODO_God_Simulator.md
 |-- Open_Agentshire_Browser.ps1
@@ -38,9 +38,16 @@ Cách dùng đơn giản:
 2. Chơi game trong Chromium local vừa mở.
 3. Khi chơi xong, double-click `Stop_Game.bat`.
 
-`Start_Game.bat` sẽ tự đóng cửa sổ sau khi mở game thành công. Nếu OpenClaw đã có trong cache, script sẽ dùng cache để mở nhanh hơn; chỉ khi cache mất thì lần đó mới phải fallback qua `npx` và có thể lâu.
+`Start_Game.bat` sẽ tự đóng cửa sổ sau khi mở game thành công. Ở máy mới, lần chạy đầu cần Internet và có thể mất vài phút vì script sẽ tự:
 
-Browser được mở từ Chromium local trong thư mục dự án: `E:\God_Simulator\.browsers\chromium-1234\chrome-win64\chrome.exe`. Trong Task Manager nó vẫn có thể hiện tên `chrome.exe`, nhưng profile riêng nằm ở `E:\God_Simulator\.browser-profile` và không dùng extension/browser chính của bạn.
+- dùng Node.js đã cài nếu phiên bản phù hợp, nếu không thì tải Node.js portable;
+- cài thư viện Agentshire và OpenClaw đúng phiên bản vào thư mục dự án;
+- đăng ký plugin Agentshire vào OpenClaw;
+- bật Gateway rồi mở game.
+
+Các lần sau sẽ dùng cache trong `.tools` nên mở nhanh hơn. Không cần cài sẵn Node.js hay OpenClaw.
+
+Nếu repo có Chromium local tại `.browsers`, game sẽ dùng bản đó. Nếu không có, script tự dùng Chrome hoặc Edge trên máy với profile riêng tại `.browser-profile` và tắt extension, nên không dùng profile/browser chính của bạn.
 
 ## Cách quan sát trong game
 
@@ -57,7 +64,7 @@ Browser được mở từ Chromium local trong thư mục dự án: `E:\God_Sim
 
 ## Cấu hình LLM cho hội thoại NPC
 
-Gateway tự nạp `LLM_Env.ps1` khi chạy `Start_Game.bat`. File này đang trỏ tới:
+Gateway tự nạp `LLM_Env.ps1` khi chạy `Start_Game.bat`. File chứa key thật không được đưa lên Git. Trên máy mới, sao chép `LLM_Env.example.ps1` thành `LLM_Env.ps1`, sau đó điền endpoint, model và key của máy đó.
 
 ```text
 http://your-llm-host:8080/v1/chat/completions
@@ -214,7 +221,7 @@ Chỉ tắt process khi chắc chắn đó là server cũ của dự án này.
 
 ## Nếu thiếu Node/npm
 
-Repo đã có Node portable tại:
+`Start_Game.bat` tự tải Node portable vào thư mục sau nếu máy chưa có Node.js phù hợp:
 
 ```text
 E:\God_Simulator\.tools\node-v24.18.0-win-x64
