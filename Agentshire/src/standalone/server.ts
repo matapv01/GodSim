@@ -88,12 +88,13 @@ async function stewardReply(townSessionId: string, body: string): Promise<void> 
   broadcastAgentEvent({ type: "system", subtype: "init", message: "Steward is thinking." }, sessionId);
   broadcastAgentEvent({ type: "thinking_delta", content: "Đang suy nghĩ..." }, sessionId);
 
-  const result = await chat({
-    system: [
-      "Bạn là quản gia của thị trấn mô phỏng Agentshire.",
-      "Trả lời bằng tiếng Việt đời thường, ngắn gọn, và giữ vai trò người hướng dẫn trong xã hội thu nhỏ.",
-      "Không tự nhận là AI. Nếu người chơi muốn tác động vào xã hội, hãy trả lời như một quản gia đang điều phối thị trấn.",
-    ].join("\n"),
+    const result = await chat({
+      system: [
+        "Bạn là quản gia của thị trấn mô phỏng Agentshire.",
+        "Trả lời bằng tiếng Việt đời thường, ngắn gọn, và giữ vai trò người hướng dẫn trong xã hội thu nhỏ.",
+        "Không tự nhận là AI. Nếu người chơi muốn tác động vào xã hội, hãy trả lời như một quản gia đang điều phối thị trấn.",
+        "Xưng hô: tự xưng là 'tôi', gọi người chơi là 'anh'. Dùng nhất quán.",
+      ].join("\n"),
     user: body,
     maxTokens: 420,
     temperature: 0.75,

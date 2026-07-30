@@ -52,6 +52,7 @@ import { SceneBootstrap } from './SceneBootstrap'
 import { WorkflowHandler } from './workflow/WorkflowHandler'
 import { Choreographer } from './workflow/Choreographer'
 import { CitizenChatManager } from '../npc/CitizenChatManager'
+import { buildXungHoInstruction, getNpcGenderString, resolvePronouns } from '../npc/PronounSystem'
 import { installDebugBindings, removeDebugBindings } from './DebugBindings'
 import { detectProfile } from '../engine/Performance'
 import type { MinigameSlot } from './minigame/MinigameSlot'
@@ -175,7 +176,7 @@ export class MainScene implements GameScene {
     this.ui.showToast(`${name} đổi nghề thành ${clean}`)
   }
   private inputEnabled = false
-  private dialogTarget = 'steward'
+  private dialogTarget: string | null = null
   private followBehavior = new FollowBehavior()
   private playerMoveEnabled = true
   private playerKeys = new Set<string>()
@@ -399,7 +400,6 @@ export class MainScene implements GameScene {
     })
 
     this.engine.input.on('doubletap', () => {
-      this.dialogTarget = 'steward'
       const stewardNpc = this.npcManager.get('steward')
       if (stewardNpc) this.cameraCtrl.follow(stewardNpc.mesh)
     })
@@ -1071,15 +1071,16 @@ __workflow 演出测试指令:
 
   // ── User message from input bar ──
 
-  showUserBubble(text: string, skipLocalCitizenReply = false, targetNpcId = this.dialogTarget): void {
+  showUserBubble(text: string, skipLocalCitizenReply = false, targetNpcId?: string): void {
+    const id = targetNpcId ?? this.dialogTarget ?? undefined
     const userNpc = this.npcManager.get('user')
     this.logBubbleText('user_message', text)
     if (userNpc) this.bubbles.show(userNpc.mesh, text, getBubbleDurationMs(text, 'user'))
     this.ui.addChatMessage({ from: t('mayor'), text, timestamp: Date.now() })
-    const targetName = this.getDialogTargetName(targetNpcId)
+    const targetName = this.getDialogTargetName(id)
     this.townJournal?.recordPlayerMessage(this.getPlayerName(), text, targetName)
-    if (targetNpcId && targetNpcId !== 'steward') {
-      const journal = this.dailyScheduler.getActivityJournals().get(targetNpcId)
+    if (id && id !== 'steward') {
+      const journal = this.dailyScheduler.getActivityJournals().get(id)
       journal?.updateRelationship(
         { npcId: 'user', name: this.getPlayerName() },
         this.classifyPlayerMessageRelationship(text),
@@ -1087,8 +1088,10 @@ __workflow 演出测试指令:
       this.socialFeedPanel?.refresh()
       this.saveSnapshot()
     }
-    this.citizenChat.onUserMessage(targetNpcId)
-    if (!skipLocalCitizenReply) this.replyFromLocalCitizenIfNeeded(text, targetNpcId)
+    if (id) {
+      this.citizenChat.onUserMessage(id)
+      if (!skipLocalCitizenReply) this.replyFromLocalCitizenIfNeeded(text, id)
+    }
   }
 
   private classifyPlayerMessageRelationship(text: string): {
@@ -1290,7 +1293,7 @@ __workflow 演出测试指令:
     `
   }
 
-  getDialogTarget(): string {
+  getDialogTarget(): string | null {
     return this.dialogTarget
   }
 
@@ -1400,7 +1403,7 @@ __workflow 演出测试指令:
       return
     }
 
-    const nearest = this.findNearestSpeechTargetNear(userPos, 3.1, false)
+    const nearest = this.findNearestSpeechTargetNear(userPos, 3.1, true)
     if (!nearest) {
       this.nearbyUserNpcId = null
       return
@@ -1496,6 +1499,7 @@ __workflow 演出测试指令:
         'Chỉ nhắc chuyện cũ, lời hứa, cuộc hẹn hoặc tình cảm nếu chúng có trong dữ liệu gần đây. Không tự bịa "tối gặp", "chuyện hôm trước" hay một mức thân thiết chưa tồn tại.',
         'Không nói rằng bạn hoặc người chơi sắp đi đâu nếu dữ liệu không có kế hoạch đó.',
         'Nói đời thường, trực tiếp, có cảm xúc; tránh khách sáo và tránh văn phong trợ lý.',
+        buildXungHoInstruction(npcId, relation?.status),
         'Chỉ trả về đúng 1 câu thoại tiếng Việt, tối đa 22 từ, không markdown.',
       ].join('\n'),
       user: JSON.stringify({
@@ -1656,6 +1660,10 @@ __workflow 演出测试指令:
     const speechTarget = requestedTargetNpcId && this.npcManager.get(requestedTargetNpcId)
       ? requestedTargetNpcId
       : this.resolveTownSpeechTarget()
+    if (!speechTarget) {
+      this.ui.showToast('Hãy lại gần một người rồi mới nói chuyện')
+      return
+    }
     this.syncDialogTarget(speechTarget)
     const isVehicleInvite = this.isVehicleInvitationText(text)
     const mayBeAppointment = this.isPlayerAppointmentText(text)
@@ -1748,7 +1756,7 @@ __workflow 演出测试指令:
     if (event.category === 'steward') {
       this.ui.setDialogTarget(config)
       this.ui.updateStewardName(config.name)
-      this.dialogTarget = 'steward'
+      this.dialogTarget = null
     }
     if (event.task && event.category === 'citizen') {
       this.workflow.workingCitizens.add(event.npcId)
@@ -2131,9 +2139,7 @@ __workflow 演出测试指令:
     this.selectNPC(npc)
     this.cameraCtrl.follow(npc.mesh)
 
-    if (npc.id === 'steward') {
-      this.syncDialogTarget('steward')
-    } else if (npc.id !== 'user') {
+    if (npc.id !== 'user') {
       const userPos = this.getPlayerSocialPosition()
       const closeEnoughToTalk = !!userPos
         && npc.mesh.visible
@@ -2141,7 +2147,7 @@ __workflow 演出测试指令:
         && npc.getPosition().distanceTo(userPos) <= 6
       if (closeEnoughToTalk) {
         this.syncDialogTarget(npc.id)
-        this.citizenChat.startChat(npc.id)
+        if (npc.id !== 'steward') this.citizenChat.startChat(npc.id)
       }
     }
 
@@ -2846,23 +2852,21 @@ __workflow 演出测试指令:
     return target?.label ?? target?.name ?? targetNpcId
   }
 
-  private resolveTownSpeechTarget(): string {
+  private resolveTownSpeechTarget(): string | null {
     const sceneType = this.sceneSwitcher?.getSceneType()
     const userPos = this.getPlayerSocialPosition()
     const cabinTarget = this.resolveCabinSpeechTarget()
     if (cabinTarget) return cabinTarget
-    if (!userPos) return this.dialogTarget
-    const selected = this.dialogTarget && this.dialogTarget !== 'steward'
+    if (!userPos) return null
+    const selected = this.dialogTarget
       ? this.npcManager.get(this.dialogTarget)
       : null
     if (selected && this.isNpcInPlayerCabin(selected.id)) return selected.id
     if (selected?.mesh.visible && selected.isInActiveScene && selected.getPosition().distanceTo(userPos) <= 6) {
       return selected.id
     }
-    const nearestCitizen = this.findNearestSpeechTargetNear(userPos, this.vehicleManager.hasPlayerAboard() ? 7.5 : 6, false)
-    if (nearestCitizen) return nearestCitizen.id
-    const nearestAny = this.findNearestSpeechTargetNear(userPos, 2.2, true)
-    return nearestAny?.id ?? (sceneType === 'town' ? 'steward' : this.dialogTarget)
+    const nearest = this.findNearestSpeechTargetNear(userPos, this.vehicleManager.hasPlayerAboard() ? 7.5 : 6, true)
+    return nearest?.id ?? null
   }
 
   private getPlayerSocialPosition(): THREE.Vector3 | null {
@@ -3003,6 +3007,7 @@ __workflow 演出测试指令:
         'Chỉ nhắc chuyện cũ, lời hứa, cuộc hẹn hoặc cảm xúc đã có nếu chúng xuất hiện trong recent_activity, recent_dialogues hoặc relationship.recentTopics.',
         'Không tự bịa chuyện hôm trước, cuộc hẹn tối nay, người thứ ba, ghen tuông hay mức độ thân thiết.',
         'Nếu đang nói chuyện trực tiếp thì đứng lại nói; không tuyên bố sẽ đi đâu nếu không thật sự có kế hoạch tương ứng trong dữ liệu.',
+        buildXungHoInstruction(npcId, relation?.status),
         'Không dùng markdown. Không tự xưng là AI.',
       ].join('\n'),
       user: JSON.stringify({

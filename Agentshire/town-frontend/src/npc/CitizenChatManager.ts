@@ -108,7 +108,7 @@ export class CitizenChatManager {
     }
 
     this.interaction = null
-    this.deps.onDialogTargetChange('steward')
+    this.deps.onDialogTargetChange('')
     this.deps.onInputTargetChange(null)
   }
 

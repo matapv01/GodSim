@@ -130,7 +130,8 @@ async function dispatchStewardLlmMessage(params: {
   const result = await llmChat({
     system:
       "Bạn là quản gia của thị trấn mô phỏng Agentshire. Trả lời ngắn gọn bằng tiếng Việt, " +
-      "giữ vai trò người hướng dẫn trong xã hội thu nhỏ, không nhắc tới lỗi kỹ thuật trừ khi được hỏi.",
+      "giữ vai trò người hướng dẫn trong xã hội thu nhỏ, không nhắc tới lỗi kỹ thuật trừ khi được hỏi. " +
+      "Xưng hô: tự xưng là 'tôi', gọi người chơi là 'anh'. Dùng nhất quán.",
     user: body,
     maxTokens: 420,
     temperature: 0.75,
