@@ -30,6 +30,8 @@ interface MoveOptions {
 
 const SWEEP_STEP = 0.12
 const COLLISION_EPSILON = 0.01
+const PATH_GRID_STEP = 1.4
+const PATH_MAX_NODES = 2200
 
 /**
  * Lightweight 2D collision/avoidance for the walkable XZ plane.
@@ -49,6 +51,81 @@ export class CollisionWorld {
 
   registerScene(scene: THREE.Scene, obstacles: CollisionObstacle[]): void {
     this.obstaclesByScene.set(scene, obstacles)
+  }
+
+  planPath(actor: CollisionActor, target: { x: number; z: number }): { x: number; z: number }[] {
+    const scene = actor.mesh.parent
+    if (!(scene instanceof THREE.Scene)) return [{ ...target }]
+
+    const start = { x: actor.mesh.position.x, z: actor.mesh.position.z }
+    const end = this.projectTarget(actor, target)
+    const radius = actor.collisionRadius + 0.08
+    if (this.hasStaticLineOfSight(scene, start, end, radius)) return [end]
+
+    const bounds = this.getPathBounds(scene, start, end)
+    const toCell = (point: { x: number; z: number }) => ({
+      cx: THREE.MathUtils.clamp(Math.round((point.x - bounds.minX) / PATH_GRID_STEP), 0, bounds.cols - 1),
+      cz: THREE.MathUtils.clamp(Math.round((point.z - bounds.minZ) / PATH_GRID_STEP), 0, bounds.rows - 1),
+    })
+    const toWorld = (cx: number, cz: number) => ({
+      x: bounds.minX + cx * PATH_GRID_STEP,
+      z: bounds.minZ + cz * PATH_GRID_STEP,
+    })
+    const key = (cx: number, cz: number) => `${cx},${cz}`
+    const startCell = toCell(start)
+    const endCell = toCell(end)
+    const startKey = key(startCell.cx, startCell.cz)
+    const endKey = key(endCell.cx, endCell.cz)
+
+    const open = new Set<string>([startKey])
+    const cameFrom = new Map<string, string>()
+    const gScore = new Map<string, number>([[startKey, 0]])
+    const fScore = new Map<string, number>([[startKey, this.gridDistance(startCell, endCell)]])
+    const neighbors = [
+      [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
+      [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2],
+    ]
+
+    for (let searched = 0; open.size > 0 && searched < PATH_MAX_NODES; searched++) {
+      let currentKey = ''
+      let currentScore = Infinity
+      for (const candidate of open) {
+        const score = fScore.get(candidate) ?? Infinity
+        if (score < currentScore) {
+          currentScore = score
+          currentKey = candidate
+        }
+      }
+      if (currentKey === endKey) {
+        const rawPath = this.reconstructGridPath(currentKey, cameFrom, toWorld)
+        const smoothed = this.smoothPath(scene, start, rawPath, radius)
+        return smoothed.length > 0 ? [...smoothed.slice(0, -1), end] : [end]
+      }
+
+      open.delete(currentKey)
+      const [cx, cz] = currentKey.split(',').map(Number)
+      for (const [dx, dz, cost] of neighbors) {
+        const nx = cx + dx
+        const nz = cz + dz
+        if (nx < 0 || nz < 0 || nx >= bounds.cols || nz >= bounds.rows) continue
+        const world = toWorld(nx, nz)
+        if (this.isStaticBlocked(world.x, world.z, radius, scene)) continue
+        if (dx !== 0 && dz !== 0) {
+          const sideA = toWorld(cx + dx, cz)
+          const sideB = toWorld(cx, cz + dz)
+          if (this.isStaticBlocked(sideA.x, sideA.z, radius, scene) || this.isStaticBlocked(sideB.x, sideB.z, radius, scene)) continue
+        }
+        const nextKey = key(nx, nz)
+        const tentative = (gScore.get(currentKey) ?? Infinity) + cost
+        if (tentative >= (gScore.get(nextKey) ?? Infinity)) continue
+        cameFrom.set(nextKey, currentKey)
+        gScore.set(nextKey, tentative)
+        fScore.set(nextKey, tentative + this.gridDistance({ cx: nx, cz: nz }, endCell))
+        open.add(nextKey)
+      }
+    }
+
+    return [end]
   }
 
   projectTarget(actor: CollisionActor, target: { x: number; z: number }): { x: number; z: number } {
@@ -213,6 +290,101 @@ export class CollisionWorld {
       if (dx * dx + dz * dz < minDistance * minDistance) return true
     }
     return false
+  }
+
+  private isStaticBlocked(x: number, z: number, radius: number, scene: THREE.Scene): boolean {
+    for (const obstacle of this.obstaclesByScene.get(scene) ?? []) {
+      if (this.overlapsObstacle(x, z, radius, obstacle)) return true
+    }
+    return false
+  }
+
+  private hasStaticLineOfSight(
+    scene: THREE.Scene,
+    from: { x: number; z: number },
+    to: { x: number; z: number },
+    radius: number,
+  ): boolean {
+    const dx = to.x - from.x
+    const dz = to.z - from.z
+    const distance = Math.sqrt(dx * dx + dz * dz)
+    const steps = Math.max(1, Math.ceil(distance / (SWEEP_STEP * 3)))
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps
+      if (this.isStaticBlocked(from.x + dx * t, from.z + dz * t, radius, scene)) return false
+    }
+    return true
+  }
+
+  private getPathBounds(scene: THREE.Scene, start: { x: number; z: number }, end: { x: number; z: number }) {
+    let minX = Math.min(start.x, end.x) - 8
+    let maxX = Math.max(start.x, end.x) + 8
+    let minZ = Math.min(start.z, end.z) - 8
+    let maxZ = Math.max(start.z, end.z) + 8
+    for (const obstacle of this.obstaclesByScene.get(scene) ?? []) {
+      if (obstacle.type === 'circle') {
+        minX = Math.min(minX, obstacle.x - obstacle.radius - 3)
+        maxX = Math.max(maxX, obstacle.x + obstacle.radius + 3)
+        minZ = Math.min(minZ, obstacle.z - obstacle.radius - 3)
+        maxZ = Math.max(maxZ, obstacle.z + obstacle.radius + 3)
+      } else {
+        minX = Math.min(minX, obstacle.minX - 3)
+        maxX = Math.max(maxX, obstacle.maxX + 3)
+        minZ = Math.min(minZ, obstacle.minZ - 3)
+        maxZ = Math.max(maxZ, obstacle.maxZ + 3)
+      }
+    }
+    return {
+      minX,
+      minZ,
+      cols: Math.max(2, Math.ceil((maxX - minX) / PATH_GRID_STEP) + 1),
+      rows: Math.max(2, Math.ceil((maxZ - minZ) / PATH_GRID_STEP) + 1),
+    }
+  }
+
+  private gridDistance(a: { cx: number; cz: number }, b: { cx: number; cz: number }): number {
+    return Math.hypot(a.cx - b.cx, a.cz - b.cz)
+  }
+
+  private reconstructGridPath(
+    endKey: string,
+    cameFrom: Map<string, string>,
+    toWorld: (cx: number, cz: number) => { x: number; z: number },
+  ): { x: number; z: number }[] {
+    const keys = [endKey]
+    let current = endKey
+    while (cameFrom.has(current)) {
+      current = cameFrom.get(current)!
+      keys.push(current)
+    }
+    keys.reverse()
+    return keys.slice(1).map(item => {
+      const [cx, cz] = item.split(',').map(Number)
+      return toWorld(cx, cz)
+    })
+  }
+
+  private smoothPath(
+    scene: THREE.Scene,
+    start: { x: number; z: number },
+    path: { x: number; z: number }[],
+    radius: number,
+  ): { x: number; z: number }[] {
+    const result: { x: number; z: number }[] = []
+    let anchor = start
+    for (let i = 0; i < path.length; i++) {
+      let farthest = i
+      for (let j = path.length - 1; j >= i; j--) {
+        if (this.hasStaticLineOfSight(scene, anchor, path[j], radius)) {
+          farthest = j
+          break
+        }
+      }
+      result.push(path[farthest])
+      anchor = path[farthest]
+      i = farthest
+    }
+    return result
   }
 
   private getSceneActors(scene: THREE.Scene, excludeId: string): CollisionActor[] {

@@ -99,6 +99,7 @@ export class NPCManager {
   private configureNavigation(npc: NPC): void {
     npc.setNavigationAdapter(this.collisionWorld ? {
       projectTarget: target => this.collisionWorld?.projectTarget(npc, target) ?? target,
+      planPath: target => this.collisionWorld?.planPath(npc, target) ?? [target],
       resolveMovement: (from, desired) =>
         this.collisionWorld?.moveActor(npc, from, desired, { allowDetour: npc.id !== 'user' }) ?? desired,
     } : null)

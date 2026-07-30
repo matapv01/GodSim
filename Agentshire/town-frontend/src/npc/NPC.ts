@@ -26,6 +26,7 @@ export type NpcState =
 
 export interface NPCNavigationAdapter {
   projectTarget(target: { x: number; z: number }): { x: number; z: number }
+  planPath?(target: { x: number; z: number }): { x: number; z: number }[]
   resolveMovement(
     from: { x: number; z: number },
     desired: { x: number; z: number },
@@ -57,6 +58,7 @@ export class NPC {
   private static assetLoader: AssetLoader | null = null
 
   private targetPos: THREE.Vector3 | null = null
+  private pathQueue: THREE.Vector3[] = []
   private speed: number = 3
   private moveResolve: ((status: 'arrived' | 'interrupted') => void) | null = null
   private navigationAdapter: NPCNavigationAdapter | null = null
@@ -546,6 +548,7 @@ export class NPC {
   private finishMove(status: 'arrived' | 'interrupted'): void {
     this.isMoving = false
     this.targetPos = null
+    this.pathQueue = []
     this.desiredRotationY = null
     this.transitionTo('idle')
     this.resolveMove(status)
@@ -570,7 +573,10 @@ export class NPC {
       this.moveResolve = resolve
       this.speed = speed ?? 3
       const walkableTarget = this.navigationAdapter?.projectTarget(target) ?? target
-      this.targetPos = new THREE.Vector3(walkableTarget.x, 0, walkableTarget.z)
+      const path = this.navigationAdapter?.planPath?.(walkableTarget) ?? [walkableTarget]
+      const [next, ...rest] = path.length > 0 ? path : [walkableTarget]
+      this.targetPos = new THREE.Vector3(next.x, 0, next.z)
+      this.pathQueue = rest.map(wp => new THREE.Vector3(wp.x, 0, wp.z))
 
       if (this.npcState !== 'idle' && this.npcState !== 'walking') {
         this.transitionTo('idle')
@@ -636,7 +642,12 @@ export class NPC {
 
       if (dist < 0.15) {
         current.set(this.targetPos.x, 0, this.targetPos.z)
-        this.finishMove('arrived')
+        const nextTarget = this.pathQueue.shift()
+        if (nextTarget) {
+          this.targetPos = nextTarget
+        } else {
+          this.finishMove('arrived')
+        }
       } else {
         const step = Math.min(this.speed * deltaTime, dist)
         const nx = dx / dist

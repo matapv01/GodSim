@@ -81,6 +81,25 @@ describe('CollisionWorld', () => {
     expect(target.z).toBeCloseTo(0)
   })
 
+  it('plans waypoints around blocking buildings instead of walking into them', () => {
+    const { scene, world, actors } = setup([{
+      type: 'box',
+      id: 'shop',
+      minX: 3,
+      maxX: 7,
+      minZ: -2,
+      maxZ: 2,
+    }])
+    const npc = actor('npc', scene, 0, 0)
+    actors.push(npc)
+
+    const path = world.planPath(npc, { x: 10, z: 0 })
+
+    expect(path.length).toBeGreaterThan(1)
+    expect(path[path.length - 1].x).toBeCloseTo(10)
+    expect(path.some(point => Math.abs(point.z) > 2.45)).toBe(true)
+  })
+
   it('prevents one person from walking through another person', () => {
     const { scene, world, actors } = setup()
     const moving = actor('moving', scene, 0, 0)
