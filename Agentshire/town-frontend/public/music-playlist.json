@@ -1,8 +1,0 @@
-{
-  "enabled": false,
-  "day": "",
-  "dusk": "",
-  "night": "",
-  "work": "",
-  "guide": "Paste YouTube video IDs. From https://youtu.be/XXXXXXXXXXX or https://www.youtube.com/watch?v=XXXXXXXXXXX take the XXXXXXXXXXX part. day = daytime, dusk = dawn/sunset, night = night, work = office. Set enabled=true to stream from YouTube instead of the local mp3 files. The video must allow embedding (most official uploads do)."
-}

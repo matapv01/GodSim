@@ -15,6 +15,15 @@ function resolveTrack(period: TimePeriod, scene: SceneType): StreamTrack {
   return 'day'
 }
 
+function extractVideoId(input: string): string {
+  const raw = String(input ?? '').trim()
+  if (!raw) return ''
+  const m = raw.match(
+    /(?:youtube\.com\/(?:watch\?.*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+  )
+  return m ? m[1] : raw
+}
+
 interface StreamBgmOptions {
   onFallback?: () => void
 }
@@ -37,21 +46,14 @@ export class StreamBGM {
   }
 
   async init(): Promise<boolean> {
-    let data: any = null
-    try {
-      const resp = await fetch('/music-playlist.json', { cache: 'no-store' })
-      if (!resp.ok) return false
-      data = await resp.json()
-    } catch {
-      return false
-    }
-    if (!data?.enabled) return false
+    const env = import.meta.env
+    if (String(env.VITE_BGM_STREAM_ENABLED ?? '').trim() !== 'true') return false
 
     this.playlist = {
-      day: String(data.day ?? ''),
-      dusk: String(data.dusk ?? ''),
-      night: String(data.night ?? ''),
-      work: String(data.work ?? ''),
+      day: extractVideoId(env.VITE_BGM_YOUTUBE_DAY),
+      dusk: extractVideoId(env.VITE_BGM_YOUTUBE_DUSK),
+      night: extractVideoId(env.VITE_BGM_YOUTUBE_NIGHT),
+      work: extractVideoId(env.VITE_BGM_YOUTUBE_WORK),
     }
     const firstVideoId = TRACK_ORDER.map(t => this.playlist[t]).find(Boolean)
     if (!firstVideoId) return false
