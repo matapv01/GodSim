@@ -108,6 +108,7 @@ export class CitizenChatManager {
     }
 
     this.interaction = null
+    this.deps.getFollowBehavior().stop()
     this.deps.onDialogTargetChange('')
     this.deps.onInputTargetChange(null)
   }

@@ -3002,7 +3002,7 @@ __workflow 演出测试指令:
   private findAllNearbySpeechTargets(userPos: THREE.Vector3, maxDistance: number): NPC[] {
     const result: NPC[] = []
     for (const npc of this.npcManager.getAll()) {
-      if (npc.id === 'user' || !npc.mesh.visible || !npc.isInActiveScene) continue
+      if (npc.id === 'user' || npc.id === 'steward' || !npc.mesh.visible || !npc.isInActiveScene) continue
       if (npc.getPosition().distanceTo(userPos) > maxDistance) continue
       result.push(npc)
     }
