@@ -7,7 +7,7 @@ import type { CollisionActor } from '../physics/CollisionWorld'
 const CAR_MODELS = ['car_sedan', 'car_hatchback', 'car_taxi'] as const
 
 const ROAD_Y = 0.06
-const LANE_OFFSET = 1.0
+const LANE_OFFSET = 2.0
 
 interface RoadPoint { x: number; z: number }
 interface VehicleRoute {
@@ -100,13 +100,13 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     owner: 'Người chơi',
     appearance: 'sedan riêng',
     modelKey: 'car_sedan',
-    homeParking: { x: 9.5, z: 28.5 },
+    homeParking: { x: 6.5, z: 50.0 },
     travelHours: [0, 24],
     automatic: false,
     from: 'Nhà người chơi',
     to: 'Quảng trường',
     purpose: 'đi lại trong thị trấn',
-    points: [{ x: 11.2, z: 29.4 }, { x: 16, z: 29.5 }, { x: 16, z: 26.75 }, { x: 24, z: 26.75 }, { x: 24, z: 18 }, { x: 25.6, z: 14.5 }],
+    points: [{ x: 6.0, z: 49.0 }, { x: 16, z: 49.0 }, { x: 16, z: 32 }, { x: 27.4, z: 32 }, { x: 27.4, z: 20.4 }],
   },
   {
     id: 'minh_sedan',
@@ -114,13 +114,13 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     owner: 'Minh',
     appearance: 'sedan',
     modelKey: 'car_sedan',
-    homeParking: { x: 4.65, z: 8.25 },
+    homeParking: { x: 8.5, z: 16.5 },
     travelHours: [6, 9],
     automatic: true,
     from: 'Nhà Minh',
     to: 'Công ty chính',
     purpose: 'đi làm',
-    points: [{ x: 6.0, z: 7.5 }, { x: 16, z: 7.5 }, { x: 16, z: 10.5 }, { x: 24.4, z: 10.5 }, { x: 24.4, z: 13.0 }],
+    points: [{ x: 8.0, z: 17.0 }, { x: 16, z: 17.0 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 38.8, z: 13.0 }, { x: 48.0, z: 13.0 }],
   },
   {
     id: 'lan_hatchback',
@@ -128,13 +128,13 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     owner: 'Lan',
     appearance: 'hatchback nhỏ',
     modelKey: 'car_hatchback',
-    homeParking: { x: 4.65, z: 13.75 },
+    homeParking: { x: 8.5, z: 21.0 },
     travelHours: [8, 11],
     automatic: true,
     from: 'Nhà Lan',
     to: 'Khu chợ',
     purpose: 'mua đồ',
-    points: [{ x: 6.0, z: 13.0 }, { x: 16, z: 13.0 }, { x: 16, z: 18.0 }, { x: 38.8, z: 18.0 }, { x: 38.8, z: 10.5 }],
+    points: [{ x: 8.0, z: 21.5 }, { x: 16, z: 21.5 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 38.8, z: 32 }, { x: 50, z: 32 }, { x: 50, z: 46.0 }],
   },
   {
     id: 'vy_city_car',
@@ -142,13 +142,13 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     owner: 'Vy',
     appearance: 'xe đô thị',
     modelKey: 'car_taxi',
-    homeParking: { x: 11.5, z: 20.5 },
+    homeParking: { x: 8.5, z: 53.0 },
     travelHours: [14, 23],
     automatic: true,
     from: 'Nhà Vy',
     to: 'Quán cà phê',
     purpose: 'gặp người quen',
-    points: [{ x: 12.0, z: 18.5 }, { x: 16, z: 18.5 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 39.4, z: 26.75 }],
+    points: [{ x: 8.0, z: 54.0 }, { x: 16, z: 50.0 }, { x: 16, z: 32 }, { x: 50, z: 32 }, { x: 50, z: 54.0 }],
   },
   {
     id: 'khoi_patrol',
@@ -156,13 +156,13 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     owner: 'Khôi',
     appearance: 'xe tuần tra',
     modelKey: 'car_sedan',
-    homeParking: { x: 11.0, z: 23.0 },
+    homeParking: { x: 72.0, z: 21.5 },
     travelHours: [7, 24],
     automatic: true,
     from: 'Nhà Khôi',
     to: 'Đường tuần tra',
     purpose: 'đi tuần ban đêm',
-    points: [{ x: 16, z: 24 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 38.8, z: 18 }, { x: 16, z: 18 }, { x: 16, z: 24 }],
+    points: [{ x: 16, z: 32 }, { x: 38.8, z: 32 }, { x: 38.8, z: 10.5 }, { x: 16, z: 10.5 }, { x: 16, z: 32 }],
   },
 ]
 

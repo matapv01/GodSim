@@ -1232,8 +1232,8 @@ __workflow 演出测试指令:
       { key: 'museum_door', name: 'Nhà văn hóa', x: WAYPOINTS.museum_door.x, z: WAYPOINTS.museum_door.z, w: 6.0, h: 3.2, c: '#ddd6fe' },
       { key: 'park_center', name: 'Công viên', x: WAYPOINTS.park_center.x, z: WAYPOINTS.park_center.z, w: 8.0, h: 4.4, c: '#bbf7d0' },
     ]
-    const sx = (x: number) => (x / 56) * 100
-    const sz = (z: number) => (z / 34) * 100
+    const sx = (x: number) => (x / 80) * 100
+    const sz = (z: number) => (z / 56) * 100
     const sceneType = this.sceneSwitcher?.getSceneType() ?? 'town'
     const mapNpcs = (this.npcManager?.getAll() ?? []).map(n => {
       const behavior = this.dailyScheduler?.getDailyBehaviors().get(n.id)
@@ -3776,11 +3776,11 @@ __workflow 演出测试指令:
   }
 
   private clampPlayerX(x: number): number {
-    return Math.max(4, Math.min(55, x))
+    return Math.max(4, Math.min(76, x))
   }
 
   private clampPlayerZ(z: number): number {
-    return Math.max(4, Math.min(33.5, z))
+    return Math.max(4, Math.min(52, z))
   }
 
   private clampPlayerPosition(x: number, z: number): { x: number; z: number } {

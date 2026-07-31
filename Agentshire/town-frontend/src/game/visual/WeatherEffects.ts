@@ -442,11 +442,11 @@ export class WeatherEffects {
   }
 
   private initSnowGround(): void {
-    const geo = new THREE.PlaneGeometry(70, 46)
+    const geo = new THREE.PlaneGeometry(84, 60)
     const mat = new THREE.MeshBasicMaterial({ color: 0xf0f4fa, transparent: true, opacity: 0, depthWrite: false })
     this.snowGround = new THREE.Mesh(geo, mat)
     this.snowGround.rotation.x = -Math.PI / 2
-    this.snowGround.position.set(28, 0.03, 17)
+    this.snowGround.position.set(40, 0.03, 28)
     this.snowGround.visible = false
     this.scene.add(this.snowGround)
   }
@@ -458,7 +458,7 @@ export class WeatherEffects {
     })
     this.fogPlane = new THREE.Mesh(geo, mat)
     this.fogPlane.rotation.x = -Math.PI / 2
-    this.fogPlane.position.set(28, 1.5, 17)
+    this.fogPlane.position.set(40, 1.5, 28)
     this.fogPlane.visible = false
     this.scene.add(this.fogPlane)
   }
@@ -481,7 +481,7 @@ export class WeatherEffects {
       },
     })
     this.auroraMesh = new THREE.Mesh(geo, this.auroraMaterial)
-    this.auroraMesh.position.set(28, 12, -18)
+    this.auroraMesh.position.set(40, 12, -10)
     this.auroraMesh.rotation.x = -0.15
     this.auroraMesh.visible = false
     this.scene.add(this.auroraMesh)

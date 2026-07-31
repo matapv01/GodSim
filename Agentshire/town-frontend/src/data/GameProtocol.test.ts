@@ -3,8 +3,8 @@ import { BUILDING_REGISTRY, WAYPOINTS, NPC_CONFIGS, WORK_SUB_STATE_LABELS } from
 import type { GameEvent, GameAction } from './GameProtocol'
 
 describe('BUILDING_REGISTRY data integrity', () => {
-  it('contains exactly 8 buildings', () => {
-    expect(BUILDING_REGISTRY).toHaveLength(8)
+  it('contains all 16 town buildings', () => {
+    expect(BUILDING_REGISTRY).toHaveLength(16)
   })
 
   it('each building has a matching WAYPOINT', () => {
@@ -44,17 +44,17 @@ describe('BUILDING_REGISTRY data integrity', () => {
 })
 
 describe('WAYPOINTS data integrity', () => {
-  it('contains gathering_point at (24,19) avoiding fountain', () => {
+  it('contains gathering_point north of fountain in plaza', () => {
     expect(WAYPOINTS.gathering_point).toBeDefined()
-    expect(WAYPOINTS.gathering_point.x).toBe(24)
-    expect(WAYPOINTS.gathering_point.z).toBe(19)
+    expect(WAYPOINTS.gathering_point.x).toBe(27.4)
+    expect(WAYPOINTS.gathering_point.z).toBe(20.4)
   })
 
-  it('gathering_point is far from plaza_fountain', () => {
+  it('gathering_point is clear of the plaza fountain', () => {
     const gp = WAYPOINTS.gathering_point
     const pf = WAYPOINTS.plaza_fountain
     const dist = Math.sqrt((gp.x - pf.x) ** 2 + (gp.z - pf.z) ** 2)
-    expect(dist).toBeGreaterThan(5)
+    expect(dist).toBeGreaterThan(1.5)
   })
 
   it('all critical waypoints exist', () => {

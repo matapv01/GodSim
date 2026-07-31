@@ -317,8 +317,8 @@ export class DailyBehavior {
     dx /= len
     dz /= len
     const target = {
-      x: Math.max(4, Math.min(55, pos.x + dx * 4 + (Math.random() - 0.5) * 1.2)),
-      z: Math.max(4, Math.min(33.5, pos.z + dz * 4 + (Math.random() - 0.5) * 1.2)),
+      x: Math.max(4, Math.min(76, pos.x + dx * 4 + (Math.random() - 0.5) * 1.2)),
+      z: Math.max(4, Math.min(52, pos.z + dz * 4 + (Math.random() - 0.5) * 1.2)),
     }
     this.journal?.record({
       location: 'town',

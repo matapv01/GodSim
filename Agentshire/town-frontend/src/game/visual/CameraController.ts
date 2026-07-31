@@ -4,8 +4,8 @@ export class CameraController {
   private camera: THREE.PerspectiveCamera
   private container: HTMLElement
 
-  private targetLookAt = new THREE.Vector3(28, 0, 17)
-  private currentLookAt = new THREE.Vector3(28, 0, 17)
+  private targetLookAt = new THREE.Vector3(40, 0, 28)
+  private currentLookAt = new THREE.Vector3(40, 0, 28)
   private cameraOffset = new THREE.Vector3(0, 24, 19)
   private baseOffset = new THREE.Vector3(0, 24, 19)
 
@@ -31,13 +31,13 @@ export class CameraController {
   private static readonly ZOOM_MAX = 1.6
   private zoomLevel = 1.0
   private static readonly PATROL_POINTS = [
-    { x: 25.6, z: 14.5 },
-    { x: 24.4, z: 8.0 },
+    { x: 40.0, z: 28.0 },
+    { x: 27.4, z: 18.6 },
+    { x: 48.0, z: 13.0 },
+    { x: 56.0, z: 23.0 },
+    { x: 64.0, z: 53.0 },
+    { x: 50.0, z: 46.0 },
     { x: 7.6, z: 15.5 },
-    { x: 42.4, z: 9.5 },
-    { x: 18.4, z: 29.5 },
-    { x: 42.4, z: 16.5 },
-    { x: 11.2, z: 25.0 },
   ]
 
   constructor(camera: THREE.PerspectiveCamera, container: HTMLElement) {
@@ -221,8 +221,8 @@ export class CameraController {
   }
 
   private clampBounds(p: THREE.Vector3): THREE.Vector3 {
-    p.x = Math.max(4, Math.min(55, p.x))
-    p.z = Math.max(4, Math.min(33.5, p.z))
+    p.x = Math.max(4, Math.min(76, p.x))
+    p.z = Math.max(4, Math.min(52, p.z))
     return p
   }
 
