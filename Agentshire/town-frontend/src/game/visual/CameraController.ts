@@ -221,8 +221,8 @@ export class CameraController {
   }
 
   private clampBounds(p: THREE.Vector3): THREE.Vector3 {
-    p.x = Math.max(4, Math.min(52, p.x))
-    p.z = Math.max(4, Math.min(31, p.z))
+    p.x = Math.max(4, Math.min(55, p.x))
+    p.z = Math.max(4, Math.min(33.5, p.z))
     return p
   }
 

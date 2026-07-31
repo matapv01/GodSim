@@ -3201,11 +3201,11 @@ __workflow 演出测试指令:
   }
 
   private clampPlayerX(x: number): number {
-    return Math.max(4, Math.min(52, x))
+    return Math.max(4, Math.min(55, x))
   }
 
   private clampPlayerZ(z: number): number {
-    return Math.max(4, Math.min(31, z))
+    return Math.max(4, Math.min(33.5, z))
   }
 
   private clampPlayerPosition(x: number, z: number): { x: number; z: number } {
