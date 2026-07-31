@@ -35,6 +35,7 @@ import { createDefaultTownConfig, getNpcProfiles, type NPCProfile } from '../dat
 import { getGodSimNpcProfile } from '../data/god-sim-npc-profiles'
 import { getProfessionOptions, isPoliceSpecialty } from '../data/Professions'
 import { GameClock } from './GameClock'
+import { TrafficLightSystem } from './scene/TrafficLightSystem'
 import { TimeOfDayLighting } from './visual/TimeOfDayLighting'
 import { WeatherSystem } from './WeatherSystem'
 import { TimeHUD } from '../ui/TimeHUD'
@@ -114,6 +115,8 @@ export class MainScene implements GameScene {
   private officeBuilder!: OfficeBuilder
   private museumBuilder!: MuseumBuilder
   private vehicleManager!: VehicleManager
+  private trafficLightSystem: TrafficLightSystem | null = null
+  private pulledOverToastAt = 0
   private vehiclePassengerNpcIds = new Set<string>()
   private trafficIncident: ActiveTrafficIncident | null = null
 
@@ -295,6 +298,12 @@ export class MainScene implements GameScene {
       onTrafficStop: info => this.handleTrafficStop(info),
     })
     this.vehicleManager.build(this.assets)
+
+    const trafficLightRefs = this.townBuilder.getTrafficLightRefs()
+    if (trafficLightRefs) {
+      this.trafficLightSystem = new TrafficLightSystem(trafficLightRefs)
+      this.vehicleManager.setTrafficLights(this.trafficLightSystem)
+    }
 
     this.engine.world.scene = this.townScene
 
@@ -2913,6 +2922,20 @@ __workflow 演出测试指令:
     if (this.playerKeys.has('d') || this.playerKeys.has('arrowright')) dx += 1
 
     if (this.vehicleManager.hasPlayerAboard()) {
+      if (this.vehicleManager.isPlayerPulledOver()) {
+        if (Date.now() - this.pulledOverToastAt > 4000) {
+          this.pulledOverToastAt = Date.now()
+          this.ui.showToast(t('police_traffic_stop.toast_pulled_over'))
+        }
+        const vehicle = this.vehicleManager.getPlayerVehicleObject()
+        if (vehicle) {
+          user.mesh.position.x = vehicle.position.x
+          user.mesh.position.z = vehicle.position.z
+          this.cameraCtrl.follow(vehicle)
+        }
+        this.stopKeyboardMoveAnim()
+        return
+      }
       if (this.vehicleManager.isPlayerDriving() && (dx !== 0 || dz !== 0)) {
         this.vehicleManager.movePlayerVehicle(dx, dz, deltaTime, (x, z) => this.clampPlayerPosition(x, z))
         const vehicle = this.vehicleManager.getPlayerVehicleObject()
@@ -3176,12 +3199,25 @@ __workflow 演出测试指令:
       : t('police_traffic_stop.officer_default')
 
     this.effects.errorSparks(new THREE.Vector3(info.position.x, 0, info.position.z))
-    this.bubbles.show(info.patrolVehicle, t('police_traffic_stop.officer_line1'), 3400)
-    this.ui.showToast(t('police_traffic_stop.toast', { owner: info.offenderOwnerName }))
+    const isRedLight = info.reason === 'red_light'
+    this.bubbles.show(
+      info.patrolVehicle,
+      isRedLight ? t('police_traffic_stop.officer_red_line1') : t('police_traffic_stop.officer_line1'),
+      3400,
+    )
+    this.ui.showToast(
+      isRedLight
+        ? t('police_traffic_stop.toast_red', { owner: info.offenderOwnerName })
+        : t('police_traffic_stop.toast', { owner: info.offenderOwnerName }),
+    )
     this.recordNpcActivity('citizen_5', 'chatted', t('police_traffic_stop.activity'))
 
     window.setTimeout(() => {
-      this.bubbles.show(info.offenderVehicle, t('police_traffic_stop.driver_line'), 3200)
+      this.bubbles.show(
+        info.offenderVehicle,
+        isRedLight ? t('police_traffic_stop.driver_red_line') : t('police_traffic_stop.driver_line'),
+        3200,
+      )
     }, 2400)
     window.setTimeout(() => {
       this.bubbles.show(info.patrolVehicle, t('police_traffic_stop.officer_line2'), 3200)
@@ -3192,10 +3228,15 @@ __workflow 演出测试指令:
         'encounter_start',
         [officerName, info.offenderOwnerName],
         t('police_traffic_stop.location'),
-        t('police_traffic_stop.log', {
-          owner: info.offenderOwnerName,
-          officer: officerName,
-        }),
+        isRedLight
+          ? t('police_traffic_stop.log_red', {
+              owner: info.offenderOwnerName,
+              officer: officerName,
+            })
+          : t('police_traffic_stop.log', {
+              owner: info.offenderOwnerName,
+              officer: officerName,
+            }),
       )
     }, 8000)
   }
@@ -4728,6 +4769,7 @@ __workflow 演出测试指令:
       this.timeOfDayLighting?.update(this.gameClock)
       this.weatherSystem?.update(deltaTime, this.gameClock)
       this.updateWeatherSocialEffects()
+      this.trafficLightSystem?.update(deltaTime)
       this.vehicleManager?.update(this.gameClock, deltaTime)
       this.updateTrafficIncident(deltaTime * 1000)
     } else if (curScene === 'office') {

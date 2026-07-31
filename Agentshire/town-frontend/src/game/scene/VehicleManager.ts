@@ -3,11 +3,18 @@ import { AssetLoader } from '../visual/AssetLoader'
 import { GameClock } from '../GameClock'
 import { t } from '../../i18n'
 import type { CollisionActor } from '../physics/CollisionWorld'
+import type { TrafficLightSystem, TrafficSignal } from './TrafficLightSystem'
 
 const CAR_MODELS = ['car_sedan', 'car_hatchback', 'car_taxi'] as const
 
 const ROAD_Y = 0.06
-const LANE_OFFSET = 8.0
+const LANE_OFFSET = 4.0
+
+const RED_LIGHT_HOLD_DISTANCE = 16
+const RED_LIGHT_VIOLATION_PROBABILITY = 0.18
+const RED_LIGHT_VIOLATION_WINDOW_MS = 25_000
+const CHASE_ARRIVE_DISTANCE = 4.0
+const CHASE_SPEED = 6.0
 
 interface RoadPoint { x: number; z: number }
 interface VehicleRoute {
@@ -59,6 +66,7 @@ export interface TrafficStopInfo {
   offenderVehicle: THREE.Object3D
   patrolVehicle: THREE.Object3D
   position: RoadPoint
+  reason: 'wrong_lane' | 'red_light'
 }
 
 interface VehicleCallbacks {
@@ -214,6 +222,9 @@ interface PooledVehicle {
   driverless: boolean
   wrongLane: boolean
   pulledOver: boolean
+  redLight: boolean
+  redLightHold: boolean
+  redLightViolationAt: number
   homeRoute: VehicleRoute
   route: VehicleRoute | null
   routePoints: RoadPoint[]
@@ -237,8 +248,12 @@ export class VehicleManager {
   private victimHitAt = new Map<string, number>()
   private crashAt = new Map<string, number>()
   private trafficStopCooldown = new Map<string, number>()
-  private activeTrafficStop: { offenderId: string } | null = null
+  private activeTrafficStop: { offenderId: string; reason: 'wrong_lane' | 'red_light' } | null = null
   private lastTrafficStopAt = 0
+  private trafficLights: TrafficLightSystem | null = null
+  private chaseTargetId: string | null = null
+  private playerViolationAt = 0
+  private playerPulledOver = false
 
   private static readonly POOL_SIZE = VEHICLE_ROUTES.length
 
@@ -252,6 +267,14 @@ export class VehicleManager {
   build(assets: AssetLoader) {
     this.buildTemplates(assets)
     this.buildPool()
+  }
+
+  setTrafficLights(trafficLights: TrafficLightSystem | null): void {
+    this.trafficLights = trafficLights
+  }
+
+  isPlayerPulledOver(): boolean {
+    return this.playerPulledOver
   }
 
   private buildTemplates(assets: AssetLoader) {
@@ -367,6 +390,9 @@ export class VehicleManager {
         driverless: false,
         wrongLane: false,
         pulledOver: false,
+        redLight: false,
+        redLightHold: false,
+        redLightViolationAt: 0,
         homeRoute,
         route: homeRoute,
         routePoints: [],
@@ -418,6 +444,9 @@ export class VehicleManager {
       && Math.random() < WRONG_LANE_PROBABILITY
     vehicle.wrongLane = wrongLane
     vehicle.pulledOver = false
+    vehicle.redLight = route.id !== PATROL_ROUTE_ID && Math.random() < RED_LIGHT_VIOLATION_PROBABILITY
+    vehicle.redLightHold = false
+    vehicle.redLightViolationAt = 0
     vehicle.crashExitNpcId = undefined
     const start = { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z }
     const routed = [start, ...this.applyLaneOffset(route.points, wrongLane)]
@@ -723,6 +752,7 @@ export class VehicleManager {
   movePlayerVehicle(dx: number, dz: number, delta: number, clamp: (x: number, z: number) => RoadPoint): boolean {
     const vehicle = this.pool.find(v => v.phase === 'manual' && v.occupantNpcId === 'user')
     if (!vehicle) return false
+    if (this.playerPulledOver) return true
     const len = Math.sqrt(dx * dx + dz * dz)
     if (len <= 0.001) return true
     const speed = 8.2
@@ -736,6 +766,8 @@ export class VehicleManager {
     vehicle.wrapper.position.z = resolved.z
     vehicle.wrapper.rotation.y = Math.atan2(dx / len, dz / len) - Math.PI / 2
     this.syncOccupants(vehicle)
+
+    this.detectPlayerRedLightViolation(previous, resolved)
 
     const victim = this.findHitPedestrian(vehicle, previous, resolved)
     if (victim && this.callbacks.onPedestrianHit?.({
@@ -768,6 +800,8 @@ export class VehicleManager {
       vehicle.segmentLengths = []
       vehicle.totalLength = 0
       vehicle.distance = 0
+      this.playerPulledOver = false
+      if (this.activeTrafficStop?.offenderId === vehicle.id) this.activeTrafficStop = null
       this.setVehicleLabel(vehicle, vehicle.homeRoute, 0, 'parking')
     } else {
       this.leaveGuest(vehicle, 'user', exit)
@@ -863,6 +897,127 @@ export class VehicleManager {
     })
   }
 
+  private detectPlayerRedLightViolation(from: RoadPoint, to: RoadPoint): void {
+    if (!this.trafficLights) return
+    const dx = to.x - from.x
+    const dz = to.z - from.z
+    const len = Math.sqrt(dx * dx + dz * dz)
+    if (len <= 1e-4) return
+    const axis: 'x' | 'z' = Math.abs(dz) >= Math.abs(dx) ? 'z' : 'x'
+    const dirSign = axis === 'z' ? Math.sign(dz) : Math.sign(dx)
+    const line = axis === 'z' ? (dirSign > 0 ? 34 : 50) : (dirSign > 0 ? 30 : 50)
+    const crossed = axis === 'z'
+      ? (dirSign > 0 ? from.z < line && to.z >= line : from.z > line && to.z <= line)
+      : (dirSign > 0 ? from.x < line && to.x >= line : from.x > line && to.x <= line)
+    if (crossed && this.trafficLights.getSignal(axis) === 'red') {
+      this.playerViolationAt = Date.now()
+    }
+  }
+
+  private getRedLightInfo(
+    v: PooledVehicle,
+    previous: RoadPoint,
+    pose: RoadPoint,
+  ): { hold: boolean; axis: 'x' | 'z'; signal: TrafficSignal; crossed: boolean } {
+    const none: { hold: boolean; axis: 'x' | 'z'; signal: TrafficSignal; crossed: boolean } = {
+      hold: false,
+      axis: 'z',
+      signal: 'green',
+      crossed: false,
+    }
+    if (!this.trafficLights) return none
+    if (v.phase !== 'driving' && v.phase !== 'returning') return none
+    if (this.chaseTargetId === v.id) return none
+    const dx = pose.x - previous.x
+    const dz = pose.z - previous.z
+    const len = Math.sqrt(dx * dx + dz * dz)
+    if (len <= 1e-4) return none
+    const axis: 'x' | 'z' = Math.abs(dz) >= Math.abs(dx) ? 'z' : 'x'
+    const signal = this.trafficLights.getSignal(axis)
+    if (signal === 'green') return { ...none, axis, signal }
+    const dirSign = axis === 'z' ? Math.sign(dz) : Math.sign(dx)
+    const line = axis === 'z' ? (dirSign > 0 ? 34 : 50) : (dirSign > 0 ? 30 : 50)
+    const approachDist = axis === 'z'
+      ? (dirSign > 0 ? previous.z - line : line - previous.z)
+      : (dirSign > 0 ? previous.x - line : line - previous.x)
+    const crossed = axis === 'z'
+      ? (dirSign > 0 ? previous.z < line && pose.z >= line : previous.z > line && pose.z <= line)
+      : (dirSign > 0 ? previous.x < line && pose.x >= line : previous.x > line && pose.x <= line)
+    if (approachDist <= 0 || v.redLight || approachDist > RED_LIGHT_HOLD_DISTANCE) {
+      return { hold: false, axis, signal, crossed }
+    }
+    return { hold: true, axis, signal, crossed: false }
+  }
+
+  private startChase(offender: PooledVehicle): void {
+    const patrol = this.pool.find(v =>
+      v.homeRoute.id === PATROL_ROUTE_ID
+      && v.active
+      && (v.phase === 'driving' || v.phase === 'returning'),
+    )
+    if (!patrol) return
+    this.chaseTargetId = offender.id
+    const start = { x: patrol.wrapper.position.x, z: patrol.wrapper.position.z }
+    const target = { x: offender.wrapper.position.x, z: offender.wrapper.position.z }
+    patrol.routePoints = [start, target]
+    patrol.segmentLengths = this.getSegmentLengths(patrol.routePoints)
+    patrol.totalLength = patrol.segmentLengths.reduce((sum, n) => sum + n, 0)
+    patrol.distance = 0
+    patrol.duration = Math.max(6, patrol.totalLength / CHASE_SPEED)
+    patrol.phase = 'driving'
+    if (patrol.route) this.setVehicleLabel(patrol, patrol.route, Math.max(1, Math.round(patrol.duration / 2)), 'driving')
+  }
+
+  private updatePatrolChase(patrol: PooledVehicle, needLights: boolean): boolean {
+    const target = this.pool.find(o => o.id === this.chaseTargetId)
+    if (!target || !target.active || target.phase === 'parked' || target.phase === 'incident' || target.phase === 'crash') {
+      this.chaseTargetId = null
+      this.rebuildRoutePoints(patrol)
+      return false
+    }
+    const dx = target.wrapper.position.x - patrol.wrapper.position.x
+    const dz = target.wrapper.position.z - patrol.wrapper.position.z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (dist <= CHASE_ARRIVE_DISTANCE) {
+      this.chaseTargetId = null
+      this.rebuildRoutePoints(patrol)
+      this.triggerTrafficStop(patrol, target, needLights, 'red_light')
+      return true
+    }
+    const step = Math.min(CHASE_SPEED, dist)
+    patrol.wrapper.position.x += (dx / dist) * step
+    patrol.wrapper.position.z += (dz / dist) * step
+    patrol.wrapper.position.y = ROAD_Y + Math.sin(performance.now() / 1000 * 12 + patrol.distance) * 0.015
+    patrol.wrapper.rotation.y = Math.atan2(dx / dist, dz / dist) - Math.PI / 2
+    patrol.headlight.intensity = needLights ? 1.5 : 0
+    patrol.taillightMat.opacity = needLights ? 0.9 : 0
+    this.syncOccupants(patrol)
+    return true
+  }
+
+  private checkChaseStart(): void {
+    if (this.chaseTargetId) return
+    const patrol = this.pool.find(v =>
+      v.homeRoute.id === PATROL_ROUTE_ID
+      && v.active
+      && (v.phase === 'driving' || v.phase === 'returning'),
+    )
+    if (!patrol) return
+    const now = Date.now()
+    if (now - this.lastTrafficStopAt < TRAFFIC_STOP_GAP_MS) return
+    for (const v of this.pool) {
+      if (!v.active || v.id === PATROL_ROUTE_ID) continue
+      const at = v.phase === 'manual' ? this.playerViolationAt : v.redLightViolationAt
+      if (!at || now - at > RED_LIGHT_VIOLATION_WINDOW_MS) continue
+      if (v.phase === 'manual' || (v.phase === 'driving' || v.phase === 'returning')) {
+        if (this.activeTrafficStop?.offenderId === v.id) continue
+        if (now - (this.trafficStopCooldown.get(v.id) ?? 0) < TRAFFIC_STOP_COOLDOWN_MS) continue
+        this.startChase(v)
+        return
+      }
+    }
+  }
+
   update(gameClock: GameClock, delta: number) {
     const hour = gameClock.getGameHour()
     const period = gameClock.getPeriod()
@@ -881,6 +1036,10 @@ export class VehicleManager {
       if (!v.active) continue
       if (v.phase === 'manual') continue
 
+      if (v.homeRoute.id === PATROL_ROUTE_ID && this.chaseTargetId === v.id) {
+        if (this.updatePatrolChase(v, needLights)) continue
+      }
+
       if (!v.route) {
         this.parkAtHome(v)
         continue
@@ -895,6 +1054,16 @@ export class VehicleManager {
           v.pulledOver = false
           v.wrongLane = false
           if (this.activeTrafficStop?.offenderId === v.id) this.activeTrafficStop = null
+          this.rebuildRoutePoints(v)
+        }
+        if (v.homeRoute.id === PATROL_ROUTE_ID) {
+          if (this.activeTrafficStop?.offenderId) {
+            const offender = this.pool.find(o => o.id === this.activeTrafficStop!.offenderId)
+            if (offender && offender.homeRoute.ownerNpcId === 'user') {
+              this.playerPulledOver = false
+              this.activeTrafficStop = null
+            }
+          }
           this.rebuildRoutePoints(v)
         }
         v.phase = v.incidentResumePhase
@@ -968,6 +1137,23 @@ export class VehicleManager {
       const previous = { x: v.wrapper.position.x, z: v.wrapper.position.z }
       const pose = this.sampleRoute(v.routePoints, v.segmentLengths, v.distance)
       const bump = Math.sin(time * 12 + v.distance) * 0.015
+
+      const redInfo = this.getRedLightInfo(v, previous, pose)
+      if (redInfo.hold) {
+        v.redLightHold = true
+        v.distance = Math.max(0, v.distance - delta * (v.totalLength / v.duration))
+        v.wrapper.position.y = ROAD_Y + bump
+        v.wrapper.rotation.y = pose.rotationY
+        this.syncOccupants(v)
+        v.headlight.intensity = needLights ? 1.5 : 0
+        v.taillightMat.opacity = needLights ? 0.9 : 0
+        continue
+      }
+      v.redLightHold = false
+      if (redInfo.signal === 'red' && redInfo.crossed && v.redLight) {
+        v.redLightViolationAt = Date.now()
+      }
+
       const resolved = this.callbacks.resolveVehicleMove
         ? this.callbacks.resolveVehicleMove(v.id, v.wrapper, previous, { x: pose.x, z: pose.z })
         : { x: pose.x, z: pose.z }
@@ -1008,6 +1194,7 @@ export class VehicleManager {
 
     this.checkVehicleCrashes(needLights)
     this.checkTrafficStops(needLights)
+    this.checkChaseStart()
   }
 
   private rebuildRoutePoints(vehicle: PooledVehicle): void {
@@ -1024,7 +1211,7 @@ export class VehicleManager {
   }
 
   private checkTrafficStops(needLights: boolean): void {
-    if (this.activeTrafficStop) return
+    if (this.activeTrafficStop || this.chaseTargetId) return
     const patrol = this.pool.find(v =>
       v.homeRoute.id === PATROL_ROUTE_ID
       && v.active
@@ -1040,35 +1227,50 @@ export class VehicleManager {
       const dz = v.wrapper.position.z - patrol.wrapper.position.z
       if (Math.sqrt(dx * dx + dz * dz) > TRAFFIC_STOP_DISTANCE) continue
 
-      this.trafficStopCooldown.set(v.id, now)
-      this.lastTrafficStopAt = now
-      this.activeTrafficStop = { offenderId: v.id }
-      const offenderPhase = v.phase as 'driving' | 'returning'
-
-      v.incidentResumePhase = offenderPhase
-      v.phase = 'incident'
-      v.incidentTimer = TRAFFIC_STOP_DURATION_S
-      v.pulledOver = true
-      v.taillightMat.opacity = 1
-      if (v.route) this.setVehicleLabel(v, v.route, Math.ceil(v.incidentTimer / 2), 'incident')
-
-      patrol.incidentResumePhase = patrol.phase as 'driving' | 'returning'
-      patrol.phase = 'incident'
-      patrol.incidentTimer = TRAFFIC_STOP_DURATION_S
-      patrol.headlight.intensity = needLights ? 0.65 : 0
-      patrol.taillightMat.opacity = 1
-      if (patrol.route) this.setVehicleLabel(patrol, patrol.route, Math.ceil(patrol.incidentTimer / 2), 'incident')
-
-      this.callbacks.onTrafficStop?.({
-        offenderOwnerName: v.route?.owner ?? v.id,
-        offenderOwnerNpcId: v.route?.ownerNpcId ?? v.id,
-        offenderVehicleId: v.id,
-        offenderVehicle: v.wrapper,
-        patrolVehicle: patrol.wrapper,
-        position: { x: v.wrapper.position.x, z: v.wrapper.position.z },
-      })
-      break
+      this.triggerTrafficStop(patrol, v, needLights, 'wrong_lane')
+      return
     }
+  }
+
+  private triggerTrafficStop(
+    patrol: PooledVehicle,
+    offender: PooledVehicle,
+    needLights: boolean,
+    reason: 'wrong_lane' | 'red_light',
+  ): void {
+    const now = Date.now()
+    this.trafficStopCooldown.set(offender.id, now)
+    this.lastTrafficStopAt = now
+    this.activeTrafficStop = { offenderId: offender.id, reason }
+
+    if (offender.phase !== 'manual') {
+      const offenderPhase = offender.phase as 'driving' | 'returning'
+      offender.incidentResumePhase = offenderPhase
+      offender.phase = 'incident'
+      offender.incidentTimer = TRAFFIC_STOP_DURATION_S
+      offender.pulledOver = true
+      offender.taillightMat.opacity = 1
+      if (offender.route) this.setVehicleLabel(offender, offender.route, Math.ceil(offender.incidentTimer / 2), 'incident')
+    } else {
+      this.playerPulledOver = true
+    }
+
+    patrol.incidentResumePhase = patrol.phase as 'driving' | 'returning'
+    patrol.phase = 'incident'
+    patrol.incidentTimer = TRAFFIC_STOP_DURATION_S
+    patrol.headlight.intensity = needLights ? 0.65 : 0
+    patrol.taillightMat.opacity = 1
+    if (patrol.route) this.setVehicleLabel(patrol, patrol.route, Math.ceil(patrol.incidentTimer / 2), 'incident')
+
+    this.callbacks.onTrafficStop?.({
+      offenderOwnerName: offender.route?.owner ?? offender.id,
+      offenderOwnerNpcId: offender.route?.ownerNpcId ?? offender.id,
+      offenderVehicleId: offender.id,
+      offenderVehicle: offender.wrapper,
+      patrolVehicle: patrol.wrapper,
+      position: { x: offender.wrapper.position.x, z: offender.wrapper.position.z },
+      reason,
+    })
   }
 
   private checkVehicleCrashes(needLights: boolean): void {
@@ -1085,6 +1287,8 @@ export class VehicleManager {
         const dz = a.wrapper.position.z - b.wrapper.position.z
         const distance = Math.sqrt(dx * dx + dz * dz)
         if (distance > VEHICLE_CRASH_DISTANCE) continue
+        // Vehicles queued behind a red light are stationary, not crashing.
+        if (a.redLightHold && b.redLightHold) continue
         // Correct-lane cars passing on opposite sides of the road are just
         // traffic passing, not a collision.
         if (a.phase !== 'manual' && b.phase !== 'manual'

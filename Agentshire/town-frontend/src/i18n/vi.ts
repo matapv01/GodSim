@@ -227,6 +227,11 @@ const vi: Record<string, string> = {
   'police_traffic_stop.location': 'Giao lộ trung tâm thị trấn',
   'police_traffic_stop.log': 'Cảnh sát {officer} dừng xe của {owner} vì đi sai làn, nhắc nhở rồi cho tiếp tục di chuyển.',
   'police_traffic_stop.activity': 'Dừng xe xử lý người đi sai làn',
+  'police_traffic_stop.toast_red': 'Cảnh sát Khôi dừng xe của {owner} vì vượt đèn đỏ!',
+  'police_traffic_stop.officer_red_line1': 'Dừng xe lại! Anh/chị vừa vượt đèn đỏ!',
+  'police_traffic_stop.driver_red_line': 'Dạ xin lỗi cảnh sát. Lần sau tôi sẽ chú ý đèn tín hiệu.',
+  'police_traffic_stop.log_red': 'Cảnh sát {officer} dừng xe của {owner} vì vượt đèn đỏ, nhắc nhở rồi cho tiếp tục di chuyển.',
+  'police_traffic_stop.toast_pulled_over': 'Bạn đã bị dừng xe! Hãy đứng yên tại chỗ đợi cảnh sát xử lý xong.',
 
   'drive_by.hitchhike_boarded': 'Cảm ơn đã cho tôi đi nhờ một quãng!',
 

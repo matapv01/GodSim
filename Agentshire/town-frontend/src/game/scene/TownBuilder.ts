@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { AssetLoader } from '../visual/AssetLoader'
 import type { CollisionObstacle } from '../physics/CollisionWorld'
+import type { TrafficLightRefs } from './TrafficLightSystem'
 
 interface WindowDef {
   pos: [number, number, number]
@@ -22,15 +23,15 @@ interface BuildingDef {
 
 const BUILDINGS: BuildingDef[] = [
   {
-    id: 'office', modelKey: 'building_A', label: 'Công ty chính', pos: [62.0, 0, 8.0], scale: 3.0, rotationY: 0,
-    doorOffset: [62.0, 0.05, 14.0], size: [8, 12, 6], color: 0x6688aa,
+    id: 'office', modelKey: 'building_A', label: 'Công ty chính', pos: [54.0, 0, 8.0], scale: 3.0, rotationY: 0,
+    doorOffset: [54.0, 0.05, 14.0], size: [8, 12, 6], color: 0x6688aa,
     windows: [
       { pos: [0, 0.95, 1.01] },
     ],
   },
   {
-    id: 'coworking', modelKey: 'building_A', label: 'Văn phòng nhỏ', pos: [72.0, 0, 8.0], scale: 1.8, rotationY: 0,
-    doorOffset: [72.0, 0.05, 14.0], size: [4, 5, 4], color: 0x6f9fbd,
+    id: 'coworking', modelKey: 'building_A', label: 'Văn phòng nhỏ', pos: [64.0, 0, 8.0], scale: 1.8, rotationY: 0,
+    doorOffset: [64.0, 0.05, 14.0], size: [4, 5, 4], color: 0x6f9fbd,
     windows: [
       { pos: [0, 1.0, 1.01] },
     ],
@@ -78,23 +79,23 @@ const BUILDINGS: BuildingDef[] = [
     windows: [{ pos: [0, 0.7, 1.01] }],
   },
   {
-    id: 'market', modelKey: 'building_E', label: 'Khu chợ', pos: [62.0, 0, 78.0], scale: 2.5, rotationY: 0,
-    doorOffset: [62.0, 0.05, 81.0], size: [8, 4, 5], color: 0xf0f0f0,
+    id: 'market', modelKey: 'building_E', label: 'Khu chợ', pos: [54.0, 0, 78.0], scale: 2.5, rotationY: 0,
+    doorOffset: [54.0, 0.05, 81.0], size: [8, 4, 5], color: 0xf0f0f0,
     windows: [{ pos: [0, 1.1, 1.01] }],
   },
   {
-    id: 'cafe', modelKey: 'building_F', label: 'Quán cà phê', pos: [70.0, 0, 78.0], scale: 2.0, rotationY: 0,
-    doorOffset: [70.0, 0.05, 81.0], size: [5, 3, 4], color: 0xd4a574,
+    id: 'cafe', modelKey: 'building_F', label: 'Quán cà phê', pos: [62.0, 0, 78.0], scale: 2.0, rotationY: 0,
+    doorOffset: [62.0, 0.05, 81.0], size: [5, 3, 4], color: 0xd4a574,
     windows: [{ pos: [0, 1.1, 1.01] }],
   },
   {
-    id: 'restaurant', modelKey: 'building_F', label: 'Quán ăn gia đình', pos: [62.0, 0, 70.0], scale: 1.9, rotationY: 0,
-    doorOffset: [62.0, 0.05, 73.0], size: [5, 3, 3], color: 0xe8b06f, roofColor: 0xb85f48,
+    id: 'restaurant', modelKey: 'building_F', label: 'Quán ăn gia đình', pos: [54.0, 0, 70.0], scale: 1.9, rotationY: 0,
+    doorOffset: [54.0, 0.05, 73.0], size: [5, 3, 3], color: 0xe8b06f, roofColor: 0xb85f48,
     windows: [{ pos: [0, 1.0, 1.01] }],
   },
   {
-    id: 'museum', modelKey: 'building_H', label: 'Nhà văn hóa', pos: [60.0, 0, 19.0], scale: 2.5, rotationY: 180,
-    doorOffset: [60.0, 0.05, 16.0], size: [6, 4, 4], color: 0xe8e8e8,
+    id: 'museum', modelKey: 'building_H', label: 'Nhà văn hóa', pos: [52.0, 0, 19.0], scale: 2.5, rotationY: 180,
+    doorOffset: [52.0, 0.05, 16.0], size: [6, 4, 4], color: 0xe8e8e8,
     windows: [{ pos: [0, 1.4, -1.01] }],
   },
   {
@@ -125,6 +126,7 @@ export class TownBuilder {
   private townGroup = new THREE.Group()
   private lightingRefs: TownLightingRefs | null = null
   private collisionObstacles: CollisionObstacle[] = []
+  private trafficLightRefs: TrafficLightRefs | null = null
 
   constructor(scene: THREE.Scene) {
     this.scene = scene
@@ -132,6 +134,10 @@ export class TownBuilder {
 
   getLightingRefs(): TownLightingRefs | null {
     return this.lightingRefs
+  }
+
+  getTrafficLightRefs(): TrafficLightRefs | null {
+    return this.trafficLightRefs
   }
 
   build(assets: AssetLoader): void {
@@ -151,6 +157,8 @@ export class TownBuilder {
     this.buildFountain(assets)
     this.buildFlowerBeds()
     this.buildFireHydrants(assets)
+    this.buildTrafficLights()
+    this.buildRoadSigns()
   }
 
   getDoorMarker(buildingId: string): THREE.Mesh | undefined {
@@ -187,6 +195,7 @@ export class TownBuilder {
     this.townGroup = new THREE.Group()
     this.doorMarkers.clear()
     this.collisionObstacles = []
+    this.trafficLightRefs = null
   }
 
   /* ───── Helpers ───── */
@@ -268,10 +277,10 @@ export class TownBuilder {
     this.townGroup.add(grass)
 
     const sidewalkPositions: [number, number, number, number, number][] = [
-      [23, 0.05, 44, 1.4, 80],
-      [57, 0.05, 44, 1.4, 80],
-      [42, 0.05, 27, 68, 1.4],
-      [42, 0.05, 61, 68, 1.4],
+      [31, 0.05, 44, 1.4, 80],
+      [49, 0.05, 44, 1.4, 80],
+      [42, 0.05, 35, 68, 1.4],
+      [42, 0.05, 53, 68, 1.4],
     ]
     const swGeo = new THREE.PlaneGeometry(1, 1)
     for (const [x, y, z, w, d] of sidewalkPositions) {
@@ -290,8 +299,8 @@ export class TownBuilder {
     this.townGroup.add(plaza)
 
     const roads: Array<{ x: number; z: number; w: number; d: number }> = [
-      { x: 40, z: 44, w: 32, d: 80 },
-      { x: 42, z: 44, w: 68, d: 32 },
+      { x: 40, z: 44, w: 16, d: 80 },
+      { x: 42, z: 44, w: 68, d: 16 },
     ]
     for (const def of roads) {
       const road = new THREE.Mesh(new THREE.PlaneGeometry(def.w, def.d), roadMat)
@@ -302,33 +311,33 @@ export class TownBuilder {
     }
 
     const vDashGeo = new THREE.PlaneGeometry(0.15, 3)
-    for (let i = 0; i < 13; i++) {
+    for (const z of [8, 14, 20, 26, 32, 54, 60, 66, 72, 78]) {
       const line = new THREE.Mesh(vDashGeo, whiteMat)
       line.rotation.x = -Math.PI / 2
-      line.position.set(40, 0.065, 8 + i * 6)
+      line.position.set(40, 0.065, z)
       this.townGroup.add(line)
     }
 
     const hDashGeo = new THREE.PlaneGeometry(3, 0.15)
-    for (let i = 0; i < 11; i++) {
+    for (const x of [10, 16, 22, 28, 52, 58, 64, 70]) {
       const line = new THREE.Mesh(hDashGeo, whiteMat)
       line.rotation.x = -Math.PI / 2
-      line.position.set(10 + i * 6, 0.065, 44)
+      line.position.set(x, 0.065, 44)
       this.townGroup.add(line)
     }
 
     const crossGeo = new THREE.PlaneGeometry(0.3, 2)
     for (const [cx, cz, horizontal] of [
-      [40, 28, true], [40, 60, true], [24, 44, false], [56, 44, false],
+      [40, 34, true], [40, 50, true], [30, 44, false], [50, 44, false],
     ] as Array<[number, number, boolean]>) {
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 16; i++) {
         const stripe = new THREE.Mesh(crossGeo, whiteMat)
         stripe.rotation.x = -Math.PI / 2
         if (horizontal) {
-          stripe.position.set(cx + i * 1.0 - 10, 0.065, cz)
+          stripe.position.set(cx + i * 1.0 - 8, 0.065, cz)
         } else {
           stripe.rotation.z = Math.PI / 2
-          stripe.position.set(cx, 0.065, cz + i * 1.0 - 10)
+          stripe.position.set(cx, 0.065, cz + i * 1.0 - 8)
         }
         this.townGroup.add(stripe)
       }
@@ -529,34 +538,34 @@ export class TownBuilder {
     const DEG = Math.PI / 180
 
     const lightDefs: Array<{ x: number; z: number; rotY: number }> = [
-      { x: 23, z: 8,  rotY: -180 * DEG },
-      { x: 23, z: 16, rotY: -180 * DEG },
-      { x: 23, z: 24, rotY: -180 * DEG },
-      { x: 23, z: 32, rotY: -180 * DEG },
-      { x: 23, z: 52, rotY: -180 * DEG },
-      { x: 23, z: 60, rotY: -180 * DEG },
-      { x: 23, z: 68, rotY: -180 * DEG },
-      { x: 23, z: 76, rotY: -180 * DEG },
-      { x: 57, z: 8,  rotY: 0 },
-      { x: 57, z: 16, rotY: 0 },
-      { x: 57, z: 24, rotY: 0 },
-      { x: 57, z: 32, rotY: 0 },
-      { x: 57, z: 52, rotY: 0 },
-      { x: 57, z: 60, rotY: 0 },
-      { x: 57, z: 68, rotY: 0 },
-      { x: 57, z: 76, rotY: 0 },
-      { x: 14, z: 27, rotY: 90 * DEG },
-      { x: 22, z: 27, rotY: 90 * DEG },
-      { x: 30, z: 27, rotY: 90 * DEG },
-      { x: 50, z: 27, rotY: 90 * DEG },
-      { x: 58, z: 27, rotY: 90 * DEG },
-      { x: 66, z: 27, rotY: 90 * DEG },
-      { x: 14, z: 61, rotY: -90 * DEG },
-      { x: 22, z: 61, rotY: -90 * DEG },
-      { x: 30, z: 61, rotY: -90 * DEG },
-      { x: 50, z: 61, rotY: -90 * DEG },
-      { x: 58, z: 61, rotY: -90 * DEG },
-      { x: 66, z: 61, rotY: -90 * DEG },
+      { x: 31, z: 8,  rotY: -180 * DEG },
+      { x: 31, z: 16, rotY: -180 * DEG },
+      { x: 31, z: 24, rotY: -180 * DEG },
+      { x: 31, z: 32, rotY: -180 * DEG },
+      { x: 31, z: 52, rotY: -180 * DEG },
+      { x: 31, z: 60, rotY: -180 * DEG },
+      { x: 31, z: 68, rotY: -180 * DEG },
+      { x: 31, z: 76, rotY: -180 * DEG },
+      { x: 49, z: 8,  rotY: 0 },
+      { x: 49, z: 16, rotY: 0 },
+      { x: 49, z: 24, rotY: 0 },
+      { x: 49, z: 32, rotY: 0 },
+      { x: 49, z: 52, rotY: 0 },
+      { x: 49, z: 60, rotY: 0 },
+      { x: 49, z: 68, rotY: 0 },
+      { x: 49, z: 76, rotY: 0 },
+      { x: 14, z: 35, rotY: 90 * DEG },
+      { x: 22, z: 35, rotY: 90 * DEG },
+      { x: 30, z: 35, rotY: 90 * DEG },
+      { x: 50, z: 35, rotY: 90 * DEG },
+      { x: 58, z: 35, rotY: 90 * DEG },
+      { x: 66, z: 35, rotY: 90 * DEG },
+      { x: 14, z: 53, rotY: -90 * DEG },
+      { x: 22, z: 53, rotY: -90 * DEG },
+      { x: 30, z: 53, rotY: -90 * DEG },
+      { x: 50, z: 53, rotY: -90 * DEG },
+      { x: 58, z: 53, rotY: -90 * DEG },
+      { x: 66, z: 53, rotY: -90 * DEG },
     ]
 
     const poleMat = new THREE.MeshLambertMaterial({ color: 0x555555 })
@@ -613,10 +622,10 @@ export class TownBuilder {
   private buildTrees(assets: AssetLoader): void {
     const treePositions: [number, number, boolean][] = [
       [5.5, 10, true], [21.5, 10, true], [5.5, 19, true], [21.5, 19, true], [13.5, 6, true],
-      [58.5, 12, false], [67, 12, false], [57, 26, true],
+      [50.5, 16, true], [58.5, 17, false], [50.5, 26, true],
       [63.5, 22.5, true], [68.5, 22.5, true], [63.5, 25.5, true], [68.5, 25.5, true],
       [5.5, 68, true], [21.5, 68, true], [5.5, 76, true], [21.5, 76, true], [13.5, 61, true],
-      [57.5, 66, false], [66.5, 66, false], [76.5, 66, false], [57.5, 74, false], [76.5, 74, false], [70, 61.5, true],
+      [50.5, 66, false], [58.5, 66, false], [76.5, 66, false], [50.5, 74, false], [76.5, 74, false], [70, 61.5, true],
     ]
 
     const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8b6914 })
@@ -760,7 +769,7 @@ export class TownBuilder {
 
     const bedCenters: [number, number][] = [
       [62.8, 24.0], [69.2, 24.0], [72.6, 24.0], [79.4, 24.0],
-      [58.5, 14.5], [65.5, 14.5],
+      [50.5, 14.5], [57.5, 14.5],
       [5.0, 12.5], [5.0, 17.5], [21.5, 12.5], [21.5, 17.5],
     ]
 
@@ -792,12 +801,12 @@ export class TownBuilder {
     const positions: [number, number][] = [
       [22.6, 12],
       [22.6, 66],
-      [57.4, 12],
-      [57.4, 66],
-      [14, 27.6],
-      [66, 27.6],
-      [14, 60.4],
-      [66, 60.4],
+      [49.4, 12],
+      [49.4, 66],
+      [14, 35.6],
+      [66, 35.6],
+      [14, 52.4],
+      [66, 52.4],
     ]
 
     for (const [x, z] of positions) {
@@ -813,5 +822,204 @@ export class TownBuilder {
         this.placeModel(model, x, 0, z, 3.5)
       }
     }
+  }
+
+  /* ───────── Traffic Lights ───────── */
+
+  private buildTrafficLights(): void {
+    const makeBulb = (color: number) => new THREE.MeshLambertMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0.08,
+    })
+    const ns = { red: makeBulb(0xff2020), yellow: makeBulb(0xffcc00), green: makeBulb(0x20d060) }
+    const ew = { red: makeBulb(0xff2020), yellow: makeBulb(0xffcc00), green: makeBulb(0x20d060) }
+    this.trafficLightRefs = { ns, ew }
+
+    const housingMat = new THREE.MeshLambertMaterial({ color: 0x222a33 })
+    const poleMat = new THREE.MeshLambertMaterial({ color: 0x4b5563 })
+    const armMat = new THREE.MeshLambertMaterial({ color: 0x374151 })
+    const capMat = new THREE.MeshLambertMaterial({ color: 0x111111 })
+    const housingGeo = new THREE.BoxGeometry(0.9, 1.5, 0.3)
+    const bulbGeo = new THREE.SphereGeometry(0.13, 10, 8)
+    const poleGeo = new THREE.CylinderGeometry(0.08, 0.12, 3.4, 8)
+    const capGeo = new THREE.SphereGeometry(0.24, 8, 6)
+
+    const addSignalHead = (
+      x: number,
+      z: number,
+      bulbs: typeof ns,
+      rotY: number,
+    ): void => {
+      const head = new THREE.Group()
+      const housing = new THREE.Mesh(housingGeo, housingMat)
+      housing.castShadow = true
+      head.add(housing)
+
+      const cap = new THREE.Mesh(capGeo, capMat)
+      cap.position.set(0, 0.85, 0)
+      head.add(cap)
+
+      const bulbsDef: Array<[number, THREE.MeshLambertMaterial]> = [
+        [0.5, bulbs.red],
+        [0, bulbs.yellow],
+        [-0.5, bulbs.green],
+      ]
+      for (const [dy, mat] of bulbsDef) {
+        const bulb = new THREE.Mesh(bulbGeo, mat)
+        bulb.position.set(0, dy, 0.17)
+        head.add(bulb)
+      }
+
+      head.position.set(x, 3.2, z)
+      head.rotation.y = rotY
+      this.townGroup.add(head)
+    }
+
+    const addSignalPost = (px: number, pz: number, hx: number, hz: number): void => {
+      this.collisionObstacles.push({
+        type: 'circle',
+        id: `trafficlight_${px}_${pz}`,
+        x: px,
+        z: pz,
+        radius: 0.16,
+      })
+      const pole = new THREE.Mesh(poleGeo, poleMat)
+      pole.position.set(px, 1.7, pz)
+      pole.castShadow = true
+      this.townGroup.add(pole)
+
+      const dx = hx - px
+      const dz = hz - pz
+      const len = Math.max(0.01, Math.hypot(dx, dz))
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, len), armMat)
+      arm.position.set((px + hx) / 2, 3.2, (pz + hz) / 2)
+      arm.rotation.y = Math.atan2(dx, dz)
+      arm.castShadow = true
+      this.townGroup.add(arm)
+    }
+
+    // Southbound (north approach, signal faces -z)
+    addSignalPost(51, 31.5, 44, 34)
+    addSignalHead(44, 34, ns, Math.PI)
+    // Northbound (south approach, signal faces +z)
+    addSignalPost(29, 52.5, 36, 50)
+    addSignalHead(36, 50, ns, 0)
+    // Eastbound (west approach, signal faces -x)
+    addSignalPost(31.5, 35, 30, 48)
+    addSignalHead(30, 48, ew, -Math.PI / 2)
+    // Westbound (east approach, signal faces +x)
+    addSignalPost(48.5, 53, 50, 40)
+    addSignalHead(50, 40, ew, Math.PI / 2)
+  }
+
+  /* ───────── Road Signs ───────── */
+
+  private addRoadSign(kind: 'stop' | 'speed30' | 'lightAhead', x: number, z: number): void {
+    const poleMat = new THREE.MeshLambertMaterial({ color: 0x4b5563 })
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.2, 6), poleMat)
+    pole.position.set(x, 1.1, z)
+    pole.castShadow = true
+    this.townGroup.add(pole)
+
+    const sprite = this.createRoadSignSprite(kind)
+    sprite.position.set(x, 2.7, z)
+    sprite.scale.set(1.05, 1.05, 1)
+    sprite.renderOrder = 20
+    this.townGroup.add(sprite)
+
+    this.collisionObstacles.push({
+      type: 'circle',
+      id: `roadsign_${kind}_${x}_${z}`,
+      x,
+      z,
+      radius: 0.15,
+    })
+  }
+
+  private buildRoadSigns(): void {
+    this.addRoadSign('speed30', 30.8, 12)
+    this.addRoadSign('speed30', 49.2, 30)
+    this.addRoadSign('stop', 28.5, 46)
+    this.addRoadSign('stop', 51.5, 42)
+    this.addRoadSign('lightAhead', 30.8, 62)
+    this.addRoadSign('lightAhead', 49.2, 62)
+  }
+
+  private createRoadSignSprite(kind: 'stop' | 'speed30' | 'lightAhead'): THREE.Sprite {
+    const canvas = document.createElement('canvas')
+    const size = 256
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+    ctx.clearRect(0, 0, size, size)
+    const c = size / 2
+    const r = size * 0.4
+
+    if (kind === 'stop') {
+      ctx.fillStyle = '#d83a2f'
+      ctx.beginPath()
+      for (let i = 0; i < 8; i++) {
+        const ang = Math.PI / 8 + (i * 2 * Math.PI) / 8
+        const px = c + Math.cos(ang) * r
+        const py = c + Math.sin(ang) * r
+        if (i === 0) ctx.moveTo(px, py)
+        else ctx.lineTo(px, py)
+      }
+      ctx.closePath()
+      ctx.fill()
+      ctx.lineWidth = 10
+      ctx.strokeStyle = '#ffffff'
+      ctx.stroke()
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '900 54px "Segoe UI", Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('STOP', c, c + 4)
+    } else if (kind === 'speed30') {
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.arc(c, c, r, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.lineWidth = 12
+      ctx.strokeStyle = '#d83a2f'
+      ctx.stroke()
+      ctx.fillStyle = '#111111'
+      ctx.font = '900 96px "Segoe UI", Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('30', c, c + 6)
+    } else {
+      ctx.fillStyle = '#f5c91a'
+      ctx.beginPath()
+      ctx.moveTo(c, c - r)
+      ctx.lineTo(c + r, c)
+      ctx.lineTo(c, c + r)
+      ctx.lineTo(c - r, c)
+      ctx.closePath()
+      ctx.fill()
+      ctx.lineWidth = 10
+      ctx.strokeStyle = '#111111'
+      ctx.stroke()
+      const ly = c - 44
+      ctx.fillStyle = '#111111'
+      ctx.fillRect(c - 26, ly - 34, 52, 92)
+      for (const [color, y] of [['#ff2d20', ly - 16], ['#ffc200', ly + 4], ['#22c55e', ly + 24]] as Array<[string, number]>) {
+        ctx.beginPath()
+        ctx.arc(c, y, 13, 0, Math.PI * 2)
+        ctx.fillStyle = color
+        ctx.fill()
+      }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    const mat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    })
+    return new THREE.Sprite(mat)
   }
 }

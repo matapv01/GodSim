@@ -246,6 +246,11 @@ const en: Record<string, string> = {
   'police_traffic_stop.location': 'Central intersection',
   'police_traffic_stop.log': 'Officer {officer} pulled over {owner} for driving in the wrong lane and issued a warning.',
   'police_traffic_stop.activity': 'Pulled over a wrong-lane driver',
+  'police_traffic_stop.toast_red': 'Officer Khôi pulled over {owner}’s car for running a red light!',
+  'police_traffic_stop.officer_red_line1': 'Stop! You ran a red light!',
+  'police_traffic_stop.driver_red_line': 'Sorry, officer. I will watch the light next time.',
+  'police_traffic_stop.log_red': 'Officer {officer} pulled over {owner} for running a red light and issued a warning.',
+  'police_traffic_stop.toast_pulled_over': 'You were pulled over! Stay in place until the officer finishes.',
 
   'drive_by.hitchhike_boarded': 'Thanks for the ride!',
 

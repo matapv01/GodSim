@@ -246,6 +246,11 @@ const zhCN: Record<string, string> = {
   'police_traffic_stop.location': '镇中心路口',
   'police_traffic_stop.log': '警察{officer}因{owner}逆向行驶将其拦下并给予警告。',
   'police_traffic_stop.activity': '拦下逆向行驶的车辆',
+  'police_traffic_stop.toast_red': '警察Khôi拦下了{owner}的车，因为闯红灯！',
+  'police_traffic_stop.officer_red_line1': '靠边停车！你刚刚闯红灯了！',
+  'police_traffic_stop.driver_red_line': '对不起警官，我下次会注意看红绿灯。',
+  'police_traffic_stop.log_red': '警察{officer}因{owner}闯红灯将其拦下并给予警告。',
+  'police_traffic_stop.toast_pulled_over': '你被警察拦下了！请原地停车等待处理。',
 
   'drive_by.hitchhike_boarded': '谢谢你让我搭一段顺风车！',
 
