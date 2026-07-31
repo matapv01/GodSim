@@ -271,6 +271,8 @@ const en: Record<string, string> = {
   'editor.add': 'Add',
   'editor.confirm_title': 'Confirm',
   'editor.publish_to_town': 'Publish',
+
+  'nearby.listening': 'Hearing:',
 }
 
 export default en

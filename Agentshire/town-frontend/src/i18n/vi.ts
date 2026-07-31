@@ -251,6 +251,8 @@ const vi: Record<string, string> = {
   'editor.add': 'Thêm',
   'editor.confirm_title': 'Xác nhận',
   'editor.publish_to_town': 'Xuất bản',
+
+  'nearby.listening': 'Đang nghe:',
 }
 
 export default vi

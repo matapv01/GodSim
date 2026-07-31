@@ -381,6 +381,48 @@ export class UIManager {
     this.updateChatTargetIndicator(null, false)
   }
 
+  // ── Nearby listeners strip (everyone in hearing range) ──
+
+  private nearbyTargetsEl: HTMLElement | null = null
+  private nearbyTargetsRenderedKey = ''
+
+  updateNearbyTargets(citizens: NPCConfig[]): void {
+    if (!this.nearbyTargetsEl) {
+      this.nearbyTargetsEl = document.getElementById('town-nearby-targets')
+    }
+    const el = this.nearbyTargetsEl
+    if (!el) return
+
+    if (!citizens.length) {
+      el.classList.add('town-nearby-hidden')
+      el.innerHTML = ''
+      this.nearbyTargetsRenderedKey = ''
+      return
+    }
+
+    const key = citizens.map(c => c.id).join(',')
+    el.classList.remove('town-nearby-hidden')
+    if (key === this.nearbyTargetsRenderedKey) return
+    this.nearbyTargetsRenderedKey = key
+
+    el.innerHTML = ''
+    const label = document.createElement('span')
+    label.className = 'town-nearby-label'
+    label.textContent = t('nearby.listening')
+    el.appendChild(label)
+    for (const c of citizens) {
+      const pill = document.createElement('span')
+      pill.className = 'town-nearby-pill'
+      pill.title = c.label || c.name
+      pill.appendChild(buildAvatarEl('town-nearby-avatar', c, 18))
+      const nm = document.createElement('span')
+      nm.className = 'town-nearby-name'
+      nm.textContent = c.label || c.name
+      pill.appendChild(nm)
+      el.appendChild(pill)
+    }
+  }
+
   // ── Topic mode (multi-citizen group discussion) ──
 
   private topicTargets: NPCConfig[] | null = null

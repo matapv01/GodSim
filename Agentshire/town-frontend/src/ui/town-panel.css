@@ -57,6 +57,47 @@
 }
 #town-image-preview::-webkit-scrollbar { display: none; }
 
+/* ── Nearby listeners strip (everyone in hearing range) ── */
+
+#town-nearby-targets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+#town-nearby-targets.town-nearby-hidden { display: none; }
+.town-nearby-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+.town-nearby-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 3px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.town-nearby-avatar {
+  width: 18px; height: 18px; border-radius: 50%;
+  object-fit: cover; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 8px; font-weight: 700; color: #fff;
+}
+.town-nearby-name {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 90px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .town-img-thumb {
   position: relative;
   flex-shrink: 0;
@@ -770,6 +811,34 @@ body.mobile-mode #town-stt-interim {
   display: none;
 }
 
+/* ── Nearby listeners strip: micro horizontal scroll ── */
+
+body.mobile-mode #town-nearby-targets {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 3px;
+  padding: 1px 6px 2px;
+  border-top: none;
+}
+body.mobile-mode #town-nearby-targets::-webkit-scrollbar { display: none; }
+body.mobile-mode .town-nearby-label { display: none; }
+body.mobile-mode .town-nearby-pill {
+  padding: 1px 5px 1px 2px;
+  gap: 2px;
+  border-radius: 9px;
+  background: rgba(255,255,255,0.08);
+  border: none;
+}
+body.mobile-mode .town-nearby-avatar {
+  width: 14px; height: 14px;
+  font-size: 6px;
+}
+body.mobile-mode .town-nearby-name {
+  font-size: 9px;
+  max-width: 56px;
+}
+
 /* ── Bottom panel: micro pill with collapse ── */
 
 body.mobile-mode #town-bottom-panel {
@@ -796,6 +865,7 @@ body.mobile-mode #town-bottom-panel.collapsed {
 }
 body.mobile-mode #town-bottom-panel.collapsed #town-agent-status,
 body.mobile-mode #town-bottom-panel.collapsed #town-input-row,
+body.mobile-mode #town-bottom-panel.collapsed #town-nearby-targets,
 body.mobile-mode #town-bottom-panel.collapsed #town-stt-interim,
 body.mobile-mode #town-bottom-panel.collapsed #town-image-preview {
   display: none;
@@ -899,6 +969,15 @@ body.mobile-mode #npc-card {
   body.mobile-mode #town-input-row {
     padding: 1px 3px;
   }
+  body.mobile-mode .town-nearby-name {
+    display: none;
+  }
+  body.mobile-mode .town-nearby-pill {
+    padding: 1px 2px;
+  }
+  body.mobile-mode #town-nearby-targets {
+    padding: 0 4px 1px;
+  }
 }
 
 /* ── Landscape mobile ── */
@@ -939,5 +1018,14 @@ body.mobile-mode #npc-card {
   }
   body.mobile-mode #town-agent-status {
     top: -16px; left: 6px;
+  }
+  body.mobile-mode .town-nearby-name {
+    display: none;
+  }
+  body.mobile-mode .town-nearby-pill {
+    padding: 1px 2px;
+  }
+  body.mobile-mode #town-nearby-targets {
+    padding: 0 4px 1px;
   }
 }

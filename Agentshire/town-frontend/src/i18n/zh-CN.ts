@@ -271,6 +271,8 @@ const zhCN: Record<string, string> = {
   'editor.add': '添加',
   'editor.confirm_title': '确认',
   'editor.publish_to_town': '发布到小镇',
+
+  'nearby.listening': '听到:',
 }
 
 export default zhCN

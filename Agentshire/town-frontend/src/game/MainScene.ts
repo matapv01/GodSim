@@ -210,6 +210,7 @@ export class MainScene implements GameScene {
   private lastTownMapRenderAt = 0
   private lastUserProximityCheckAt = 0
   private nearbyUserNpcId: string | null = null
+  private nearbySpeechTargetIds: string[] = []
   private userReactionCooldowns = new Map<string, number>()
   private pendingUserReactions = new Set<string>()
 
@@ -1412,10 +1413,17 @@ __workflow 演出测试指令:
 
     const user = this.npcManager.get('user')
     const userPos = this.getPlayerSocialPosition()
-    if (!user || !userPos || !user.isInActiveScene) {
+    const sceneType = this.sceneSwitcher?.getSceneType()
+    if (!user || !userPos || !user.isInActiveScene || sceneType !== 'town') {
       this.nearbyUserNpcId = null
+      this.setNearbySpeechTargets([])
       return
     }
+
+    const maxDistance = this.vehicleManager.hasPlayerAboard() ? 7.5 : 6
+    this.setNearbySpeechTargets(
+      this.findAllNearbySpeechTargets(userPos, maxDistance).map(n => n.id),
+    )
 
     const nearest = this.findNearestSpeechTargetNear(userPos, 3.1, true)
     if (!nearest) {
@@ -1426,6 +1434,22 @@ __workflow 演出测试指令:
 
     this.nearbyUserNpcId = nearest.id
     void this.triggerUserReaction(nearest.id, 'proximity')
+  }
+
+  private setNearbySpeechTargets(ids: string[]): void {
+    const changed = ids.length !== this.nearbySpeechTargetIds.length ||
+      ids.some((id, i) => id !== this.nearbySpeechTargetIds[i])
+    this.nearbySpeechTargetIds = ids
+    if (!changed) return
+    const configs = ids
+      .map(id => this.npcManager.get(id))
+      .filter((n): n is NPC => !!n)
+      .map(n => this.npcToConfig(n))
+    this.ui.updateNearbyTargets(configs)
+  }
+
+  getNearbySpeechTargetIds(): string[] {
+    return [...this.nearbySpeechTargetIds]
   }
 
   private async triggerUserReaction(npcId: string, context: 'visit' | 'proximity'): Promise<void> {
@@ -1671,29 +1695,74 @@ __workflow 演出测试指令:
   private onUserMessage(text: string, requestedTargetNpcId?: string): void {
     if (!this.inputEnabled) return
 
-    const speechTarget = requestedTargetNpcId && this.npcManager.get(requestedTargetNpcId)
-      ? requestedTargetNpcId
-      : this.resolveTownSpeechTarget()
+    if (requestedTargetNpcId && this.npcManager.get(requestedTargetNpcId)) {
+      this.routeSpeechMessage(text, requestedTargetNpcId)
+      return
+    }
+
+    const userPos = this.getPlayerSocialPosition()
+    const maxDistance = this.vehicleManager.hasPlayerAboard() ? 7.5 : 6
+    const nearbyIds = userPos
+      ? this.findAllNearbySpeechTargets(userPos, maxDistance).map(n => n.id)
+      : []
+
+    if (nearbyIds.length > 1) {
+      this.routeBroadcastMessage(text, nearbyIds)
+      return
+    }
+
+    const cabinTarget = this.resolveCabinSpeechTarget()
+    const speechTarget = cabinTarget ?? (nearbyIds[0] ?? this.resolveTownSpeechTarget())
     if (!speechTarget) {
       this.ui.showToast('Hãy lại gần một người rồi mới nói chuyện')
       return
     }
-    this.syncDialogTarget(speechTarget)
+    this.routeSpeechMessage(text, speechTarget)
+  }
+
+  private routeSpeechMessage(text: string, targetId: string): void {
+    this.syncDialogTarget(targetId)
     const isVehicleInvite = this.isVehicleInvitationText(text)
     const mayBeAppointment = this.isPlayerAppointmentText(text)
-    this.showUserBubble(text, true, speechTarget)
-    if (isVehicleInvite && speechTarget !== 'steward') {
-      void this.handleVehicleInvitation(speechTarget)
+    this.showUserBubble(text, true, targetId)
+    if (isVehicleInvite && targetId !== 'steward') {
+      void this.handleVehicleInvitation(targetId)
       return
     }
-    if (mayBeAppointment && this.capturePlayerAppointment(text, speechTarget)) return
-    if (speechTarget !== 'steward') {
-      this.replyFromLocalCitizenIfNeeded(text, speechTarget, true)
-      this.dataSource.sendAction({ type: 'direct_speech', targetNpcId: speechTarget, text })
+    if (mayBeAppointment && this.capturePlayerAppointment(text, targetId)) return
+    if (targetId !== 'steward') {
+      this.replyFromLocalCitizenIfNeeded(text, targetId, true)
+      this.dataSource.sendAction({ type: 'direct_speech', targetNpcId: targetId, text })
       return
     }
-    this.dataSource.sendAction({ type: 'user_message', targetNpcId: speechTarget, text })
+    this.dataSource.sendAction({ type: 'user_message', targetNpcId: targetId, text })
   }
+
+  private routeBroadcastMessage(text: string, targetIds: string[]): void {
+    const userNpc = this.npcManager.get('user')
+    this.logBubbleText('user_message', text)
+    if (userNpc) this.bubbles.show(userNpc.mesh, text, getBubbleDurationMs(text, 'user'))
+    this.ui.addChatMessage({ from: t('mayor'), text, timestamp: Date.now() })
+    this.townJournal?.recordPlayerMessage(this.getPlayerName(), text, 'all')
+    this.syncDialogTarget(targetIds[0])
+
+    for (const npcId of targetIds) {
+      this.dailyScheduler.getActivityJournals().get(npcId)?.updateRelationship(
+        { npcId: 'user', name: this.getPlayerName() },
+        this.classifyPlayerMessageRelationship(text),
+      )
+      if (npcId === 'steward') {
+        this.dataSource.sendAction({ type: 'user_message', targetNpcId: npcId, text })
+        continue
+      }
+      this.citizenChat.onUserMessage(npcId)
+      this.replyFromLocalCitizenIfNeeded(text, npcId, true)
+      this.dataSource.sendAction({ type: 'direct_speech', targetNpcId: npcId, text })
+    }
+    this.socialFeedPanel?.refresh()
+    this.saveSnapshot()
+  }
+
 
   // ── Central GameEvent dispatcher ──
 
@@ -2928,6 +2997,17 @@ __workflow 演出测试指令:
       }
     }
     return best
+  }
+
+  private findAllNearbySpeechTargets(userPos: THREE.Vector3, maxDistance: number): NPC[] {
+    const result: NPC[] = []
+    for (const npc of this.npcManager.getAll()) {
+      if (npc.id === 'user' || !npc.mesh.visible || !npc.isInActiveScene) continue
+      if (npc.getPosition().distanceTo(userPos) > maxDistance) continue
+      result.push(npc)
+    }
+    result.sort((a, b) => a.getPosition().distanceTo(userPos) - b.getPosition().distanceTo(userPos))
+    return result
   }
 
   private npcToConfig(npc: NPC): NPCConfig {
