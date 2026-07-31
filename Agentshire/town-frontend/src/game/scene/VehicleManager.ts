@@ -482,6 +482,7 @@ export class VehicleManager {
         mesh: vehicle.wrapper,
         collisionRadius: VEHICLE_COLLISION_RADIUS,
         isInActiveScene: true,
+        scene: this.scene,
       }))
   }
 
@@ -761,8 +762,18 @@ export class VehicleManager {
       const previous = { x: v.wrapper.position.x, z: v.wrapper.position.z }
       const pose = this.sampleRoute(v.routePoints, v.segmentLengths, v.distance)
       const bump = Math.sin(time * 12 + v.distance) * 0.015
-      v.wrapper.position.x = pose.x
-      v.wrapper.position.z = pose.z
+      const resolved = this.callbacks.resolveVehicleMove
+        ? this.callbacks.resolveVehicleMove(v.id, v.wrapper, previous, { x: pose.x, z: pose.z })
+        : { x: pose.x, z: pose.z }
+      const moved = Math.hypot(resolved.x - previous.x, resolved.z - previous.z)
+      if (moved > 1e-4) {
+        v.wrapper.position.x = resolved.x
+        v.wrapper.position.z = resolved.z
+      } else {
+        // Blocked (pedestrian / object / another vehicle): hold position and
+        // rewind route progress so the vehicle resumes from where it actually is.
+        v.distance = Math.max(0, v.distance - delta * (v.totalLength / v.duration))
+      }
       v.wrapper.position.y = ROAD_Y + bump
       v.wrapper.rotation.y = pose.rotationY
       this.syncOccupants(v)

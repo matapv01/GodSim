@@ -2724,6 +2724,7 @@ __workflow 演出测试指令:
         mesh: vehicle,
         collisionRadius: 0.95,
         isInActiveScene: this.sceneSwitcher?.getSceneType() === 'town',
+        scene: this.townScene,
       },
       from,
       desired,

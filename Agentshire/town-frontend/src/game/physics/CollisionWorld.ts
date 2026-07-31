@@ -22,6 +22,12 @@ export interface CollisionActor {
   mesh: THREE.Object3D
   collisionRadius: number
   isInActiveScene: boolean
+  /**
+   * Scene the actor belongs to. Defaults to `mesh.parent` when the parent
+   * is a Scene; set explicitly for actors parented under a wrapper Group
+   * (e.g. vehicles) that still live in a specific scene.
+   */
+  scene?: THREE.Scene
 }
 
 interface MoveOptions {
@@ -53,9 +59,14 @@ export class CollisionWorld {
     this.obstaclesByScene.set(scene, obstacles)
   }
 
+  private getActorScene(actor: CollisionActor): THREE.Scene | undefined {
+    if (actor.scene) return actor.scene
+    return actor.mesh.parent instanceof THREE.Scene ? actor.mesh.parent : undefined
+  }
+
   planPath(actor: CollisionActor, target: { x: number; z: number }): { x: number; z: number }[] {
-    const scene = actor.mesh.parent
-    if (!(scene instanceof THREE.Scene)) return [{ ...target }]
+    const scene = this.getActorScene(actor)
+    if (!scene) return [{ ...target }]
 
     const start = { x: actor.mesh.position.x, z: actor.mesh.position.z }
     const end = this.projectTarget(actor, target)
@@ -129,8 +140,8 @@ export class CollisionWorld {
   }
 
   projectTarget(actor: CollisionActor, target: { x: number; z: number }): { x: number; z: number } {
-    const scene = actor.mesh.parent
-    if (!(scene instanceof THREE.Scene)) return { ...target }
+    const scene = this.getActorScene(actor)
+    if (!scene) return { ...target }
 
     const projected = new THREE.Vector2(target.x, target.z)
     const origin = new THREE.Vector2(actor.mesh.position.x, actor.mesh.position.z)
@@ -163,8 +174,8 @@ export class CollisionWorld {
     desired: { x: number; z: number },
     options: MoveOptions = {},
   ): { x: number; z: number } {
-    const scene = actor.mesh.parent
-    if (!(scene instanceof THREE.Scene)) return { ...desired }
+    const scene = this.getActorScene(actor)
+    if (!scene) return { ...desired }
 
     const start = this.depenetratePoint(
       new THREE.Vector2(from.x, from.z),
@@ -210,7 +221,7 @@ export class CollisionWorld {
   resolveOverlaps(actors: CollisionActor[], activeScene: THREE.Scene): void {
     const active = actors.filter(actor =>
       actor.isInActiveScene
-      && actor.mesh.parent === activeScene
+      && this.getActorScene(actor) === activeScene
       && actor.mesh.visible,
     )
 
@@ -390,7 +401,7 @@ export class CollisionWorld {
   private getSceneActors(scene: THREE.Scene, excludeId: string): CollisionActor[] {
     return this.actorsProvider().filter(actor =>
       actor.id !== excludeId
-      && actor.mesh.parent === scene
+      && this.getActorScene(actor) === scene
       && actor.mesh.visible
       && actor.isInActiveScene,
     )
