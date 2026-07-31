@@ -31,13 +31,13 @@ export class CameraController {
   private static readonly ZOOM_MAX = 1.6
   private zoomLevel = 1.0
   private static readonly PATROL_POINTS = [
-    { x: 25.6, z: 19.25 },
-    { x: 24.4, z: 9.25 },
+    { x: 25.6, z: 14.5 },
+    { x: 24.4, z: 8.0 },
     { x: 7.6, z: 15.5 },
-    { x: 42.4, z: 14.25 },
-    { x: 18.4, z: 28.0 },
-    { x: 42.4, z: 21.75 },
-    { x: 11.2, z: 24.25 },
+    { x: 42.4, z: 9.5 },
+    { x: 18.4, z: 29.5 },
+    { x: 42.4, z: 16.5 },
+    { x: 11.2, z: 25.0 },
   ]
 
   constructor(camera: THREE.PerspectiveCamera, container: HTMLElement) {

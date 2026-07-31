@@ -7,7 +7,7 @@ import type { CollisionActor } from '../physics/CollisionWorld'
 const CAR_MODELS = ['car_sedan', 'car_hatchback', 'car_taxi'] as const
 
 const ROAD_Y = 0.06
-const LANE_OFFSET = 0.32
+const LANE_OFFSET = 1.0
 
 interface RoadPoint { x: number; z: number }
 interface VehicleRoute {
@@ -100,13 +100,13 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     owner: 'Người chơi',
     appearance: 'sedan riêng',
     modelKey: 'car_sedan',
-    homeParking: { x: 6.15, z: 30.2 },
+    homeParking: { x: 9.5, z: 28.5 },
     travelHours: [0, 24],
     automatic: false,
     from: 'Nhà người chơi',
     to: 'Quảng trường',
     purpose: 'đi lại trong thị trấn',
-    points: [{ x: 7.6, z: 30.5 }, { x: 16, z: 30.5 }, { x: 16, z: 26.75 }, { x: 24, z: 26.75 }],
+    points: [{ x: 11.2, z: 29.4 }, { x: 16, z: 29.5 }, { x: 16, z: 26.75 }, { x: 24, z: 26.75 }, { x: 24, z: 18 }, { x: 25.6, z: 14.5 }],
   },
   {
     id: 'minh_sedan',
@@ -142,13 +142,13 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     owner: 'Vy',
     appearance: 'xe đô thị',
     modelKey: 'car_taxi',
-    homeParking: { x: 12.65, z: 19.25 },
+    homeParking: { x: 11.5, z: 20.5 },
     travelHours: [14, 23],
     automatic: true,
     from: 'Nhà Vy',
     to: 'Quán cà phê',
     purpose: 'gặp người quen',
-    points: [{ x: 14.0, z: 18.5 }, { x: 16, z: 18.5 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 38.8, z: 18.0 }],
+    points: [{ x: 12.0, z: 18.5 }, { x: 16, z: 18.5 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 39.4, z: 26.75 }],
   },
   {
     id: 'khoi_patrol',
@@ -156,7 +156,7 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     owner: 'Khôi',
     appearance: 'xe tuần tra',
     modelKey: 'car_sedan',
-    homeParking: { x: 14.0, z: 22.5 },
+    homeParking: { x: 11.0, z: 23.0 },
     travelHours: [7, 24],
     automatic: true,
     from: 'Nhà Khôi',

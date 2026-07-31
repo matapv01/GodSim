@@ -13,13 +13,13 @@ import { getLocale } from '../../i18n'
 interface Obstacle { x: number; z: number; radius: number }
 
 const OBSTACLES: Obstacle[] = [
-  { x: 25.6, z: 19.25, radius: 2.2 },
-  { x: 22.0, z: 16.5, radius: 0.7 },
-  { x: 29.2, z: 16.5, radius: 0.7 },
-  { x: 22.0, z: 22.0, radius: 0.7 },
-  { x: 29.2, z: 22.0, radius: 0.7 },
-  { x: 18.4, z: 28.0, radius: 0.8 },
-  { x: 22.0, z: 26.75, radius: 0.8 },
+  { x: 25.6, z: 14.5, radius: 1.8 },
+  { x: 22.0, z: 14.25, radius: 0.8 },
+  { x: 29.2, z: 14.25, radius: 0.8 },
+  { x: 22.0, z: 23.5, radius: 0.8 },
+  { x: 29.2, z: 23.5, radius: 0.8 },
+  { x: 32.4, z: 23.2, radius: 0.8 },
+  { x: 18.4, z: 29.5, radius: 0.8 },
 ]
 
 const FORMATION_RADIUS = 3.0
