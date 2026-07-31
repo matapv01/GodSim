@@ -1442,7 +1442,9 @@ __workflow 演出测试指令:
 
     if (this.vehicleManager.isPlayerDriving()) {
       this.nearbyUserNpcId = null
-      this.setNearbySpeechTargets([])
+      this.setNearbySpeechTargets(
+        this.findAllNearbySpeechTargets(userPos, 7.5).map(n => n.id),
+      )
       this.updateDriveByReactions(now)
       return
     }
