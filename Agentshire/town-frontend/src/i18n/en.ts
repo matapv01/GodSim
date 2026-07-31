@@ -209,6 +209,13 @@ const en: Record<string, string> = {
   'traffic_incident.log_start': '{driver} hit {victim} with a car; they began arguing as a crowd gathered.',
   'traffic_incident.log_end': 'The fight involving {victim} was stopped and {count} witnesses left the scene.',
   'traffic_incident.activity': 'Was hit by a car and got into a heated dispute with the driver',
+  'traffic_incident.police_toast': 'Officer {officer} is on the scene to handle the accident!',
+  'traffic_incident.police_stop': 'Stop right there! I am the police—calm down and explain what happened!',
+  'traffic_incident.police_warning': 'Driving too close to the road is a violation. Watch where you drive!',
+  'traffic_incident.police_fine': '{driver}, this is your written warning. Next offense will be fined!',
+  'traffic_incident.police_disperse': 'Nothing to see here anymore! Everyone move along!',
+  'traffic_incident.police_log': 'Officer {officer} mediated the collision between {victim} and {driver}.',
+  'traffic_incident.log_police_end': 'Officer {officer} filed the collision report; {count} witnesses left the scene.',
 
   'traffic_crash.location': 'Central intersection',
   'traffic_crash.vehicle_title': '{owner}’s car collided with another vehicle',
@@ -217,6 +224,23 @@ const en: Record<string, string> = {
   'traffic_crash.toast_player': 'You crashed into {owner}’s car!',
   'traffic_crash.log': '{ownerA}’s car and {ownerB}’s car collided, throwing up a cloud of smoke.',
   'traffic_crash.log_player': 'You drove your car into {owner}’s car at the intersection.',
+  'traffic_crash.officer_default': 'The officer',
+  'traffic_crash.police_toast': 'Officer {officer} is handling the collision!',
+  'traffic_crash.police_line': 'Both cars, stop! Show your papers and check the damage!',
+  'traffic_crash.police_line2': 'Collision recorded. Keep a safe distance next time.',
+  'traffic_crash.police_log': 'Officer {officer} filed the report on the collision between {ownerA} and {ownerB}.',
+
+  'police_traffic.activity': 'Arrived to handle a traffic accident',
+
+  'police_traffic_stop.toast': 'Officer Khôi pulled over {owner}’s car for driving in the wrong lane!',
+  'police_traffic_stop.officer_default': 'Officer Khôi',
+  'police_traffic_stop.officer_line1': 'Pull over! You were driving in the wrong lane!',
+  'police_traffic_stop.officer_line2': 'Let me see your vehicle papers and license.',
+  'police_traffic_stop.officer_line3': 'This is a warning. Next time stay in your lane or you will be fined!',
+  'police_traffic_stop.driver_line': 'I am so sorry, officer. I will be more careful.',
+  'police_traffic_stop.location': 'Central intersection',
+  'police_traffic_stop.log': 'Officer {officer} pulled over {owner} for driving in the wrong lane and issued a warning.',
+  'police_traffic_stop.activity': 'Pulled over a wrong-lane driver',
 
   'drive_by.hitchhike_boarded': 'Thanks for the ride!',
 

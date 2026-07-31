@@ -190,6 +190,13 @@ const vi: Record<string, string> = {
   'traffic_incident.log_start': '{driver} lái xe va vào {victim}; hai bên lập tức cãi vã và đám đông bắt đầu tụ tập.',
   'traffic_incident.log_end': 'Cuộc ẩu đả quanh {victim} đã được can ngăn; {count} người chứng kiến rời hiện trường.',
   'traffic_incident.activity': 'Bị xe va phải rồi tranh cãi dữ dội với tài xế',
+  'traffic_incident.police_toast': 'Cảnh sát {officer} có mặt xử lý vụ va chạm!',
+  'traffic_incident.police_stop': 'Dừng lại ngay! Tôi là cảnh sát, bình tĩnh nói rõ sự việc!',
+  'traffic_incident.police_warning': 'Điều khiển xe sát lòng đường là vi phạm. Lần sau phải chú ý quan sát!',
+  'traffic_incident.police_fine': '{driver}, đây là biên bản nhắc nhở. Lần sau vi phạm sẽ bị xử phạt!',
+  'traffic_incident.police_disperse': 'Không còn gì để xem nữa! Mọi người giải tán đi!',
+  'traffic_incident.police_log': 'Cảnh sát {officer} có mặt hòa giải vụ va chạm giữa {victim} và {driver}.',
+  'traffic_incident.log_police_end': 'Cảnh sát {officer} đã lập biên bản vụ va chạm giữa {victim} và tài xế; {count} người chứng kiến rời hiện trường.',
 
   'traffic_crash.location': 'Giao lộ trung tâm thị trấn',
   'traffic_crash.vehicle_title': 'Xe nhà {owner} vừa va chạm với xe khác',
@@ -198,6 +205,23 @@ const vi: Record<string, string> = {
   'traffic_crash.toast_player': 'Bạn vừa va chạm với xe của {owner}!',
   'traffic_crash.log': 'Xe của {ownerA} và xe của {ownerB} va chạm trên đường, cú va tạo khói lớn.',
   'traffic_crash.log_player': 'Bạn lái xe va vào xe của {owner} tại giao lộ, khói bốc lên nghi ngút.',
+  'traffic_crash.officer_default': 'Cảnh sát',
+  'traffic_crash.police_toast': 'Cảnh sát {officer} đang xử lý vụ va chạm!',
+  'traffic_crash.police_line': 'Hai xe dừng lại! Xuất trình giấy tờ và kiểm tra thiệt hại!',
+  'traffic_crash.police_line2': 'Va chạm đã được ghi nhận. Lần sau giữ khoảng cách an toàn.',
+  'traffic_crash.police_log': 'Cảnh sát {officer} lập biên bản vụ va chạm giữa xe của {ownerA} và xe của {ownerB}.',
+
+  'police_traffic.activity': 'Có mặt xử lý tai nạn giao thông',
+
+  'police_traffic_stop.toast': 'Cảnh sát Khôi dừng xe của {owner} vì đi sai làn đường!',
+  'police_traffic_stop.officer_default': 'Cảnh sát Khôi',
+  'police_traffic_stop.officer_line1': 'Dừng xe lại! Anh/chị vừa đi sai làn đường!',
+  'police_traffic_stop.officer_line2': 'Đưa giấy tờ xe và bằng lái cho tôi kiểm tra.',
+  'police_traffic_stop.officer_line3': 'Lần này chỉ cảnh cáo. Lần sau đi đúng làn, nếu không sẽ bị phạt!',
+  'police_traffic_stop.driver_line': 'Dạ, tôi xin lỗi. Tôi sẽ chú ý hơn ạ.',
+  'police_traffic_stop.location': 'Giao lộ trung tâm thị trấn',
+  'police_traffic_stop.log': 'Cảnh sát {officer} dừng xe của {owner} vì đi sai làn, nhắc nhở rồi cho tiếp tục di chuyển.',
+  'police_traffic_stop.activity': 'Dừng xe xử lý người đi sai làn',
 
   'drive_by.hitchhike_boarded': 'Cảm ơn đã cho tôi đi nhờ một quãng!',
 

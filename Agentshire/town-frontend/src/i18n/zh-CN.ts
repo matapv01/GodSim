@@ -209,6 +209,13 @@ const zhCN: Record<string, string> = {
   'traffic_incident.log_start': '{driver}驾车撞到{victim}，双方立刻争吵，附近居民开始围观。',
   'traffic_incident.log_end': '围绕{victim}的冲突被制止，{count}名目击者离开现场。',
   'traffic_incident.activity': '被车辆撞到后与司机发生激烈争执',
+  'traffic_incident.police_toast': '警察{officer}到场处理事故！',
+  'traffic_incident.police_stop': '都停下！我是警察，冷静把事情说清楚！',
+  'traffic_incident.police_warning': '开车离行车道太近是违规的，下次注意观察！',
+  'traffic_incident.police_fine': '{driver}，这是给你的警告单，下次再犯就要罚款！',
+  'traffic_incident.police_disperse': '没什么好看的了！大家都散了吧！',
+  'traffic_incident.police_log': '警察{officer}到场调解了{victim}与{driver}的碰撞纠纷。',
+  'traffic_incident.log_police_end': '警察{officer}对碰撞事故立了案，{count}名目击者离开现场。',
 
   'traffic_crash.location': '镇中心路口',
   'traffic_crash.vehicle_title': '{owner}家的车刚与另一辆车相撞',
@@ -217,6 +224,23 @@ const zhCN: Record<string, string> = {
   'traffic_crash.toast_player': '你撞上了{owner}的车！',
   'traffic_crash.log': '{ownerA}的车与{ownerB}的车在路上相撞，撞击扬起浓烟。',
   'traffic_crash.log_player': '你开车在路口撞上了{owner}的车，扬起一阵浓烟。',
+  'traffic_crash.officer_default': '警察',
+  'traffic_crash.police_toast': '警察{officer}正在处理碰撞事故！',
+  'traffic_crash.police_line': '两辆车都停下！出示证件并检查损失！',
+  'traffic_crash.police_line2': '碰撞已记录，下次请保持安全距离。',
+  'traffic_crash.police_log': '警察{officer}对{ownerA}和{ownerB}的碰撞事故立了案。',
+
+  'police_traffic.activity': '到场处理交通事故',
+
+  'police_traffic_stop.toast': '警察Khôi拦下了{owner}的车，因为逆向行驶！',
+  'police_traffic_stop.officer_default': '警察Khôi',
+  'police_traffic_stop.officer_line1': '靠边停车！你刚刚逆向行驶了！',
+  'police_traffic_stop.officer_line2': '出示车辆证件和驾驶证接受检查。',
+  'police_traffic_stop.officer_line3': '这次只警告一次，下次一定要走对车道，否则罚款！',
+  'police_traffic_stop.driver_line': '对不起警官，我会注意的。',
+  'police_traffic_stop.location': '镇中心路口',
+  'police_traffic_stop.log': '警察{officer}因{owner}逆向行驶将其拦下并给予警告。',
+  'police_traffic_stop.activity': '拦下逆向行驶的车辆',
 
   'drive_by.hitchhike_boarded': '谢谢你让我搭一段顺风车！',
 

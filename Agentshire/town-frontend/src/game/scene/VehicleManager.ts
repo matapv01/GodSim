@@ -50,6 +50,15 @@ export interface VehicleCrash {
   playerInvolved: boolean
 }
 
+export interface TrafficStopInfo {
+  offenderOwnerName: string
+  offenderOwnerNpcId: string
+  offenderVehicleId: string
+  offenderVehicle: THREE.Object3D
+  patrolVehicle: THREE.Object3D
+  position: RoadPoint
+}
+
 interface VehicleCallbacks {
   canBoard?: (npcId: string, position: RoadPoint) => boolean
   onBoard?: (npcId: string) => void
@@ -64,6 +73,7 @@ interface VehicleCallbacks {
   getPedestrians?: () => VehiclePedestrian[]
   onPedestrianHit?: (incident: VehicleIncident) => boolean
   onVehicleCrash?: (crash: VehicleCrash) => void
+  onTrafficStop?: (info: TrafficStopInfo) => void
 }
 
 export const TRAFFIC_INCIDENT_DURATION_MS = 18_000
@@ -73,6 +83,12 @@ const VICTIM_HIT_COOLDOWN_MS = 60_000
 const VEHICLE_CRASH_DISTANCE = 2.0
 const VEHICLE_CRASH_DURATION_S = 4
 const VEHICLE_CRASH_COOLDOWN_MS = 30_000
+const WRONG_LANE_PROBABILITY = 0.16
+const TRAFFIC_STOP_DISTANCE = 5.5
+const TRAFFIC_STOP_DURATION_S = 9
+const TRAFFIC_STOP_COOLDOWN_MS = 40_000
+const TRAFFIC_STOP_GAP_MS = 35_000
+const PATROL_ROUTE_ID = 'khoi_patrol'
 
 const VEHICLE_ROUTES: VehicleRoute[] = [
   {
@@ -138,7 +154,7 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     appearance: 'xe tuần tra',
     modelKey: 'car_sedan',
     homeParking: { x: 14.0, z: 22.5 },
-    travelHours: [18, 24],
+    travelHours: [7, 24],
     automatic: true,
     from: 'Nhà Khôi',
     to: 'Đường tuần tra',
@@ -192,6 +208,8 @@ interface PooledVehicle {
   parkTimer: number
   nextTripAt: number
   driverless: boolean
+  wrongLane: boolean
+  pulledOver: boolean
   homeRoute: VehicleRoute
   route: VehicleRoute | null
   routePoints: RoadPoint[]
@@ -214,6 +232,9 @@ export class VehicleManager {
   private ridingNpcIds = new Set<string>()
   private victimHitAt = new Map<string, number>()
   private crashAt = new Map<string, number>()
+  private trafficStopCooldown = new Map<string, number>()
+  private activeTrafficStop: { offenderId: string } | null = null
+  private lastTrafficStopAt = 0
 
   private static readonly POOL_SIZE = VEHICLE_ROUTES.length
 
@@ -340,6 +361,8 @@ export class VehicleManager {
         parkTimer: 0,
         nextTripAt: 0,
         driverless: false,
+        wrongLane: false,
+        pulledOver: false,
         homeRoute,
         route: homeRoute,
         routePoints: [],
@@ -371,6 +394,7 @@ export class VehicleManager {
   private canStartAutoTrip(v: PooledVehicle, hour: number, isNight: boolean): boolean {
     const route = v.homeRoute
     const inWindow = hour >= route.travelHours[0] && hour < route.travelHours[1]
+    if (route.id === PATROL_ROUTE_ID && inWindow) return true
     const ownerAvailable = this.callbacks.canBoard?.(route.ownerNpcId, this.getHomeParkingPoint(route)) !== false
     if (inWindow && ownerAvailable) return true
     return isNight
@@ -380,13 +404,18 @@ export class VehicleManager {
     const vehicle = this.getAvailableAutoVehicle(hour, isNight)
     if (!vehicle) return
 
-    this.startAutomaticTrip(vehicle, isNight)
+    this.startAutomaticTrip(vehicle, isNight, true)
   }
 
-  private startAutomaticTrip(vehicle: PooledVehicle, isNight: boolean): void {
+  private startAutomaticTrip(vehicle: PooledVehicle, isNight: boolean, fromAutoSpawn = false): void {
     const route = vehicle.homeRoute
+    const wrongLane = fromAutoSpawn
+      && route.id !== PATROL_ROUTE_ID
+      && Math.random() < WRONG_LANE_PROBABILITY
+    vehicle.wrongLane = wrongLane
+    vehicle.pulledOver = false
     const start = { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z }
-    const routed = [start, ...this.applyLaneOffset(route.points)]
+    const routed = [start, ...this.applyLaneOffset(route.points, wrongLane)]
     vehicle.route = route
     vehicle.routePoints = routed
     vehicle.segmentLengths = this.getSegmentLengths(routed)
@@ -777,6 +806,9 @@ export class VehicleManager {
     vehicle.parkTimer = 0
     vehicle.incidentTimer = 0
     vehicle.driverless = false
+    vehicle.wrongLane = false
+    vehicle.pulledOver = false
+    if (this.activeTrafficStop?.offenderId === vehicle.id) this.activeTrafficStop = null
     vehicle.nextTripAt = performance.now() / 1000 + 20 + Math.random() * 40
   }
 
@@ -853,6 +885,12 @@ export class VehicleManager {
         v.headlight.intensity = needLights ? 0.65 : 0
         v.taillightMat.opacity = 1
         if (v.incidentTimer > 0) continue
+        if (v.pulledOver) {
+          v.pulledOver = false
+          v.wrongLane = false
+          if (this.activeTrafficStop?.offenderId === v.id) this.activeTrafficStop = null
+          this.rebuildRoutePoints(v)
+        }
         v.phase = v.incidentResumePhase
         v.taillightMat.opacity = needLights ? 0.9 : 0
         this.setVehicleLabel(
@@ -885,7 +923,7 @@ export class VehicleManager {
         if (v.parkTimer > 0) continue
 
         const returning = [
-          ...this.applyLaneOffset([...v.route.points].reverse()),
+          ...this.applyLaneOffset([...v.route.points].reverse(), v.wrongLane),
           this.getHomeParkingPoint(v.route),
         ]
         v.routePoints = returning
@@ -959,6 +997,67 @@ export class VehicleManager {
     }
 
     this.checkVehicleCrashes(needLights)
+    this.checkTrafficStops(needLights)
+  }
+
+  private rebuildRoutePoints(vehicle: PooledVehicle): void {
+    const route = vehicle.route
+    if (!route) return
+    const start = { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z }
+    const routed = [start, ...this.applyLaneOffset(route.points, vehicle.wrongLane)]
+    vehicle.routePoints = routed
+    vehicle.segmentLengths = this.getSegmentLengths(routed)
+    vehicle.totalLength = vehicle.segmentLengths.reduce((sum, n) => sum + n, 0)
+    vehicle.distance = 0
+    vehicle.duration = Math.max(12, vehicle.totalLength / (2.2 + Math.random() * 0.8))
+  }
+
+  private checkTrafficStops(needLights: boolean): void {
+    if (this.activeTrafficStop) return
+    const patrol = this.pool.find(v =>
+      v.homeRoute.id === PATROL_ROUTE_ID
+      && v.active
+      && (v.phase === 'driving' || v.phase === 'returning'),
+    )
+    if (!patrol) return
+    const now = Date.now()
+    if (now - this.lastTrafficStopAt < TRAFFIC_STOP_GAP_MS) return
+    for (const v of this.pool) {
+      if (!v.active || !v.wrongLane || (v.phase !== 'driving' && v.phase !== 'returning')) continue
+      if (now - (this.trafficStopCooldown.get(v.id) ?? 0) < TRAFFIC_STOP_COOLDOWN_MS) continue
+      const dx = v.wrapper.position.x - patrol.wrapper.position.x
+      const dz = v.wrapper.position.z - patrol.wrapper.position.z
+      if (Math.sqrt(dx * dx + dz * dz) > TRAFFIC_STOP_DISTANCE) continue
+
+      this.trafficStopCooldown.set(v.id, now)
+      this.lastTrafficStopAt = now
+      this.activeTrafficStop = { offenderId: v.id }
+      const offenderPhase = v.phase as 'driving' | 'returning'
+
+      v.incidentResumePhase = offenderPhase
+      v.phase = 'incident'
+      v.incidentTimer = TRAFFIC_STOP_DURATION_S
+      v.pulledOver = true
+      v.taillightMat.opacity = 1
+      if (v.route) this.setVehicleLabel(v, v.route, Math.ceil(v.incidentTimer / 2), 'incident')
+
+      patrol.incidentResumePhase = patrol.phase as 'driving' | 'returning'
+      patrol.phase = 'incident'
+      patrol.incidentTimer = TRAFFIC_STOP_DURATION_S
+      patrol.headlight.intensity = needLights ? 0.65 : 0
+      patrol.taillightMat.opacity = 1
+      if (patrol.route) this.setVehicleLabel(patrol, patrol.route, Math.ceil(patrol.incidentTimer / 2), 'incident')
+
+      this.callbacks.onTrafficStop?.({
+        offenderOwnerName: v.route?.owner ?? v.id,
+        offenderOwnerNpcId: v.route?.ownerNpcId ?? v.id,
+        offenderVehicleId: v.id,
+        offenderVehicle: v.wrapper,
+        patrolVehicle: patrol.wrapper,
+        position: { x: v.wrapper.position.x, z: v.wrapper.position.z },
+      })
+      break
+    }
   }
 
   private checkVehicleCrashes(needLights: boolean): void {
@@ -1023,8 +1122,9 @@ export class VehicleManager {
     return best
   }
 
-  private applyLaneOffset(points: RoadPoint[]): RoadPoint[] {
+  private applyLaneOffset(points: RoadPoint[], wrongLane = false): RoadPoint[] {
     if (points.length < 2) return points
+    const sign = wrongLane ? -1 : 1
     return points.map((p, i) => {
       const prev = points[Math.max(0, i - 1)]
       const next = points[Math.min(points.length - 1, i + 1)]
@@ -1032,8 +1132,8 @@ export class VehicleManager {
       const dz = next.z - prev.z
       const len = Math.max(0.001, Math.sqrt(dx * dx + dz * dz))
       return {
-        x: p.x + (-dz / len) * LANE_OFFSET,
-        z: p.z + (dx / len) * LANE_OFFSET,
+        x: p.x + (-dz / len) * LANE_OFFSET * sign,
+        z: p.z + (dx / len) * LANE_OFFSET * sign,
       }
     })
   }

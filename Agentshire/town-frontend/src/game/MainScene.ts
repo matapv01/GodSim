@@ -10,6 +10,7 @@ import { MuseumBuilder } from './scene/MuseumBuilder'
 import {
   TRAFFIC_INCIDENT_DURATION_MS,
   VehicleManager,
+  type TrafficStopInfo,
   type VehicleCrash,
   type VehicleIncident,
   type VehiclePedestrian,
@@ -32,7 +33,7 @@ import { TownJournal } from '../npc/TownJournal'
 import { getCharacterKeyForNpc } from '../data/CharacterRoster'
 import { createDefaultTownConfig, getNpcProfiles, type NPCProfile } from '../data/TownConfig'
 import { getGodSimNpcProfile } from '../data/god-sim-npc-profiles'
-import { getProfessionOptions } from '../data/Professions'
+import { getProfessionOptions, isPoliceSpecialty } from '../data/Professions'
 import { GameClock } from './GameClock'
 import { TimeOfDayLighting } from './visual/TimeOfDayLighting'
 import { WeatherSystem } from './WeatherSystem'
@@ -84,6 +85,7 @@ type ActiveTrafficIncident = {
   event: VehicleIncident
   victim: NPC
   audience: NPC[]
+  officer: NPC | null
   elapsedMs: number
   nextBeat: number
   baseVehicleRotationY: number
@@ -289,6 +291,7 @@ export class MainScene implements GameScene {
       getPedestrians: () => this.getVehiclePedestrians(),
       onPedestrianHit: incident => this.startTrafficIncident(incident),
       onVehicleCrash: crash => this.handleVehicleCrash(crash),
+      onTrafficStop: info => this.handleTrafficStop(info),
     })
     this.vehicleManager.build(this.assets)
 
@@ -3018,6 +3021,9 @@ __workflow 演出测试指令:
     const nameA = this.vehicleManager.getVehicleOwnerName(crash.vehicleAId) ?? crash.vehicleAId
     const nameB = this.vehicleManager.getVehicleOwnerName(crash.vehicleBId) ?? crash.vehicleBId
 
+    const officer = this.findNearbyPoliceOfficer({ x: crash.position.x, z: crash.position.z }, 16)
+    const officerName = officer ? (officer.label ?? officer.name) : t('traffic_crash.officer_default')
+
     if (crash.playerInvolved) {
       const playerVehicle = this.vehicleManager.getPlayerVehicleObject()
       const otherVehicleId = playerVehicle === crash.vehicleA ? crash.vehicleBId : crash.vehicleAId
@@ -3038,6 +3044,97 @@ __workflow 演出测试指令:
         t('traffic_crash.log', { ownerA: nameA, ownerB: nameB }),
       )
     }
+
+    if (officer) {
+      this.policeDealWithCrash(officer, { x: crash.position.x, z: crash.position.z }, nameA, nameB, officerName)
+    }
+  }
+
+  private policeDealWithCrash(
+    officer: NPC,
+    position: { x: number; z: number },
+    nameA: string,
+    nameB: string,
+    officerName: string,
+  ): void {
+    const officerBehavior = this.dailyScheduler.getDailyBehaviors().get(officer.id)
+    officerBehavior?.pauseForDialogue()
+    officer.stopMoving()
+    this.effects.exclamation(officer.mesh)
+    this.bubbles.show(officer.mesh, t('traffic_crash.police_line'), 3400)
+    this.ui.showToast(t('traffic_crash.police_toast', { officer: officerName }))
+    this.recordNpcActivity(officer.id, 'chatted', t('police_traffic.activity'))
+    officer.moveTo({
+      x: position.x + 1.6,
+      z: position.z + 1.6,
+    }, 3.2).then(status => {
+      if (status !== 'arrived') return
+      officer.smoothLookAt(new THREE.Vector3(position.x, 0, position.z))
+      officer.playAnim('thinking')
+      this.bubbles.show(officer.mesh, t('traffic_crash.police_line2'), 3400)
+    })
+    this.townJournal.record(
+      'encounter_end',
+      [officerName, nameA, nameB],
+      t('traffic_crash.location'),
+      t('traffic_crash.police_log', { officer: officerName, ownerA: nameA, ownerB: nameB }),
+    )
+  }
+
+  private handleTrafficStop(info: TrafficStopInfo): void {
+    if (this.sceneSwitcher?.getSceneType() !== 'town') return
+
+    const officer = this.npcManager.get('citizen_5')
+    const officerName = officer
+      ? (officer.label ?? officer.name)
+      : t('police_traffic_stop.officer_default')
+
+    this.effects.errorSparks(new THREE.Vector3(info.position.x, 0, info.position.z))
+    this.bubbles.show(info.patrolVehicle, t('police_traffic_stop.officer_line1'), 3400)
+    this.ui.showToast(t('police_traffic_stop.toast', { owner: info.offenderOwnerName }))
+    this.recordNpcActivity('citizen_5', 'chatted', t('police_traffic_stop.activity'))
+
+    window.setTimeout(() => {
+      this.bubbles.show(info.offenderVehicle, t('police_traffic_stop.driver_line'), 3200)
+    }, 2400)
+    window.setTimeout(() => {
+      this.bubbles.show(info.patrolVehicle, t('police_traffic_stop.officer_line2'), 3200)
+    }, 5200)
+    window.setTimeout(() => {
+      this.bubbles.show(info.patrolVehicle, t('police_traffic_stop.officer_line3'), 3600)
+      this.townJournal.record(
+        'encounter_start',
+        [officerName, info.offenderOwnerName],
+        t('police_traffic_stop.location'),
+        t('police_traffic_stop.log', {
+          owner: info.offenderOwnerName,
+          officer: officerName,
+        }),
+      )
+    }, 8000)
+  }
+
+  private findNearbyPoliceOfficer(
+    position: { x: number; z: number },
+    maxDistance: number,
+    excludeId?: string,
+  ): NPC | null {
+    let best: NPC | null = null
+    let bestDist = maxDistance
+    const target = new THREE.Vector3(position.x, 0, position.z)
+    for (const npc of this.npcManager.getAll()) {
+      if (npc.id === 'user' || npc.id === excludeId || !npc.mesh.visible || !npc.isInActiveScene) continue
+      if (npc.mesh.parent !== this.townScene) continue
+      if (this.vehiclePassengerNpcIds.has(npc.id)) continue
+      const specialty = this.getConfiguredSpecialty(npc.id)
+      if (!isPoliceSpecialty(specialty)) continue
+      const d = npc.getPosition().distanceTo(target)
+      if (d < bestDist) {
+        bestDist = d
+        best = npc
+      }
+    }
+    return best
   }
 
   private startTrafficIncident(event: VehicleIncident): boolean {
@@ -3070,10 +3167,18 @@ __workflow 演出测试指令:
     victim.smoothLookAt(event.position)
     victim.playAnim('frustrated')
 
+    const officer = this.findNearbyPoliceOfficer(
+      { x: event.position.x, z: event.position.z },
+      16,
+      victim.id,
+    )
+    const officerName = officer ? (officer.label ?? officer.name) : event.driverName
+
     const audience = this.npcManager.getAll()
       .filter(npc =>
         npc.id !== victim.id
         && npc.id !== 'user'
+        && npc.id !== officer?.id
         && npc.mesh.visible
         && npc.isInActiveScene
         && npc.mesh.parent === this.townScene
@@ -3108,10 +3213,27 @@ __workflow 演出测试指令:
       })
     })
 
+    if (officer) {
+      const officerBehavior = this.dailyScheduler.getDailyBehaviors().get(officer.id)
+      officerBehavior?.pauseForDialogue()
+      officer.stopMoving()
+      this.effects.exclamation(officer.mesh)
+      officer.moveTo({
+        x: event.position.x + Math.cos((event.vehicleId.length % 5) * 0.18) * 2.2,
+        z: event.position.z + Math.sin((event.vehicleId.length % 5) * 0.18) * 2.2,
+      }, 3.2).then(status => {
+        if (status !== 'arrived' || this.trafficIncident?.event.vehicleId !== event.vehicleId) return
+        officer.smoothLookAt(event.position)
+        officer.playAnim('wave')
+        this.bubbles.show(officer.mesh, t('traffic_incident.police_stop'), 3400)
+      })
+    }
+
     this.trafficIncident = {
       event,
       victim,
       audience,
+      officer,
       elapsedMs: 0,
       nextBeat: 1,
       baseVehicleRotationY: event.vehicle.rotation.y,
@@ -3125,16 +3247,27 @@ __workflow 演出测试指令:
     )
     this.effects.exclamation(victim.mesh)
     this.effects.errorSparks(new THREE.Vector3(event.position.x, 0, event.position.z))
-    this.ui.showToast(t('traffic_incident.toast', { victim: victimName }))
+    this.ui.showToast(officer
+      ? t('traffic_incident.police_toast', { officer: officerName })
+      : t('traffic_incident.toast', { victim: victimName }))
     this.townJournal.record(
       'encounter_start',
       [victimName, event.driverName],
       t('traffic_incident.location'),
-      t('traffic_incident.log_start', {
-        victim: victimName,
-        driver: event.driverName,
-      }),
+      officer
+        ? t('traffic_incident.police_log', {
+          officer: officerName,
+          victim: victimName,
+          driver: event.driverName,
+        })
+        : t('traffic_incident.log_start', {
+          victim: victimName,
+          driver: event.driverName,
+        }),
     )
+    if (officer) {
+      this.recordNpcActivity(officer.id, 'chatted', t('police_traffic.activity'))
+    }
     this.recordNpcActivity(victim.id, 'chatted', t('traffic_incident.activity'))
     return true
   }
@@ -3144,8 +3277,9 @@ __workflow 演出测试指令:
     if (!incident) return
     incident.elapsedMs += deltaMs
 
-    const { event, victim, audience } = incident
-    const fighting = incident.elapsedMs >= 6_200 && incident.elapsedMs <= 14_500
+    const { event, victim, audience, officer } = incident
+    const policePresent = officer != null
+    const fighting = !policePresent && incident.elapsedMs >= 6_200 && incident.elapsedMs <= 14_500
     event.vehicle.rotation.y = incident.baseVehicleRotationY
       + (fighting ? Math.sin(incident.elapsedMs * 0.026) * 0.025 : 0)
 
@@ -3162,20 +3296,41 @@ __workflow 演出测试指令:
         victim.playAnim('frustrated')
         this.bubbles.show(victim.mesh, t('traffic_incident.victim_escalate'), 3000)
       } else if (beat === 3) {
-        victim.playAnim('dancing')
-        this.effects.errorSparks(new THREE.Vector3(event.position.x, 0.2, event.position.z))
-        this.bubbles.show(event.vehicle, t('traffic_incident.fight_start'), 3000)
-      } else if (beat === 4 && audience[0]) {
-        audience[0].playAnim('wave')
-        this.bubbles.show(audience[0].mesh, t('traffic_incident.crowd_gather'), 3000)
+        if (policePresent && officer) {
+          officer.playAnim('frustrated')
+          this.bubbles.show(officer.mesh, t('traffic_incident.police_stop'), 3200)
+        } else {
+          victim.playAnim('dancing')
+          this.effects.errorSparks(new THREE.Vector3(event.position.x, 0.2, event.position.z))
+          this.bubbles.show(event.vehicle, t('traffic_incident.fight_start'), 3000)
+        }
+      } else if (beat === 4) {
+        if (policePresent && officer) {
+          officer.playAnim('wave')
+          this.bubbles.show(officer.mesh, t('traffic_incident.police_warning'), 3600)
+        } else if (audience[0]) {
+          audience[0].playAnim('wave')
+          this.bubbles.show(audience[0].mesh, t('traffic_incident.crowd_gather'), 3000)
+        }
       } else if (beat === 5) {
-        victim.playAnim('dancing')
-        this.effects.errorSparks(new THREE.Vector3(event.position.x, 0.4, event.position.z))
-        this.bubbles.show(victim.mesh, t('traffic_incident.victim_fight'), 2800)
-      } else if (beat === 6 && audience.length > 0) {
-        const mediator = audience[Math.min(1, audience.length - 1)]
-        mediator.playAnim('frustrated')
-        this.bubbles.show(mediator.mesh, t('traffic_incident.crowd_stop'), 3200)
+        if (policePresent && officer) {
+          officer.playAnim('thinking')
+          this.effects.errorSparks(new THREE.Vector3(event.position.x, 0.4, event.position.z))
+          this.bubbles.show(officer.mesh, t('traffic_incident.police_fine', { driver: event.driverName }), 3600)
+        } else {
+          victim.playAnim('dancing')
+          this.effects.errorSparks(new THREE.Vector3(event.position.x, 0.4, event.position.z))
+          this.bubbles.show(victim.mesh, t('traffic_incident.victim_fight'), 2800)
+        }
+      } else if (beat === 6) {
+        if (policePresent && officer) {
+          officer.playAnim('wave')
+          this.bubbles.show(officer.mesh, t('traffic_incident.police_disperse'), 3200)
+        } else if (audience.length > 0) {
+          const mediator = audience[Math.min(1, audience.length - 1)]
+          mediator.playAnim('frustrated')
+          this.bubbles.show(mediator.mesh, t('traffic_incident.crowd_stop'), 3200)
+        }
       } else if (beat === 7) {
         this.bubbles.show(event.vehicle, t('traffic_incident.driver_end'), 2400)
       }
@@ -3201,15 +3356,35 @@ __workflow 演出测试指令:
       }
     }
 
+    if (incident.officer) {
+      incident.officer.stopMoving()
+      incident.officer.transitionTo('idle')
+      const officerBehavior = this.dailyScheduler.getDailyBehaviors().get(incident.officer.id)
+      if (officerBehavior) {
+        officerBehavior.walkAwayFrom(incident.event.position, t('traffic_incident.police_disperse'))
+      }
+    }
+
     const victimName = incident.victim.label ?? incident.victim.name
+    const officerName = incident.officer ? (incident.officer.label ?? incident.officer.name) : undefined
     this.townJournal.record(
       'encounter_end',
-      [victimName, incident.event.driverName, ...incident.audience.map(npc => npc.label ?? npc.name)],
+      [
+        victimName,
+        incident.event.driverName,
+        ...incident.audience.map(npc => npc.label ?? npc.name),
+      ],
       t('traffic_incident.location'),
-      t('traffic_incident.log_end', {
-        victim: victimName,
-        count: String(incident.audience.length),
-      }),
+      incident.officer
+        ? t('traffic_incident.log_police_end', {
+          officer: officerName ?? '',
+          victim: victimName,
+          count: String(incident.audience.length),
+        })
+        : t('traffic_incident.log_end', {
+          victim: victimName,
+          count: String(incident.audience.length),
+        }),
     )
   }
 
