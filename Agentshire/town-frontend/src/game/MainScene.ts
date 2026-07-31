@@ -219,6 +219,10 @@ export class MainScene implements GameScene {
   private pendingUserReactions = new Set<string>()
   private driveByReactionCooldowns = new Map<string, number>()
   private driveByBoardPending = new Map<string, { since: number }>()
+  private rideInvitePending: { vehicleId: string; ownerNpcId: string; ownerName: string; expiresAt: number } | null = null
+  private npcPlayerInviteCooldowns = new Map<string, number>()
+  private npcNpcInviteCooldowns = new Map<string, number>()
+  private lastNpcInviteScanAt = 0
 
   private dispatcher!: EventDispatcher
   private dialogManager!: DialogManager
@@ -403,6 +407,8 @@ export class MainScene implements GameScene {
       if (event.type === 'chat_with_citizen') {
         this.citizenChat.startChat(event.npcId)
       }
+      if (event.type === 'ride_invite') this.inviteNearestNpcToVehicle()
+      if (event.type === 'ride_accept') this.acceptNpcRideInvite()
     })
 
     this.engine.input.on('tap', (gesture) => {
@@ -1437,18 +1443,27 @@ __workflow 演出测试指令:
       this.nearbyUserNpcId = null
       this.setNearbySpeechTargets([])
       this.driveByBoardPending.clear()
+      this.rideInvitePending = null
+      this.ui.setRideAcceptBar(false)
+      this.ui.setRideInviteButton(false)
       return
     }
 
     if (this.vehicleManager.isPlayerDriving()) {
       this.nearbyUserNpcId = null
+      this.rideInvitePending = null
+      this.ui.setRideAcceptBar(false)
       this.setNearbySpeechTargets(
         this.findAllNearbySpeechTargets(userPos, 7.5).map(n => n.id),
       )
+      this.updateRideInviteButton(userPos)
       this.updateDriveByReactions(now)
+      this.updateNpcRideInvites(now)
       return
     }
     this.driveByBoardPending.clear()
+    this.ui.setRideInviteButton(false)
+    this.updateNpcRideInvites(now)
 
     const maxDistance = this.vehicleManager.hasPlayerAboard() ? 7.5 : 6
     this.setNearbySpeechTargets(
@@ -1525,6 +1540,165 @@ __workflow 演出测试指令:
       )
       this.socialFeedPanel?.refresh()
       this.saveSnapshot()
+    }
+  }
+
+  inviteNearestNpcToVehicle(): void {
+    if (!this.vehicleManager.isPlayerDriving()) return
+    const vehicle = this.vehicleManager.getPlayerVehicleObject()
+    if (!vehicle) return
+    const vehiclePos = new THREE.Vector3(vehicle.position.x, 0, vehicle.position.z)
+    const nearest = this.findVehicleInviteCandidate(vehiclePos)
+    if (!nearest) {
+      this.ui.showToast('Chưa có ai đứng gần xe để mời. Lái lại gần một người đã nhé.')
+      return
+    }
+    void this.handleVehicleInvitation(nearest.id)
+  }
+
+  private findVehicleInviteCandidate(vehiclePos: THREE.Vector3): NPC | null {
+    let best: NPC | null = null
+    let bestDist = 7.5
+    for (const npc of this.npcManager.getAll()) {
+      if (npc.id === 'user' || !npc.mesh.visible || !npc.isInActiveScene) continue
+      if (npc.id === 'steward') continue
+      if (this.isNpcInPlayerCabin(npc.id)) continue
+      const d = npc.getPosition().distanceTo(vehiclePos)
+      if (d < bestDist) {
+        bestDist = d
+        best = npc
+      }
+    }
+    return best
+  }
+
+  acceptNpcRideInvite(): void {
+    const pending = this.rideInvitePending
+    if (!pending || Date.now() > pending.expiresAt) {
+      this.rideInvitePending = null
+      this.ui.setRideAcceptBar(false)
+      return
+    }
+    this.rideInvitePending = null
+    this.ui.setRideAcceptBar(false)
+
+    const result = this.vehicleManager.boardNpcVehicleAsPassenger(pending.vehicleId)
+    if (!result.ok) {
+      this.ui.showToast('Xe vừa đi rồi, tiếc quá.')
+      return
+    }
+    const owner = this.npcManager.get(pending.ownerNpcId)
+    const ownerName = owner?.label ?? owner?.name ?? pending.ownerName
+    const reply = `Lên xe rồi. Cảm ơn ${ownerName} chở đi nhờ!`
+    this.dialogManager.onDialogMessage(pending.ownerNpcId, reply, false)
+    this.recordDirectNpcMessage(pending.ownerNpcId, reply)
+    this.dailyScheduler.getActivityJournals().get(pending.ownerNpcId)?.updateRelationship(
+      { npcId: 'user', name: this.getPlayerName() },
+      { topic: 'Đồng ý cho người chơi đi nhờ xe', sentimentDelta: 0.06, trustDelta: 0.04 },
+    )
+    this.socialFeedPanel?.refresh()
+    this.saveSnapshot()
+  }
+
+  private updateRideInviteButton(userPos: THREE.Vector3): void {
+    if (!this.vehicleManager.isPlayerDriving()) {
+      this.ui.setRideInviteButton(false)
+      return
+    }
+    const nearest = this.findVehicleInviteCandidate(userPos)
+    this.ui.setRideInviteButton(
+      !!nearest,
+      nearest ? nearest.label ?? nearest.name ?? nearest.id : undefined,
+    )
+  }
+
+  private updateNpcRideInvites(now: number): void {
+    const nowMs = Date.now()
+
+    if (this.rideInvitePending && nowMs > this.rideInvitePending.expiresAt) {
+      this.rideInvitePending = null
+      this.ui.setRideAcceptBar(false)
+    }
+
+    if (!this.rideInvitePending && !this.vehicleManager.hasPlayerAboard() && !this.vehicleManager.isPlayerDriving()) {
+      const userPos = this.getPlayerSocialPosition()
+      if (userPos) {
+        const vehicle = this.vehicleManager.getStoppedNpcVehicleNear(userPos, 6)
+        if (vehicle && vehicle.parkTimer <= 12) {
+          const owner = this.npcManager.get(vehicle.ownerNpcId)
+          const journal = owner ? this.dailyScheduler.getActivityJournals().get(vehicle.ownerNpcId) : null
+          const relation = journal?.getRelationship('user')
+          const status = relation?.status ?? 'stranger'
+          const profile = owner ? getGodSimNpcProfile(vehicle.ownerNpcId) : null
+          const sentiment = relation?.sentiment ?? 0
+          const trust = relation?.trust ?? 0
+          const willing = !!owner && owner.mesh.visible && owner.isInActiveScene
+            && (status === 'lover' || status === 'crush' || status === 'close_friend'
+              || (status === 'friend' && sentiment >= 0.2)
+              || (status === 'neighbor' && trust >= 0.3 && (profile?.personality.confidence ?? 0) >= 55))
+          if (willing && nowMs - (this.npcPlayerInviteCooldowns.get(vehicle.ownerNpcId) ?? 0) >= 120_000) {
+            this.npcPlayerInviteCooldowns.set(vehicle.ownerNpcId, nowMs)
+            this.rideInvitePending = {
+              vehicleId: vehicle.id,
+              ownerNpcId: vehicle.ownerNpcId,
+              ownerName: vehicle.ownerName,
+              expiresAt: nowMs + 10_000,
+            }
+            this.ui.setRideAcceptBar(true, vehicle.ownerName)
+            owner.stopMoving()
+            owner.smoothLookAt({ x: userPos.x, z: userPos.z })
+            const invite = `Ê ${this.getPlayerName()}, tôi sắp đi một đoạn. Lên xe đi nhờ không? Chở cho khỏe!`
+            this.dialogManager.onDialogMessage(vehicle.ownerNpcId, invite, false)
+            this.recordDirectNpcMessage(vehicle.ownerNpcId, invite)
+          }
+        }
+      }
+    }
+
+    if (now - this.lastNpcInviteScanAt < 2000 || this.trafficIncident) return
+    this.lastNpcInviteScanAt = now
+
+    for (const vehicle of this.vehicleManager.getStoppedNpcVehicles()) {
+      if (vehicle.parkTimer > 12) continue
+      const owner = this.npcManager.get(vehicle.ownerNpcId)
+      if (!owner || !owner.mesh.visible || !owner.isInActiveScene) continue
+      for (const npc of this.npcManager.getAll()) {
+        if (npc.id === 'user' || npc.id === 'steward' || npc.id === vehicle.ownerNpcId) continue
+        if (!npc.mesh.visible || !npc.isInActiveScene) continue
+        if (this.vehiclePassengerNpcIds.has(npc.id)) continue
+        const distance = npc.getPosition().distanceTo(new THREE.Vector3(vehicle.x, 0, vehicle.z))
+        if (distance > 4.5) continue
+        const key = `${vehicle.ownerNpcId}|${npc.id}`
+        if (nowMs - (this.npcNpcInviteCooldowns.get(key) ?? 0) < 90_000) continue
+
+        const journal = this.dailyScheduler.getActivityJournals().get(npc.id)
+        const relation = journal?.getRelationship(vehicle.ownerNpcId)
+        const status = relation?.status ?? 'stranger'
+        const sentiment = relation?.sentiment ?? 0
+        const okay = status === 'lover' || status === 'crush' || status === 'close_friend'
+          || (status === 'friend' && sentiment >= 0.25)
+          || (status === 'neighbor' && (relation?.trust ?? 0) >= 0.3)
+        if (!okay) continue
+        this.npcNpcInviteCooldowns.set(key, nowMs)
+
+        const guestName = npc.label ?? npc.name ?? npc.id
+        const invite = `${guestName}, tôi sắp đi về. Lên xe đi nhờ một đoạn không?`
+        this.dialogManager.onDialogMessage(vehicle.ownerNpcId, invite, false)
+        this.recordDirectNpcMessage(vehicle.ownerNpcId, invite)
+        if (this.vehicleManager.addGuestToNpcVehicle(vehicle.id, npc.id)) {
+          this.dailyScheduler.getDailyBehaviors().get(npc.id)?.pauseForDialogue()
+          npc.stopMoving()
+          const thanks = 'Ừ, đi cùng cho có bầu. Nhưng nhớ lái chậm thôi nhé!'
+          this.dialogManager.onDialogMessage(npc.id, thanks, false)
+          this.recordDirectNpcMessage(npc.id, thanks)
+          journal?.updateRelationship(
+            { npcId: vehicle.ownerNpcId, name: vehicle.ownerName },
+            { topic: `Đồng ý đi nhờ xe của ${vehicle.ownerName}`, sentimentDelta: 0.04, trustDelta: 0.02 },
+          )
+          this.socialFeedPanel?.refresh()
+          this.saveSnapshot()
+        }
+      }
     }
   }
 

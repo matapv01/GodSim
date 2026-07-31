@@ -201,6 +201,11 @@ const vi: Record<string, string> = {
 
   'drive_by.hitchhike_boarded': 'Cảm ơn đã cho tôi đi nhờ một quãng!',
 
+  'ride.invite_button': 'Mời lên xe',
+  'ride.invite_title': 'Mời {name} lên xe',
+  'ride.accept_label': '{name} đang mời bạn đi nhờ',
+  'ride.accept_button': 'Đồng ý đi nhờ',
+
   'editor.scene_workshop': 'Sửa cảnh',
   'editor.citizen_workshop': 'Xưởng nhân vật',
   'editor.save': 'Lưu',

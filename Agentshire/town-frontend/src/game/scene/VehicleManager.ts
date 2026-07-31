@@ -515,6 +515,100 @@ export class VehicleManager {
     return vehicle?.homeRoute.owner ?? null
   }
 
+  getStoppedNpcVehicleNear(position: RoadPoint, maxDistance = 6): {
+    id: string
+    ownerNpcId: string
+    ownerName: string
+    x: number
+    z: number
+    parkTimer: number
+  } | null {
+    let nearest: PooledVehicle | null = null
+    let nearestDistance = maxDistance
+    for (const vehicle of this.pool) {
+      if (!vehicle.active || vehicle.phase !== 'visiting') continue
+      if (vehicle.homeRoute.ownerNpcId === 'user') continue
+      const dx = vehicle.wrapper.position.x - position.x
+      const dz = vehicle.wrapper.position.z - position.z
+      const distance = Math.sqrt(dx * dx + dz * dz)
+      if (distance >= nearestDistance) continue
+      nearest = vehicle
+      nearestDistance = distance
+    }
+    if (!nearest) return null
+    return {
+      id: nearest.homeRoute.id,
+      ownerNpcId: nearest.homeRoute.ownerNpcId,
+      ownerName: nearest.homeRoute.owner,
+      x: nearest.wrapper.position.x,
+      z: nearest.wrapper.position.z,
+      parkTimer: nearest.parkTimer,
+    }
+  }
+
+  getStoppedNpcVehicles(): Array<{
+    id: string
+    ownerNpcId: string
+    ownerName: string
+    x: number
+    z: number
+    parkTimer: number
+  }> {
+    const result: Array<{
+      id: string
+      ownerNpcId: string
+      ownerName: string
+      x: number
+      z: number
+      parkTimer: number
+    }> = []
+    for (const vehicle of this.pool) {
+      if (!vehicle.active || vehicle.phase !== 'visiting') continue
+      if (vehicle.homeRoute.ownerNpcId === 'user') continue
+      result.push({
+        id: vehicle.homeRoute.id,
+        ownerNpcId: vehicle.homeRoute.ownerNpcId,
+        ownerName: vehicle.homeRoute.owner,
+        x: vehicle.wrapper.position.x,
+        z: vehicle.wrapper.position.z,
+        parkTimer: vehicle.parkTimer,
+      })
+    }
+    return result
+  }
+
+  addGuestToNpcVehicle(vehicleId: string, npcId: string): boolean {
+    const vehicle = this.pool.find(v => v.homeRoute.id === vehicleId)
+    if (!vehicle || !vehicle.active || vehicle.phase === 'manual') return false
+    if (vehicle.homeRoute.ownerNpcId === 'user') return false
+    if (this.ridingNpcIds.has(npcId)) return false
+    this.boardNpc(vehicle, npcId, false)
+    this.syncOccupants(vehicle)
+    return true
+  }
+
+  boardNpcVehicleAsPassenger(vehicleId: string): {
+    ok: boolean
+    ownerNpcId?: string
+    ownerName?: string
+    destination?: string
+  } {
+    const vehicle = this.pool.find(v => v.homeRoute.id === vehicleId)
+    if (!vehicle || !vehicle.active || vehicle.phase !== 'visiting') return { ok: false }
+    if (vehicle.homeRoute.ownerNpcId === 'user') return { ok: false }
+    this.boardNpc(vehicle, 'user', false)
+    this.boardOccupant(vehicle)
+    vehicle.parkTimer = Math.min(vehicle.parkTimer, 2.5)
+    this.syncOccupants(vehicle)
+    this.setVehicleLabel(vehicle, vehicle.homeRoute, Math.max(1, Math.round(vehicle.parkTimer / 2)), 'parking')
+    return {
+      ok: true,
+      ownerNpcId: vehicle.homeRoute.ownerNpcId,
+      ownerName: vehicle.homeRoute.owner,
+      destination: vehicle.homeRoute.to,
+    }
+  }
+
   getPlayerCabinInfo(): {
     id: string
     ownerNpcId: string
@@ -642,7 +736,10 @@ export class VehicleManager {
 
   private parkAtHome(vehicle: PooledVehicle) {
     const route = vehicle.homeRoute
-    if (route) this.leaveOccupant(vehicle, route.points[0])
+    if (route) {
+      this.leaveOccupant(vehicle, route.points[0])
+      this.leaveAllGuests(vehicle, route.points[0])
+    }
     vehicle.active = false
     vehicle.phase = 'parked'
     this.placeParkedAtHome(vehicle)

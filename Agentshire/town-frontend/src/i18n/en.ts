@@ -220,6 +220,11 @@ const en: Record<string, string> = {
 
   'drive_by.hitchhike_boarded': 'Thanks for the ride!',
 
+  'ride.invite_button': 'Invite into car',
+  'ride.invite_title': 'Invite {name} into the car',
+  'ride.accept_label': '{name} is offering you a ride',
+  'ride.accept_button': 'Ride along',
+
   // ── Editor ──
   'editor.scene_workshop': 'Scene Editor',
   'editor.citizen_workshop': 'Character Workshop',

@@ -18,6 +18,8 @@ export type UIEvent =
   | { type: 'back_town' }
   | { type: 'play_now'; gameUrl: string }
   | { type: 'chat_with_citizen'; npcId: string; label: string }
+  | { type: 'ride_invite' }
+  | { type: 'ride_accept' }
 
 type UIEventCallback = (event: UIEvent) => void
 
@@ -100,6 +102,11 @@ export class UIManager {
       if (e.key === 'Enter') { e.preventDefault(); this.handleSend() }
     })
     this.backBtn?.addEventListener('click', () => this.emit({ type: 'back_town' }))
+
+    document.getElementById('town-ride-invite-btn')
+      ?.addEventListener('click', () => this.emit({ type: 'ride_invite' }))
+    document.getElementById('town-ride-accept-btn')
+      ?.addEventListener('click', () => this.emit({ type: 'ride_accept' }))
 
     const settingsBtn = document.getElementById('tab-settings')
     if (settingsBtn) {
@@ -385,6 +392,10 @@ export class UIManager {
 
   private nearbyTargetsEl: HTMLElement | null = null
   private nearbyTargetsRenderedKey = ''
+  private rideInviteBtn: HTMLButtonElement | null = null
+  private rideAcceptBar: HTMLElement | null = null
+  private rideAcceptBtn: HTMLButtonElement | null = null
+  private rideAcceptLabel: HTMLElement | null = null
 
   updateNearbyTargets(citizens: NPCConfig[]): void {
     if (!this.nearbyTargetsEl) {
@@ -421,6 +432,38 @@ export class UIManager {
       pill.appendChild(nm)
       el.appendChild(pill)
     }
+  }
+
+  // ── Ride invite (player invites an NPC into the car) ──
+
+  setRideInviteButton(visible: boolean, npcLabel?: string): void {
+    if (!this.rideInviteBtn) {
+      this.rideInviteBtn = document.getElementById('town-ride-invite-btn') as HTMLButtonElement | null
+    }
+    const btn = this.rideInviteBtn
+    if (!btn) return
+    btn.style.display = visible ? '' : 'none'
+    if (!visible) return
+    btn.innerHTML = ''
+    const icon = createLucideIcon('car', 16, '#000')
+    if (icon) btn.appendChild(icon)
+    const label = document.createElement('span')
+    label.textContent = t('ride.invite_button')
+    btn.appendChild(label)
+    btn.title = npcLabel ? t('ride.invite_title', { name: npcLabel }) : t('ride.invite_button')
+  }
+
+  // ── Ride accept (an NPC offers the player a ride) ──
+
+  setRideAcceptBar(visible: boolean, ownerName?: string): void {
+    if (!this.rideAcceptBar) this.rideAcceptBar = document.getElementById('town-ride-accept-bar')
+    if (!this.rideAcceptBtn) this.rideAcceptBtn = document.getElementById('town-ride-accept-btn') as HTMLButtonElement | null
+    if (!this.rideAcceptLabel) this.rideAcceptLabel = document.getElementById('town-ride-accept-label')
+    if (!this.rideAcceptBar) return
+    this.rideAcceptBar.style.display = visible ? '' : 'none'
+    if (!visible) return
+    if (this.rideAcceptLabel) this.rideAcceptLabel.textContent = ownerName ? t('ride.accept_label', { name: ownerName }) : t('ride.accept_label', { name: '' })
+    if (this.rideAcceptBtn) this.rideAcceptBtn.textContent = t('ride.accept_button')
   }
 
   // ── Topic mode (multi-citizen group discussion) ──

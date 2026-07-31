@@ -220,6 +220,11 @@ const zhCN: Record<string, string> = {
 
   'drive_by.hitchhike_boarded': '谢谢你让我搭一段顺风车！',
 
+  'ride.invite_button': '邀请上车',
+  'ride.invite_title': '邀请{name}上车',
+  'ride.accept_label': '{name}想捎你一程',
+  'ride.accept_button': '同意搭车',
+
   // ── Editor ──
   'editor.scene_workshop': '场景工坊',
   'editor.citizen_workshop': '角色工坊',
