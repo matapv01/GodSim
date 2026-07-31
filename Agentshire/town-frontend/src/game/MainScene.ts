@@ -10,6 +10,7 @@ import { MuseumBuilder } from './scene/MuseumBuilder'
 import {
   TRAFFIC_INCIDENT_DURATION_MS,
   VehicleManager,
+  type VehicleCrash,
   type VehicleIncident,
   type VehiclePedestrian,
 } from './scene/VehicleManager'
@@ -216,6 +217,8 @@ export class MainScene implements GameScene {
   private nearbySpeechTargetIds: string[] = []
   private userReactionCooldowns = new Map<string, number>()
   private pendingUserReactions = new Set<string>()
+  private driveByReactionCooldowns = new Map<string, number>()
+  private driveByBoardPending = new Map<string, { since: number }>()
 
   private dispatcher!: EventDispatcher
   private dialogManager!: DialogManager
@@ -281,6 +284,7 @@ export class MainScene implements GameScene {
       resolveVehicleMove: (vehicleId, vehicle, from, desired) => this.resolveVehicleMove(vehicleId, vehicle, from, desired),
       getPedestrians: () => this.getVehiclePedestrians(),
       onPedestrianHit: incident => this.startTrafficIncident(incident),
+      onVehicleCrash: crash => this.handleVehicleCrash(crash),
     })
     this.vehicleManager.build(this.assets)
 
@@ -1432,8 +1436,17 @@ __workflow 演出测试指令:
     if (!user || !userPos || !user.isInActiveScene || sceneType !== 'town') {
       this.nearbyUserNpcId = null
       this.setNearbySpeechTargets([])
+      this.driveByBoardPending.clear()
       return
     }
+
+    if (this.vehicleManager.isPlayerDriving()) {
+      this.nearbyUserNpcId = null
+      this.setNearbySpeechTargets([])
+      this.updateDriveByReactions(now)
+      return
+    }
+    this.driveByBoardPending.clear()
 
     const maxDistance = this.vehicleManager.hasPlayerAboard() ? 7.5 : 6
     this.setNearbySpeechTargets(
@@ -1449,6 +1462,68 @@ __workflow 演出测试指令:
 
     this.nearbyUserNpcId = nearest.id
     void this.triggerUserReaction(nearest.id, 'proximity')
+  }
+
+  private updateDriveByReactions(now: number): void {
+    const vehicle = this.vehicleManager.getPlayerVehicleObject()
+    if (!vehicle || this.trafficIncident) {
+      this.driveByBoardPending.clear()
+      return
+    }
+    const vPos = new THREE.Vector3(vehicle.position.x, 0, vehicle.position.z)
+
+    for (const npc of this.npcManager.getAll()) {
+      if (npc.id === 'user' || !npc.mesh.visible || !npc.isInActiveScene) continue
+      if (npc.mesh.parent !== this.townScene || this.vehiclePassengerNpcIds.has(npc.id)) continue
+      const distance = npc.getPosition().distanceTo(vPos)
+
+      if (distance >= 2.0 && distance <= 7.0) {
+        if (now - (this.driveByReactionCooldowns.get(npc.id) ?? 0) >= 25_000) {
+          this.driveByReactionCooldowns.set(npc.id, now)
+          void this.triggerUserReaction(npc.id, 'drive_by')
+        }
+      }
+
+      const pending = this.driveByBoardPending.get(npc.id)
+      if (distance <= 5.5) {
+        if (!pending) this.driveByBoardPending.set(npc.id, { since: now })
+        else if (now - pending.since >= 1_600) {
+          this.driveByBoardPending.delete(npc.id)
+          void this.tryHitchhikeBoard(npc)
+        }
+      } else if (pending) {
+        this.driveByBoardPending.delete(npc.id)
+      }
+    }
+  }
+
+  private async tryHitchhikeBoard(npc: NPC): Promise<void> {
+    if (!this.vehicleManager.isPlayerDriving() || this.trafficIncident) return
+    const journal = this.dailyScheduler.getActivityJournals().get(npc.id)
+    const relation = journal?.getRelationship('user')
+    const status = relation?.status ?? 'stranger'
+    const sentiment = relation?.sentiment ?? 0
+    const trust = relation?.trust ?? 0
+    const profile = getGodSimNpcProfile(npc.id)
+    const willing = status === 'lover'
+      || status === 'crush'
+      || status === 'close_friend'
+      || (status === 'friend' && sentiment >= 0.35)
+      || (status === 'neighbor' && trust >= 0.35 && profile.personality.confidence >= 55)
+    if (!willing) return
+
+    if (this.vehicleManager.addGuestToPlayerVehicle(npc.id)) {
+      this.dailyScheduler.getDailyBehaviors().get(npc.id)?.pauseForDialogue()
+      npc.stopMoving()
+      this.dialogManager.onDialogMessage(npc.id, t('drive_by.hitchhike_boarded'), false)
+      this.recordDirectNpcMessage(npc.id, t('drive_by.hitchhike_boarded'))
+      journal?.updateRelationship(
+        { npcId: 'user', name: this.getPlayerName() },
+        { topic: 'Xin đi nhờ xe của người chơi khi gặp trên đường', sentimentDelta: 0.05, trustDelta: 0.03 },
+      )
+      this.socialFeedPanel?.refresh()
+      this.saveSnapshot()
+    }
   }
 
   private setNearbySpeechTargets(ids: string[]): void {
@@ -1467,7 +1542,7 @@ __workflow 演出测试指令:
     return [...this.nearbySpeechTargetIds]
   }
 
-  private async triggerUserReaction(npcId: string, context: 'visit' | 'proximity'): Promise<void> {
+  private async triggerUserReaction(npcId: string, context: 'visit' | 'proximity' | 'drive_by'): Promise<void> {
     const cooldownKey = `${context}:${npcId}`
     const now = Date.now()
     if ((this.userReactionCooldowns.get(cooldownKey) ?? 0) > now) return
@@ -1479,7 +1554,7 @@ __workflow 演出测试指令:
     if (!npc || !user || !userPos || !npc.mesh.visible || !npc.isInActiveScene || !user.isInActiveScene) return
 
     this.pendingUserReactions.add(cooldownKey)
-    this.userReactionCooldowns.set(cooldownKey, now + (context === 'visit' ? 120_000 : 45_000))
+    this.userReactionCooldowns.set(cooldownKey, now + (context === 'visit' ? 120_000 : context === 'drive_by' ? 25_000 : 45_000))
 
     npc.stopMoving()
     npc.smoothLookAt({ x: userPos.x, z: userPos.z })
@@ -1524,7 +1599,7 @@ __workflow 演出测试指令:
     }
   }
 
-  private async buildUserReaction(npcId: string, context: 'visit' | 'proximity'): Promise<string> {
+  private async buildUserReaction(npcId: string, context: 'visit' | 'proximity' | 'drive_by'): Promise<string> {
     const npc = this.npcManager.get(npcId)
     const npcName = npc?.label ?? npc?.name ?? npcId
     const profile = getGodSimNpcProfile(npcId)
@@ -1542,10 +1617,14 @@ __workflow 演出测试指令:
         `Bạn là ${npcName}. ${profile.personality}`,
         isIntrusion
           ? 'Người chơi vừa tự nhiên xông vào nhà riêng của bạn. Bạn phải phản ứng ngay, không được im lặng.'
-          : 'Người chơi vừa đi sát tới trước mặt bạn. Hãy chủ động phản ứng tự nhiên.',
-        context === 'proximity'
-          ? 'Ngoai duong la gap mat xa hoi binh thuong: uu tien chao hoi am ap, to mo, co the vui ve hoac hoi tham. Khong duoc gat gong voi nguoi la chi vi ho di gan qua.'
-          : 'Neu khong phai nha rieng cua ban, hay phan ung nhu gap mat o noi cong cong.',
+          : context === 'drive_by'
+            ? 'Người chơi vừa lái xe lướt ngang chỗ bạn đang đứng. Bạn nhìn thấy người chơi đang cầm lái trong xe.'
+            : 'Người chơi vừa đi sát tới trước mặt bạn. Hãy chủ động phản ứng tự nhiên.',
+        context === 'drive_by'
+          ? 'Phan ung khi xe luot ngang: nguoi la thi ngac nhien, lich su tranh ra hoac nhìn theo; nguoi quen thi vay chao, hoi tham hoac co the xín đi nho. Ngan gon, dung tuong den viec ngoi len xe ngay.'
+          : context === 'proximity'
+            ? 'Ngoai duong la gap mat xa hoi binh thuong: uu tien chao hoi am ap, to mo, co the vui ve hoac hoi tham. Khong duoc gat gong voi nguoi la chi vi ho di gan qua.'
+            : 'Neu khong phai nha rieng cua ban, hay phan ung nhu gap mat o noi cong cong.',
         'Phản ứng theo đúng quan hệ: người lạ thì lịch sự, hơi giữ khoảng cách nhưng vẫn có thiện chí; quen biết thì hỏi chuyện; thân thiết thì tự nhiên hơn.',
         'Chi duoc kho chiu/gat neu relationship co tension cao, trang thai strained/rival, hoac nguoi choi dang xong vao nha rieng. Neu khong co ly do ro rang, nguoi la cung nen lich su va mo loi de lam quen.',
         'Neu relationship.recentTopics hoac recent_dialogues co noi dung cu giua hai nguoi, hay bam vao dung noi dung do de hoi tiep mot cach tu nhien.',
@@ -1556,7 +1635,11 @@ __workflow 演出测试指令:
         'Chỉ trả về đúng 1 câu thoại tiếng Việt, tối đa 22 từ, không markdown.',
       ].join('\n'),
       user: JSON.stringify({
-        event: isIntrusion ? 'player_entered_my_private_home_uninvited' : 'player_approached_me',
+        event: isIntrusion
+          ? 'player_entered_my_private_home_uninvited'
+          : context === 'drive_by'
+            ? 'player_drove_by_me'
+            : 'player_approached_me',
         place: building?.name ?? 'thị trấn',
         relationship: relation ? {
           label: relation.label,
@@ -1585,7 +1668,7 @@ __workflow 演出测试指令:
     }
   }
 
-  private buildFallbackUserReaction(npcId: string, isIntrusion: boolean, context: 'visit' | 'proximity'): string {
+  private buildFallbackUserReaction(npcId: string, isIntrusion: boolean, context: 'visit' | 'proximity' | 'drive_by'): string {
     const journal = this.dailyScheduler.getActivityJournals().get(npcId)
     const relation = journal?.getRelationship('user')
     const topic = relation?.recentTopics?.slice(-1)[0]
@@ -1598,6 +1681,18 @@ __workflow 演出测试指令:
         return 'Ơ, bạn vào lúc nào thế? Có chuyện gì mà không gọi tôi trước?'
       }
       return 'Khoan đã, ai cho bạn tự tiện vào nhà tôi vậy? Bạn cần gì?'
+    }
+    if (context === 'drive_by') {
+      if (relation?.status === 'lover' || relation?.status === 'crush' || relation?.status === 'close_friend') {
+        return 'Ơ, bạn lái xe à? Dừng lại chở tôi một quãng với!'
+      }
+      if (relation?.status === 'friend' || relation?.status === 'neighbor') {
+        return 'Chào bạn! Lái xe chắc đi lại tiện nhỉ, hôm khác cho tôi đi nhờ với!'
+      }
+      if (relation?.status === 'strained' || relation?.status === 'rival') {
+        return 'Ơ, lại là bạn? Lái xe cẩn thận chứ đừng có vun vút như thế.'
+      }
+      return 'Ơ, có xe lướt qua kìa. Lái xe mà cũng không quan sát, may mà tôi né được.'
     }
     if (isStreetGreeting && topic && (relation?.interactionCount ?? 0) > 0) {
       return `Chào bạn. Tôi vẫn nhớ chuyện "${topic}", nếu bạn muốn thì mình nói tiếp cho rõ.`
@@ -2732,10 +2827,49 @@ __workflow 演出测试指令:
     )
   }
 
+  isPlayerDriving(): boolean {
+    return this.vehicleManager?.isPlayerDriving() ?? false
+  }
+
+  private handleVehicleCrash(crash: VehicleCrash): void {
+    if (this.sceneSwitcher?.getSceneType() !== 'town') return
+
+    const position = new THREE.Vector3(crash.position.x, 0, crash.position.z)
+    this.effects.crashSmoke(position.clone().setY(0.35))
+    this.effects.crashSmoke(position.clone().setY(0.15))
+    if (crash.playerInvolved) this.vfx.addCameraShake(0.18)
+
+    const nameA = this.vehicleManager.getVehicleOwnerName(crash.vehicleAId) ?? crash.vehicleAId
+    const nameB = this.vehicleManager.getVehicleOwnerName(crash.vehicleBId) ?? crash.vehicleBId
+
+    if (crash.playerInvolved) {
+      const playerVehicle = this.vehicleManager.getPlayerVehicleObject()
+      const otherVehicleId = playerVehicle === crash.vehicleA ? crash.vehicleBId : crash.vehicleAId
+      const otherOwner = this.vehicleManager.getVehicleOwnerName(otherVehicleId) ?? otherVehicleId
+      this.ui.showToast(t('traffic_crash.toast_player', { owner: otherOwner }))
+      this.townJournal.record(
+        'encounter_start',
+        [nameA, nameB],
+        t('traffic_crash.location'),
+        t('traffic_crash.log_player', { owner: otherOwner }),
+      )
+    } else {
+      this.ui.showToast(t('traffic_crash.toast', { ownerA: nameA, ownerB: nameB }))
+      this.townJournal.record(
+        'encounter_start',
+        [nameA, nameB],
+        t('traffic_crash.location'),
+        t('traffic_crash.log', { ownerA: nameA, ownerB: nameB }),
+      )
+    }
+  }
+
   private startTrafficIncident(event: VehicleIncident): boolean {
     if (this.trafficIncident || this.sceneSwitcher?.getSceneType() !== 'town') return false
     const victim = this.npcManager.get(event.victimNpcId)
     if (!victim || !victim.mesh.visible || this.vehiclePassengerNpcIds.has(victim.id)) return false
+
+    this.effects.bloodSplash(new THREE.Vector3(event.position.x, 0, event.position.z))
 
     const victimBehavior = this.dailyScheduler.getDailyBehaviors().get(victim.id)
     victimBehavior?.pauseForDialogue()
@@ -3133,6 +3267,7 @@ __workflow 演出测试指令:
         current_location_name: currentLocationName,
         weather: this.weatherSystem?.getDisplayWeather() ?? 'clear',
         period: this.gameClock?.getPeriod(),
+        player_is_driving: this.vehicleManager.isPlayerDriving(),
         vehicle_context: vehicleInfo ? {
           vehicle_id: vehicleInfo.id,
           owner: vehicleInfo.ownerName,

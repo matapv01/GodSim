@@ -70,8 +70,9 @@ async function routeFallbackCitizenMessage(params: {
   label: string;
   message: string;
   townSessionId: string;
+  transport?: string;
 }): Promise<void> {
-  const { npcId, label, message, townSessionId } = params;
+  const { npcId, label, message, townSessionId, transport } = params;
   const citizen = findCitizenConfig(npcId);
   const name = String(citizen?.name ?? citizen?.label ?? label ?? npcId);
   const persona = [
@@ -104,6 +105,7 @@ async function routeFallbackCitizenMessage(params: {
   });
 
   const { chat } = await import("./llm-agent-proxy.js");
+  const isDriving = transport === "car";
   const result = await chat({
     system: [
       `Bạn là ${name}, một cư dân trưởng thành trong xã hội thu nhỏ Agentshire.`,
@@ -115,11 +117,15 @@ async function routeFallbackCitizenMessage(params: {
       "Xưng hô nhất quán: dùng 'tôi' khi xưng bản thân, gọi người chơi là 'bạn' hoặc 'anh'/'chị' tùy theo giới tính người chơi và mức độ thân thiết.",
       "Đừng khách sáo kiểu trợ lý. Đừng tự nhận là AI. Đừng lặp lại cùng một kiểu câu.",
       "Trả lời 1-3 câu ngắn, có thể hỏi ngược lại để kéo quan hệ tiến triển.",
+      isDriving
+        ? "Bối cảnh hiện tại: người chơi đang lái xe trong thị trấn và trò chuyện với bạn từ trên xe (có thể đang dừng cạnh bạn hoặc chạy chậm). Hãy nhắc đúng bối cảnh này một cách tự nhiên: ngạc nhiên thấy bạn cầm lái, hỏi đang đi đâu, nhắc lái cẩn thận, hoặc nếu thân thiết có thể vui vẻ rủ đi nhờ."
+        : "Bối cảnh hiện tại: người chơi đang đi bộ trong thị trấn và nói chuyện trực tiếp với bạn.",
       persona ? `Thông tin nhân vật:\n${persona}` : "",
     ].filter(Boolean).join("\n"),
     user: JSON.stringify({
       latest_message: message,
       recent_conversation: history,
+      player_transport: isDriving ? "car" : "walking",
       style_hint: "ấm áp, dễ thương, đời thường, mềm mỏng và có chừng mực",
     }),
     maxTokens: 320,
@@ -161,13 +167,14 @@ export async function routeCitizenMessage(params: {
   accountId: string;
   cfg: Record<string, unknown>;
   mediaPaths?: string[];
+  transport?: string;
 }): Promise<void> {
-  const { npcId, label, message, townSessionId, accountId, cfg, mediaPaths } = params;
+  const { npcId, label, message, townSessionId, accountId, cfg, mediaPaths, transport } = params;
 
   const agentId = findCitizenAgentId(npcId);
   if (!agentId || process.env.AGENTSHIRE_STANDALONE === "1") {
     console.log(`[citizen-chat] No active agent for ${label} (${npcId}), using shared Qwen fallback`);
-    await routeFallbackCitizenMessage({ npcId, label, message, townSessionId });
+    await routeFallbackCitizenMessage({ npcId, label, message, townSessionId, transport });
     return;
   }
 
@@ -177,13 +184,18 @@ export async function routeCitizenMessage(params: {
     rt = mod.getTownRuntime();
   } catch {
     console.log(`[citizen-chat] Runtime unavailable for ${label} (${npcId}), using shared Qwen fallback`);
-    await routeFallbackCitizenMessage({ npcId, label, message, townSessionId });
+    await routeFallbackCitizenMessage({ npcId, label, message, townSessionId, transport });
     return;
   }
   const sanitizedSession = sanitizeTownSessionId(townSessionId);
   const sessionKey = `agent:${agentId}:${sanitizedSession}`;
 
-  console.log(`[citizen-chat] Routing to ${agentId} (${label}), sessionKey=${sessionKey}`);
+  console.log(`[citizen-chat] Routing to ${agentId} (${label}), sessionKey=${sessionKey}${transport ? ` transport=${transport}` : ""}`);
+
+  const isDriving = transport === "car";
+  const drivingContext: Array<{ role: string; content: string }> | undefined = isDriving
+    ? [{ role: "system", content: "Bối cảnh hiện tại: người chơi đang lái xe trong thị trấn và trò chuyện với bạn từ trên xe. Hãy nhắc đúng bối cảnh này một cách tự nhiên khi trả lời." }]
+    : undefined;
 
   const msgCtx = rt.channel.reply.finalizeInboundContext({
     Body: message,
@@ -199,6 +211,7 @@ export async function routeCitizenMessage(params: {
     Provider: CHANNEL_ID,
     Surface: CHANNEL_ID,
     ...(mediaPaths?.length ? { MediaPaths: mediaPaths } : {}),
+    ...(drivingContext ? { Context: drivingContext } : {}),
   });
 
   await rt.channel.reply.dispatchReplyWithBufferedBlockDispatcher({

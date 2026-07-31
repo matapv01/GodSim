@@ -39,6 +39,10 @@ export class VFXSystem {
     this.registry.setCamera(camera)
   }
 
+  addCameraShake(intensity: number): void {
+    this.registry.shakeIntensity = Math.max(this.registry.shakeIntensity, intensity)
+  }
+
   // ── Spawn effects ──
 
   summonShockwave(position: THREE.Vector3): void {

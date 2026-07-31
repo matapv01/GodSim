@@ -1,0 +1,12 @@
+import{g}from"./index-DJifQCx1.js";const p="modulepreload",v=function(e,n){return new URL(e,n).href},h={},C=function(n,o,a){let m=Promise.resolve();if(o&&o.length>0){const i=document.getElementsByTagName("link"),t=document.querySelector("meta[property=csp-nonce]"),d=(t==null?void 0:t.nonce)||(t==null?void 0:t.getAttribute("nonce"));m=Promise.allSettled(o.map(r=>{if(r=v(r,a),r in h)return;h[r]=!0;const c=r.endsWith(".css"),w=c?'[rel="stylesheet"]':"";if(!!a)for(let l=i.length-1;l>=0;l--){const u=i[l];if(u.href===r&&(!c||u.rel==="stylesheet"))return}else if(document.querySelector(`link[href="${r}"]${w}`))return;const s=document.createElement("link");if(s.rel=c?"stylesheet":p,c||(s.as="script"),s.crossOrigin="",s.href=r,d&&s.setAttribute("nonce",d),document.head.appendChild(s),c)return new Promise((l,u)=>{s.addEventListener("load",l),s.addEventListener("error",()=>u(new Error(`Unable to preload CSS for ${r}`)))})}))}function f(i){const t=new Event("vite:preloadError",{cancelable:!0});if(t.payload=i,window.dispatchEvent(t),!t.defaultPrevented)throw i}return m.then(i=>{for(const t of i||[])t.status==="rejected"&&f(t.reason);return n().catch(f)})};function T(){return""}function E(){return""}function b(e){const n=E();return!n||/^https?:\/\//i.test(e)?e:`${n}${e.startsWith("/")?e:`/${e}`}`}function _(e,n){return fetch(b(e),n)}const k=new Set(["new","help"]);function $(e){const n=e.match(/^\/([a-z][\w-]*)\s*([\s\S]*)$/i);if(!n)return null;const o=n[1].toLowerCase(),a=n[2].trim();return o==="reset"?{type:"frontend",command:"new",args:a,raw:e}:k.has(o)?{type:"frontend",command:o,args:a,raw:e}:{type:"gateway",command:o,args:a,raw:e}}const y=["可用指令：","","  /new [model]     创建新会话（可选模型参数）","  /stop            中止当前运行","  /status          查看当前状态","  /model [name]    查看/切换模型","  /think <level>   设置思考深度","  /tools           查看可用工具","  /help            显示此帮助","","更多指令：/fast, /verbose, /reasoning, /btw, /usage, /context, /commands"].join(`
+`),S=`Available commands:
+  /new [model]     New session (optional model)
+  /stop            Abort current run
+  /status          View current status
+  /model [name]    View/switch model
+  /think <level>   Set thinking depth
+  /tools           List tools
+  /help            Show this help
+
+More: /fast, /verbose, /reasoning, /btw, /usage, /context, /commands`;function R(){return g()==="en"?S:y}export{C as _,R as a,_ as b,T as g,$ as p};
+//# sourceMappingURL=command-parser--VgOPH3L.js.map

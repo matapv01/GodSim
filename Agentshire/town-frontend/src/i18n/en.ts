@@ -210,6 +210,16 @@ const en: Record<string, string> = {
   'traffic_incident.log_end': 'The fight involving {victim} was stopped and {count} witnesses left the scene.',
   'traffic_incident.activity': 'Was hit by a car and got into a heated dispute with the driver',
 
+  'traffic_crash.location': 'Central intersection',
+  'traffic_crash.vehicle_title': '{owner}’s car collided with another vehicle',
+  'traffic_crash.vehicle_detail': 'Collision recorded — pulled over to check',
+  'traffic_crash.toast': '{ownerA}’s car and {ownerB}’s car collided in the street!',
+  'traffic_crash.toast_player': 'You crashed into {owner}’s car!',
+  'traffic_crash.log': '{ownerA}’s car and {ownerB}’s car collided, throwing up a cloud of smoke.',
+  'traffic_crash.log_player': 'You drove your car into {owner}’s car at the intersection.',
+
+  'drive_by.hitchhike_boarded': 'Thanks for the ride!',
+
   // ── Editor ──
   'editor.scene_workshop': 'Scene Editor',
   'editor.citizen_workshop': 'Character Workshop',

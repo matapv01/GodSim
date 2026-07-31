@@ -288,7 +288,12 @@ async function main() {
           director.onUserMessage(action.text)
           const targetId = action.targetNpcId ?? 'steward'
           if (targetId !== 'steward') {
-            wsSend({ type: 'citizen_chat', npcId: targetId, message: action.text })
+            wsSend({
+              type: 'citizen_chat',
+              npcId: targetId,
+              message: action.text,
+              transport: sceneRef?.isPlayerDriving() ? 'car' : 'walking',
+            })
           } else {
             const wsMsg = director.processWorldAction(action)
             if (wsMsg) wsSend(wsMsg)
@@ -334,9 +339,13 @@ async function main() {
     implicitChatFnRef = async (req: {
       scene: string; system: string; user: string; maxTokens?: number; extraStop?: string[]
     }) => {
+      const drivingNote = scene.isPlayerDriving()
+        ? '\n[Thông tin thêm: người chơi hiện đang lái xe trong thị trấn. Nếu nội dung có liên quan, hãy nhắc đúng bối cảnh này.]'
+        : ''
+      const system = `${req.system}${drivingNote}`
       if (_ws.readyState !== WebSocket.OPEN) {
         const result = await bridgeModule.implicitChat({
-          scene: req.scene, system: req.system, user: req.user,
+          scene: req.scene, system, user: req.user,
           maxTokens: req.maxTokens, extraStop: req.extraStop,
         })
         return { text: result.text, fallback: result.fallback }
@@ -355,7 +364,7 @@ async function main() {
         _ws.send(JSON.stringify({
           type: 'implicit_chat_request',
           id,
-          system: req.system,
+          system,
           user: req.user,
           maxTokens: req.maxTokens ?? 200,
           temperature: 0.62,

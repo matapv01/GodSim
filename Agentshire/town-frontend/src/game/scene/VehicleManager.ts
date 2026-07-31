@@ -41,6 +41,15 @@ export interface VehicleIncident {
   speed: number
 }
 
+export interface VehicleCrash {
+  vehicleAId: string
+  vehicleBId: string
+  vehicleA: THREE.Object3D
+  vehicleB: THREE.Object3D
+  position: RoadPoint
+  playerInvolved: boolean
+}
+
 interface VehicleCallbacks {
   canBoard?: (npcId: string, position: RoadPoint) => boolean
   onBoard?: (npcId: string) => void
@@ -54,12 +63,16 @@ interface VehicleCallbacks {
   ) => RoadPoint
   getPedestrians?: () => VehiclePedestrian[]
   onPedestrianHit?: (incident: VehicleIncident) => boolean
+  onVehicleCrash?: (crash: VehicleCrash) => void
 }
 
 export const TRAFFIC_INCIDENT_DURATION_MS = 18_000
 const VEHICLE_HIT_RADIUS = 1.05
 const VEHICLE_COLLISION_RADIUS = 0.95
 const VICTIM_HIT_COOLDOWN_MS = 60_000
+const VEHICLE_CRASH_DISTANCE = 2.0
+const VEHICLE_CRASH_DURATION_S = 4
+const VEHICLE_CRASH_COOLDOWN_MS = 30_000
 
 const VEHICLE_ROUTES: VehicleRoute[] = [
   {
@@ -155,7 +168,7 @@ interface PooledVehicle {
   id: string
   wrapper: THREE.Group
   active: boolean
-  phase: 'driving' | 'visiting' | 'returning' | 'incident' | 'parked' | 'manual'
+  phase: 'driving' | 'visiting' | 'returning' | 'incident' | 'crash' | 'parked' | 'manual'
   incidentResumePhase: 'driving' | 'returning'
   incidentTimer: number
   occupantNpcId?: string
@@ -185,6 +198,7 @@ export class VehicleManager {
   private yOffsets: number[] = [] // per-template Y offset to fix wheel sinking
   private ridingNpcIds = new Set<string>()
   private victimHitAt = new Map<string, number>()
+  private crashAt = new Map<string, number>()
 
   private static readonly POOL_SIZE = VEHICLE_ROUTES.length
 
@@ -496,6 +510,11 @@ export class VehicleManager {
     }
   }
 
+  getVehicleOwnerName(vehicleId: string): string | null {
+    const vehicle = this.pool.find(v => v.id === vehicleId)
+    return vehicle?.homeRoute.owner ?? null
+  }
+
   getPlayerCabinInfo(): {
     id: string
     ownerNpcId: string
@@ -720,6 +739,21 @@ export class VehicleManager {
         )
       }
 
+      if (v.phase === 'crash') {
+        v.incidentTimer -= delta
+        v.headlight.intensity = needLights ? 0.65 : 0
+        v.taillightMat.opacity = 1
+        if (v.incidentTimer > 0) continue
+        v.phase = v.incidentResumePhase
+        v.taillightMat.opacity = needLights ? 0.9 : 0
+        this.setVehicleLabel(
+          v,
+          v.route,
+          Math.max(2, Math.round((v.totalLength - v.distance) / Math.max(0.1, v.totalLength / v.duration) / 2)),
+          v.phase === 'returning' ? 'returning' : 'driving',
+        )
+      }
+
       if (v.phase === 'visiting') {
         v.parkTimer -= delta
         v.headlight.intensity = 0
@@ -799,6 +833,51 @@ export class VehicleManager {
         this.setVehicleLabel(v, v.route, Math.ceil(v.incidentTimer / 2), 'incident')
       }
     }
+
+    this.checkVehicleCrashes(needLights)
+  }
+
+  private checkVehicleCrashes(needLights: boolean): void {
+    const candidates = this.pool.filter(v =>
+      v.wrapper.visible && (v.active || v.phase === 'parked'),
+    )
+    const now = Date.now()
+    for (let i = 0; i < candidates.length; i++) {
+      const a = candidates[i]
+      for (let j = i + 1; j < candidates.length; j++) {
+        const b = candidates[j]
+        if (a.phase === 'crash' && b.phase === 'crash') continue
+        const dx = a.wrapper.position.x - b.wrapper.position.x
+        const dz = a.wrapper.position.z - b.wrapper.position.z
+        const distance = Math.sqrt(dx * dx + dz * dz)
+        if (distance > VEHICLE_CRASH_DISTANCE) continue
+        const key = [a.id, b.id].sort().join('|')
+        if (now - (this.crashAt.get(key) ?? 0) < VEHICLE_CRASH_COOLDOWN_MS) continue
+        this.crashAt.set(key, now)
+
+        this.callbacks.onVehicleCrash?.({
+          vehicleAId: a.id,
+          vehicleBId: b.id,
+          vehicleA: a.wrapper,
+          vehicleB: b.wrapper,
+          position: {
+            x: (a.wrapper.position.x + b.wrapper.position.x) / 2,
+            z: (a.wrapper.position.z + b.wrapper.position.z) / 2,
+          },
+          playerInvolved: a.phase === 'manual' || b.phase === 'manual',
+        })
+
+        for (const v of [a, b]) {
+          if (v.phase !== 'manual' && v.active) {
+            v.incidentResumePhase = v.phase === 'returning' ? 'returning' : 'driving'
+            v.phase = 'crash'
+            v.incidentTimer = VEHICLE_CRASH_DURATION_S
+            v.taillightMat.opacity = 1
+            if (v.route) this.setVehicleLabel(v, v.route, Math.ceil(v.incidentTimer / 2), 'crash')
+          }
+        }
+      }
+    }
   }
 
   private findHitPedestrian(
@@ -874,7 +953,7 @@ export class VehicleManager {
     vehicle: PooledVehicle,
     route: VehicleRoute,
     minutes: number,
-    state: 'driving' | 'returning' | 'parking' | 'home' | 'manual' | 'incident' = 'driving',
+    state: 'driving' | 'returning' | 'parking' | 'home' | 'manual' | 'incident' | 'crash' = 'driving',
   ): void {
     if (vehicle.labelTexture) {
       vehicle.labelTexture.dispose()
@@ -907,6 +986,8 @@ export class VehicleManager {
     ctx.font = '700 28px "Segoe UI", Arial, sans-serif'
     const title = state === 'incident'
       ? t('traffic_incident.vehicle_title', { owner: route.owner })
+      : state === 'crash'
+        ? t('traffic_crash.vehicle_title', { owner: route.owner })
       : state === 'home'
         ? `Xe của ${route.owner}`
       : state === 'manual'
@@ -925,6 +1006,8 @@ export class VehicleManager {
       ? `Đang về nhà cất xe · ~${minutes} phút`
       : state === 'incident'
         ? t('traffic_incident.vehicle_detail')
+      : state === 'crash'
+        ? t('traffic_crash.vehicle_detail')
       : state === 'parking'
         ? 'Đang đỗ ở điểm đến · lát nữa quay về'
         : `Đang trên đường · ~${minutes} phút`
@@ -950,6 +1033,7 @@ export class VehicleManager {
     this.yOffsets = []
     this.ridingNpcIds.clear()
     this.victimHitAt.clear()
+    this.crashAt.clear()
     this.group.clear()
     this.scene.remove(this.group)
   }

@@ -36,7 +36,7 @@ export interface TownWsServerOptions {
     temperature: number;
     stop: string[];
   }) => Promise<{ text: string; usage?: { input: number; output: number }; error?: string }>;
-  onCitizenChat?: (payload: { npcId: string; message: string; townSessionId: string }) => void;
+  onCitizenChat?: (payload: { npcId: string; message: string; townSessionId: string; transport?: string }) => void;
   onTopicStart?: (payload: { npcIds: string[]; townSessionId: string }) => void;
   onTopicMessage?: (payload: { npcIds: string[]; message: string; townSessionId: string }) => void;
   onTopicEnd?: (payload: { townSessionId: string }) => void;
@@ -444,7 +444,12 @@ export function startTownWsServer(opts: TownWsServerOptions): void {
           console.log(
             `${sessionLogPrefix(townSessionId)} WS ← citizen_chat npc=${msg.npcId} len=${String(msg.message).length}${_debug ? ` "${String(msg.message).slice(0, 80)}"` : ""}`,
           );
-          opts.onCitizenChat?.({ npcId: msg.npcId, message: msg.message, townSessionId });
+          opts.onCitizenChat?.({
+            npcId: msg.npcId,
+            message: msg.message,
+            townSessionId,
+            transport: typeof msg.transport === "string" ? msg.transport : undefined,
+          });
         } else if (msg.type === "topic_start" && Array.isArray(msg.npcIds)) {
           const townSessionId = getClientSessionId(ws);
           console.log(`${sessionLogPrefix(townSessionId)} WS ← topic_start npcIds=[${msg.npcIds.join(",")}]`);

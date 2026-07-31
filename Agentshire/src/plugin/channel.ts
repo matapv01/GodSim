@@ -318,9 +318,9 @@ export const agentTownPlugin: ChannelPlugin<ResolvedTownAccount> = {
             console.error("[agentshire] onAction dispatch error:", err);
           }
         },
-        onCitizenChat: async ({ npcId, message, townSessionId }) => {
+        onCitizenChat: async ({ npcId, message, townSessionId, transport }) => {
           console.log(
-            `[agentshire] onCitizenChat (${townSessionId}): npc=${npcId} len=${message.length}${DEBUG ? ` "${message.slice(0, 80)}"` : ""}`,
+            `[agentshire] onCitizenChat (${townSessionId}): npc=${npcId} len=${message.length}${transport ? ` transport=${transport}` : ""}${DEBUG ? ` "${message.slice(0, 80)}"` : ""}`,
           );
           try {
             const { routeCitizenMessage } = await import("./citizen-chat-router.js");
@@ -331,6 +331,7 @@ export const agentTownPlugin: ChannelPlugin<ResolvedTownAccount> = {
               townSessionId: sanitizeTownSessionId(townSessionId),
               accountId: account.accountId,
               cfg: ctx.cfg,
+              transport,
             });
           } catch (err) {
             console.error("[agentshire] onCitizenChat dispatch error:", err);

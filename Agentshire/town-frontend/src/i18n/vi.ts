@@ -191,6 +191,16 @@ const vi: Record<string, string> = {
   'traffic_incident.log_end': 'Cuộc ẩu đả quanh {victim} đã được can ngăn; {count} người chứng kiến rời hiện trường.',
   'traffic_incident.activity': 'Bị xe va phải rồi tranh cãi dữ dội với tài xế',
 
+  'traffic_crash.location': 'Giao lộ trung tâm thị trấn',
+  'traffic_crash.vehicle_title': 'Xe nhà {owner} vừa va chạm với xe khác',
+  'traffic_crash.vehicle_detail': 'Va chạm đã được ghi nhận — đang dừng kiểm tra',
+  'traffic_crash.toast': 'Xe của {ownerA} và xe của {ownerB} vừa va chạm giữa đường!',
+  'traffic_crash.toast_player': 'Bạn vừa va chạm với xe của {owner}!',
+  'traffic_crash.log': 'Xe của {ownerA} và xe của {ownerB} va chạm trên đường, cú va tạo khói lớn.',
+  'traffic_crash.log_player': 'Bạn lái xe va vào xe của {owner} tại giao lộ, khói bốc lên nghi ngút.',
+
+  'drive_by.hitchhike_boarded': 'Cảm ơn đã cho tôi đi nhờ một quãng!',
+
   'editor.scene_workshop': 'Sửa cảnh',
   'editor.citizen_workshop': 'Xưởng nhân vật',
   'editor.save': 'Lưu',

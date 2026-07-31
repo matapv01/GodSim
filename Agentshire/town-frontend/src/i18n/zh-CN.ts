@@ -210,6 +210,16 @@ const zhCN: Record<string, string> = {
   'traffic_incident.log_end': '围绕{victim}的冲突被制止，{count}名目击者离开现场。',
   'traffic_incident.activity': '被车辆撞到后与司机发生激烈争执',
 
+  'traffic_crash.location': '镇中心路口',
+  'traffic_crash.vehicle_title': '{owner}家的车刚与另一辆车相撞',
+  'traffic_crash.vehicle_detail': '碰撞已记录——正在停车检查',
+  'traffic_crash.toast': '{ownerA}的车和{ownerB}的车在路上相撞了！',
+  'traffic_crash.toast_player': '你撞上了{owner}的车！',
+  'traffic_crash.log': '{ownerA}的车与{ownerB}的车在路上相撞，撞击扬起浓烟。',
+  'traffic_crash.log_player': '你开车在路口撞上了{owner}的车，扬起一阵浓烟。',
+
+  'drive_by.hitchhike_boarded': '谢谢你让我搭一段顺风车！',
+
   // ── Editor ──
   'editor.scene_workshop': '场景工坊',
   'editor.citizen_workshop': '角色工坊',
