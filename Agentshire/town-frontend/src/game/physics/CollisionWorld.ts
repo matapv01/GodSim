@@ -32,6 +32,7 @@ export interface CollisionActor {
 
 interface MoveOptions {
   allowDetour?: boolean
+  detourAngles?: number[]
 }
 
 const SWEEP_STEP = 0.12
@@ -189,12 +190,13 @@ export class CollisionWorld {
     const candidates = [delta]
     if (options.allowDetour) {
       const preferredSide = this.hashDirection(actor.id)
-      for (const angle of [
+      const angles = options.detourAngles ?? [
         Math.PI / 3, -Math.PI / 3,
         Math.PI / 2, -Math.PI / 2,
         (Math.PI * 2) / 3, -(Math.PI * 2) / 3,
         Math.PI,
-      ]) {
+      ]
+      for (const angle of angles) {
         candidates.push(this.rotate(delta, angle * preferredSide))
       }
     }

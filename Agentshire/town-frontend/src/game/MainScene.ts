@@ -291,6 +291,7 @@ export class MainScene implements GameScene {
       getPedestrians: () => this.getVehiclePedestrians(),
       onPedestrianHit: incident => this.startTrafficIncident(incident),
       onVehicleCrash: crash => this.handleVehicleCrash(crash),
+      onCrashExit: (npcId, position) => this.handleCrashDriverExit(npcId, position),
       onTrafficStop: info => this.handleTrafficStop(info),
     })
     this.vehicleManager.build(this.assets)
@@ -3002,7 +3003,14 @@ __workflow 演出测试指令:
       },
       from,
       desired,
-      { allowDetour: false },
+      {
+        allowDetour: true,
+        detourAngles: [
+          Math.PI / 6, -Math.PI / 6,
+          Math.PI / 4, -Math.PI / 4,
+          Math.PI / 3, -Math.PI / 3,
+        ],
+      },
     )
   }
 
@@ -3045,9 +3053,82 @@ __workflow 演出测试指令:
       )
     }
 
+    this.playCrashDriverDialogue(crash, nameA, nameB)
+
     if (officer) {
       this.policeDealWithCrash(officer, { x: crash.position.x, z: crash.position.z }, nameA, nameB, officerName)
     }
+  }
+
+  private playCrashDriverDialogue(
+    crash: VehicleCrash,
+    nameA: string,
+    nameB: string,
+  ): void {
+    if (this.sceneSwitcher?.getSceneType() !== 'town') return
+    const driverA = crash.driverAId ? this.npcManager.get(crash.driverAId) : null
+    const driverB = crash.driverBId ? this.npcManager.get(crash.driverBId) : null
+    if (!driverA && !driverB) return
+
+    if (driverA && driverB) {
+      driverA.smoothLookAt(new THREE.Vector3(crash.vehicleB.position.x, 0, crash.vehicleB.position.z))
+      driverB.smoothLookAt(new THREE.Vector3(crash.vehicleA.position.x, 0, crash.vehicleA.position.z))
+      driverA.playAnim('frustrated')
+      driverB.playAnim('frustrated')
+      this.bubbles.show(driverA.mesh, t('traffic_crash.driver_a', { other: nameB }), 3200)
+      window.setTimeout(() => {
+        if (this.sceneSwitcher?.getSceneType() !== 'town') return
+        driverB.smoothLookAt(new THREE.Vector3(crash.vehicleA.position.x, 0, crash.vehicleA.position.z))
+        driverB.playAnim('frustrated')
+        this.bubbles.show(driverB.mesh, t('traffic_crash.driver_b', { other: nameA }), 3200)
+      }, 1800)
+      window.setTimeout(() => {
+        if (this.sceneSwitcher?.getSceneType() !== 'town') return
+        driverA.playAnim('wave')
+        this.bubbles.show(driverA.mesh, t('traffic_crash.driver_a2'), 3200)
+      }, 3600)
+      window.setTimeout(() => {
+        if (this.sceneSwitcher?.getSceneType() !== 'town') return
+        this.walkCrashDriverBack(driverA, crash.vehicleA)
+        this.walkCrashDriverBack(driverB, crash.vehicleB)
+      }, 6500)
+      return
+    }
+
+    const driver = (driverA ?? driverB)!
+    const otherVehicle = driver === driverA ? crash.vehicleB : crash.vehicleA
+    driver.smoothLookAt(new THREE.Vector3(otherVehicle.position.x, 0, otherVehicle.position.z))
+    driver.playAnim('frustrated')
+    this.bubbles.show(driver.mesh, t('traffic_crash.driver_player', { player: t('traffic_crash.player_default') }), 3400)
+    window.setTimeout(() => {
+      if (this.sceneSwitcher?.getSceneType() !== 'town') return
+      this.walkCrashDriverBack(driver, driver === driverA ? crash.vehicleA : crash.vehicleB)
+    }, 6500)
+  }
+
+  private walkCrashDriverBack(driver: NPC, vehicle: THREE.Object3D): void {
+    driver.stopMoving()
+    driver.transitionTo('idle')
+    const door = this.clampPlayerPosition(vehicle.position.x + 1.4, vehicle.position.z + 0.8)
+    driver.moveTo({ x: door.x, z: door.z }, 3.2).then(status => {
+      if (status !== 'arrived' || this.sceneSwitcher?.getSceneType() !== 'town') return
+      driver.smoothLookAt(new THREE.Vector3(vehicle.position.x, 0, vehicle.position.z))
+      driver.transitionTo('idle')
+    })
+  }
+
+  private handleCrashDriverExit(npcId: string, position: { x: number; z: number }): void {
+    if (this.sceneSwitcher?.getSceneType() !== 'town') return
+    const npc = this.npcManager.get(npcId)
+    if (!npc) return
+    npc.stopMoving()
+    npc.transitionTo('idle')
+    const clamped = this.clampPlayerPosition(position.x, position.z)
+    npc.mesh.position.set(clamped.x, 0, clamped.z)
+    npc.setVisible(true)
+    this.vehiclePassengerNpcIds.delete(npcId)
+    this.dailyScheduler.getDailyBehaviors().get(npcId)?.pauseForDialogue()
+    if (npcId === 'user') this.cameraCtrl.follow(npc.mesh)
   }
 
   private policeDealWithCrash(
@@ -3073,6 +3154,13 @@ __workflow 演出测试指令:
       officer.playAnim('thinking')
       this.bubbles.show(officer.mesh, t('traffic_crash.police_line2'), 3400)
     })
+    window.setTimeout(() => {
+      if (this.sceneSwitcher?.getSceneType() !== 'town') return
+      officer.stopMoving()
+      officer.transitionTo('idle')
+      const behavior = this.dailyScheduler.getDailyBehaviors().get(officer.id)
+      if (behavior) behavior.walkAwayFrom(position, t('traffic_incident.police_disperse'))
+    }, 12_000)
     this.townJournal.record(
       'encounter_end',
       [officerName, nameA, nameB],

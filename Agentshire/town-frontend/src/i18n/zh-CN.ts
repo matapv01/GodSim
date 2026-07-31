@@ -229,6 +229,11 @@ const zhCN: Record<string, string> = {
   'traffic_crash.police_line': '两辆车都停下！出示证件并检查损失！',
   'traffic_crash.police_line2': '碰撞已记录，下次请保持安全距离。',
   'traffic_crash.police_log': '警察{officer}对{ownerA}和{ownerB}的碰撞事故立了案。',
+  'traffic_crash.driver_a': '{other}，你怎么开车的？！直接撞上了我的车！',
+  'traffic_crash.driver_b': '我一直开得好好的，{other}，是你造成的！',
+  'traffic_crash.driver_a2': '算了，幸好没人受伤。下次注意看路！',
+  'traffic_crash.driver_player': '{player}，开车看路！差点出大事！',
+  'traffic_crash.player_default': '你',
 
   'police_traffic.activity': '到场处理交通事故',
 

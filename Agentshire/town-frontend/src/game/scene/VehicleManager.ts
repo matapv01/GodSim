@@ -48,6 +48,8 @@ export interface VehicleCrash {
   vehicleB: THREE.Object3D
   position: RoadPoint
   playerInvolved: boolean
+  driverAId?: string
+  driverBId?: string
 }
 
 export interface TrafficStopInfo {
@@ -73,6 +75,7 @@ interface VehicleCallbacks {
   getPedestrians?: () => VehiclePedestrian[]
   onPedestrianHit?: (incident: VehicleIncident) => boolean
   onVehicleCrash?: (crash: VehicleCrash) => void
+  onCrashExit?: (npcId: string, position: RoadPoint) => void
   onTrafficStop?: (info: TrafficStopInfo) => void
 }
 
@@ -81,8 +84,8 @@ const VEHICLE_HIT_RADIUS = 1.05
 const VEHICLE_COLLISION_RADIUS = 0.95
 const VICTIM_HIT_COOLDOWN_MS = 60_000
 const VEHICLE_CRASH_DISTANCE = 2.0
-const VEHICLE_CRASH_DURATION_S = 4
-const VEHICLE_CRASH_COOLDOWN_MS = 30_000
+const VEHICLE_CRASH_DURATION_S = 12
+const VEHICLE_CRASH_COOLDOWN_MS = 45_000
 const WRONG_LANE_PROBABILITY = 0.16
 const TRAFFIC_STOP_DISTANCE = 5.5
 const TRAFFIC_STOP_DURATION_S = 9
@@ -202,6 +205,7 @@ interface PooledVehicle {
   incidentResumePhase: 'driving' | 'returning'
   incidentTimer: number
   occupantNpcId?: string
+  crashExitNpcId?: string
   guestNpcIds: Set<string>
   distance: number
   duration: number
@@ -414,6 +418,7 @@ export class VehicleManager {
       && Math.random() < WRONG_LANE_PROBABILITY
     vehicle.wrongLane = wrongLane
     vehicle.pulledOver = false
+    vehicle.crashExitNpcId = undefined
     const start = { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z }
     const routed = [start, ...this.applyLaneOffset(route.points, wrongLane)]
     vehicle.route = route
@@ -808,6 +813,7 @@ export class VehicleManager {
     vehicle.driverless = false
     vehicle.wrongLane = false
     vehicle.pulledOver = false
+    vehicle.crashExitNpcId = undefined
     if (this.activeTrafficStop?.offenderId === vehicle.id) this.activeTrafficStop = null
     vehicle.nextTripAt = performance.now() / 1000 + 20 + Math.random() * 40
   }
@@ -906,6 +912,10 @@ export class VehicleManager {
         v.headlight.intensity = needLights ? 0.65 : 0
         v.taillightMat.opacity = 1
         if (v.incidentTimer > 0) continue
+        if (v.crashExitNpcId) {
+          this.boardOccupant(v)
+          v.crashExitNpcId = undefined
+        }
         v.phase = v.incidentResumePhase
         v.taillightMat.opacity = needLights ? 0.9 : 0
         this.setVehicleLabel(
@@ -1004,7 +1014,8 @@ export class VehicleManager {
     const route = vehicle.route
     if (!route) return
     const start = { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z }
-    const routed = [start, ...this.applyLaneOffset(route.points, vehicle.wrongLane)]
+    const base = vehicle.phase === 'returning' ? [...route.points].reverse() : route.points
+    const routed = [start, ...this.applyLaneOffset(base, vehicle.wrongLane)]
     vehicle.routePoints = routed
     vehicle.segmentLengths = this.getSegmentLengths(routed)
     vehicle.totalLength = vehicle.segmentLengths.reduce((sum, n) => sum + n, 0)
@@ -1062,7 +1073,7 @@ export class VehicleManager {
 
   private checkVehicleCrashes(needLights: boolean): void {
     const candidates = this.pool.filter(v =>
-      v.wrapper.visible && (v.active || v.phase === 'parked'),
+      v.wrapper.visible && v.active,
     )
     const now = Date.now()
     for (let i = 0; i < candidates.length; i++) {
@@ -1074,9 +1085,28 @@ export class VehicleManager {
         const dz = a.wrapper.position.z - b.wrapper.position.z
         const distance = Math.sqrt(dx * dx + dz * dz)
         if (distance > VEHICLE_CRASH_DISTANCE) continue
+        // Correct-lane cars passing on opposite sides of the road are just
+        // traffic passing, not a collision.
+        if (a.phase !== 'manual' && b.phase !== 'manual'
+          && !a.wrongLane && !b.wrongLane
+          && this.isOpposingDirections(a, b)) continue
         const key = [a.id, b.id].sort().join('|')
         if (now - (this.crashAt.get(key) ?? 0) < VEHICLE_CRASH_COOLDOWN_MS) continue
         this.crashAt.set(key, now)
+
+        this.separateCrashedVehicles(a, b)
+        this.resolveCrashLanes(a, b)
+
+        for (const v of [a, b]) {
+          if (v.phase !== 'manual' && v.active) {
+            v.incidentResumePhase = v.phase === 'returning' ? 'returning' : 'driving'
+            v.phase = 'crash'
+            v.incidentTimer = VEHICLE_CRASH_DURATION_S
+            v.taillightMat.opacity = 1
+            if (v.route) this.setVehicleLabel(v, v.route, Math.ceil(v.incidentTimer / 2), 'crash')
+            this.exitCrashDriver(v)
+          }
+        }
 
         this.callbacks.onVehicleCrash?.({
           vehicleAId: a.id,
@@ -1088,19 +1118,62 @@ export class VehicleManager {
             z: (a.wrapper.position.z + b.wrapper.position.z) / 2,
           },
           playerInvolved: a.phase === 'manual' || b.phase === 'manual',
+          driverAId: a.crashExitNpcId,
+          driverBId: b.crashExitNpcId,
         })
-
-        for (const v of [a, b]) {
-          if (v.phase !== 'manual' && v.active) {
-            v.incidentResumePhase = v.phase === 'returning' ? 'returning' : 'driving'
-            v.phase = 'crash'
-            v.incidentTimer = VEHICLE_CRASH_DURATION_S
-            v.taillightMat.opacity = 1
-            if (v.route) this.setVehicleLabel(v, v.route, Math.ceil(v.incidentTimer / 2), 'crash')
-          }
-        }
       }
     }
+  }
+
+  private separateCrashedVehicles(a: PooledVehicle, b: PooledVehicle): void {
+    const dx = a.wrapper.position.x - b.wrapper.position.x
+    const dz = a.wrapper.position.z - b.wrapper.position.z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (dist < 0.001) return
+    const push = 1.3
+    const ux = dx / dist
+    const uz = dz / dist
+    a.wrapper.position.x += ux * push
+    a.wrapper.position.z += uz * push
+    b.wrapper.position.x -= ux * push
+    b.wrapper.position.z -= uz * push
+  }
+
+  private resolveCrashLanes(a: PooledVehicle, b: PooledVehicle): void {
+    for (const v of [a, b]) {
+      if (v.wrongLane && v.route && v.phase !== 'manual') {
+        v.wrongLane = false
+        this.rebuildRoutePoints(v)
+      }
+    }
+  }
+
+  private isOpposingDirections(a: PooledVehicle, b: PooledVehicle): boolean {
+    const dir = (v: PooledVehicle) => {
+      if (v.routePoints.length < 2) return { x: 0, z: 0 }
+      const pose = this.sampleRoute(
+        v.routePoints,
+        v.segmentLengths,
+        Math.min(v.totalLength, v.distance + 1),
+      )
+      const dx = pose.x - v.wrapper.position.x
+      const dz = pose.z - v.wrapper.position.z
+      const len = Math.max(0.001, Math.sqrt(dx * dx + dz * dz))
+      return { x: dx / len, z: dz / len }
+    }
+    const da = dir(a)
+    const db = dir(b)
+    return da.x * db.x + da.z * db.z < -0.4
+  }
+
+  private exitCrashDriver(vehicle: PooledVehicle): void {
+    if (vehicle.driverless || !vehicle.occupantNpcId) return
+    const npcId = vehicle.occupantNpcId
+    const exit = { x: vehicle.wrapper.position.x + 1.4, z: vehicle.wrapper.position.z + 0.8 }
+    vehicle.crashExitNpcId = npcId
+    vehicle.occupantNpcId = undefined
+    this.ridingNpcIds.delete(npcId)
+    this.callbacks.onCrashExit?.(npcId, exit)
   }
 
   private findHitPedestrian(

@@ -229,6 +229,11 @@ const en: Record<string, string> = {
   'traffic_crash.police_line': 'Both cars, stop! Show your papers and check the damage!',
   'traffic_crash.police_line2': 'Collision recorded. Keep a safe distance next time.',
   'traffic_crash.police_log': 'Officer {officer} filed the report on the collision between {ownerA} and {ownerB}.',
+  'traffic_crash.driver_a': '{other}, what were you thinking?! You crashed right into my car!',
+  'traffic_crash.driver_b': 'I was driving fine — you are the one who caused this, {other}!',
+  'traffic_crash.driver_a2': 'Fine, at least no one is hurt. Watch the road next time!',
+  'traffic_crash.driver_player': 'Hey {player}, watch where you are going! You almost caused a crash!',
+  'traffic_crash.player_default': 'you',
 
   'police_traffic.activity': 'Arrived to handle a traffic accident',
 

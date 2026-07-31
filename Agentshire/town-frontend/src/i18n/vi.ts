@@ -210,6 +210,11 @@ const vi: Record<string, string> = {
   'traffic_crash.police_line': 'Hai xe dừng lại! Xuất trình giấy tờ và kiểm tra thiệt hại!',
   'traffic_crash.police_line2': 'Va chạm đã được ghi nhận. Lần sau giữ khoảng cách an toàn.',
   'traffic_crash.police_log': 'Cảnh sát {officer} lập biên bản vụ va chạm giữa xe của {ownerA} và xe của {ownerB}.',
+  'traffic_crash.driver_a': '{other}, anh/chị lái xe kiểu gì vậy?! Đâm thẳng vào xe tôi!',
+  'traffic_crash.driver_b': 'Tôi đi đúng đường, còn anh/chị mới là người gây tai nạn đó, {other}!',
+  'traffic_crash.driver_a2': 'Thôi được, may là không ai bị thương. Lần sau phải chú ý quan sát!',
+  'traffic_crash.driver_player': 'Này {player}, nhìn đường mà lái! Vừa suýt gây tai nạn đấy!',
+  'traffic_crash.player_default': 'Bạn',
 
   'police_traffic.activity': 'Có mặt xử lý tai nạn giao thông',
 
