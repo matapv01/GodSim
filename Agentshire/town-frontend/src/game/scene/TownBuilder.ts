@@ -93,7 +93,7 @@ const BUILDINGS: BuildingDef[] = [
   },
   {
     id: 'restaurant', modelKey: 'building_F', label: 'Quán ăn gia đình', pos: [42.4, 0, 29.25], scale: 1.9, rotationY: 0,
-    doorOffset: [42.4, 0.05, 26.75], size: [5, 3, 3], color: 0xe8b06f, roofColor: 0xb85f48,
+    doorOffset: [42.4, 0.05, 31.25], size: [5, 3, 3], color: 0xe8b06f, roofColor: 0xb85f48,
     windows: [
       { pos: [0, 1.0, 1.01] },
     ],
