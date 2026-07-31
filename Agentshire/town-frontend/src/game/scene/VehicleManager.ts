@@ -124,12 +124,26 @@ const VEHICLE_ROUTES: VehicleRoute[] = [
     appearance: 'xe đô thị',
     modelKey: 'car_taxi',
     homeParking: { x: 12.65, z: 19.25 },
-    travelHours: [16, 21],
+    travelHours: [14, 23],
     automatic: true,
     from: 'Nhà Vy',
     to: 'Quán cà phê',
     purpose: 'gặp người quen',
     points: [{ x: 14.0, z: 18.5 }, { x: 16, z: 18.5 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 38.8, z: 18.0 }],
+  },
+  {
+    id: 'khoi_patrol',
+    ownerNpcId: 'citizen_5',
+    owner: 'Khôi',
+    appearance: 'xe tuần tra',
+    modelKey: 'car_sedan',
+    homeParking: { x: 14.0, z: 22.5 },
+    travelHours: [18, 24],
+    automatic: true,
+    from: 'Nhà Khôi',
+    to: 'Đường tuần tra',
+    purpose: 'đi tuần ban đêm',
+    points: [{ x: 16, z: 24 }, { x: 16, z: 26.75 }, { x: 38.8, z: 26.75 }, { x: 38.8, z: 18 }, { x: 16, z: 18 }, { x: 16, z: 24 }],
   },
 ]
 
@@ -141,15 +155,15 @@ interface TrafficDensity {
 }
 
 const TRAFFIC_TABLE: TrafficDensity[] = [
-  { startHour: 0,  endHour: 5,  intervalMin: 35, intervalMax: 55 },
-  { startHour: 5,  endHour: 7,  intervalMin: 12, intervalMax: 18 },
-  { startHour: 7,  endHour: 9,  intervalMin: 8,  intervalMax: 14 },
-  { startHour: 9,  endHour: 12, intervalMin: 12, intervalMax: 20 },
-  { startHour: 12, endHour: 14, intervalMin: 10, intervalMax: 16 },
-  { startHour: 14, endHour: 17, intervalMin: 12, intervalMax: 20 },
-  { startHour: 17, endHour: 19, intervalMin: 8,  intervalMax: 14 },
-  { startHour: 19, endHour: 22, intervalMin: 16, intervalMax: 26 },
-  { startHour: 22, endHour: 24, intervalMin: 28, intervalMax: 45 },
+  { startHour: 0,  endHour: 5,  intervalMin: 22, intervalMax: 38 },
+  { startHour: 5,  endHour: 7,  intervalMin: 10, intervalMax: 16 },
+  { startHour: 7,  endHour: 9,  intervalMin: 7,  intervalMax: 12 },
+  { startHour: 9,  endHour: 12, intervalMin: 10, intervalMax: 16 },
+  { startHour: 12, endHour: 14, intervalMin: 8,  intervalMax: 14 },
+  { startHour: 14, endHour: 17, intervalMin: 10, intervalMax: 16 },
+  { startHour: 17, endHour: 19, intervalMin: 7,  intervalMax: 12 },
+  { startHour: 19, endHour: 22, intervalMin: 12, intervalMax: 20 },
+  { startHour: 22, endHour: 24, intervalMin: 18, intervalMax: 30 },
 ]
 
 function getSpawnInterval(hour: number): number {
@@ -176,7 +190,8 @@ interface PooledVehicle {
   distance: number
   duration: number
   parkTimer: number
-  lastTripDay: number
+  nextTripAt: number
+  driverless: boolean
   homeRoute: VehicleRoute
   route: VehicleRoute | null
   routePoints: RoadPoint[]
@@ -323,7 +338,8 @@ export class VehicleManager {
         distance: 0,
         duration: 0,
         parkTimer: 0,
-        lastTripDay: -1,
+        nextTripAt: 0,
+        driverless: false,
         homeRoute,
         route: homeRoute,
         routePoints: [],
@@ -338,27 +354,36 @@ export class VehicleManager {
     }
   }
 
-  private getAvailableParkedVehicle(hour: number, dayCount: number): PooledVehicle | null {
-    return this.pool.find(v =>
+  private getAvailableAutoVehicle(hour: number, isNight: boolean): PooledVehicle | null {
+    const now = performance.now() / 1000
+    const eligible = this.pool.filter(v =>
       !v.active
       && v.phase === 'parked'
       && v.homeRoute.automatic
-      && v.lastTripDay !== dayCount
-      && hour >= v.homeRoute.travelHours[0]
-      && hour < v.homeRoute.travelHours[1]
+      && now >= v.nextTripAt
       && !this.ridingNpcIds.has(v.homeRoute.ownerNpcId)
-      && this.callbacks.canBoard?.(v.homeRoute.ownerNpcId, this.getHomeParkingPoint(v.homeRoute)) !== false
-    ) ?? null
+      && this.canStartAutoTrip(v, hour, isNight)
+    )
+    if (!eligible.length) return null
+    return eligible[Math.floor(Math.random() * eligible.length)]
   }
 
-  private spawn(isNight: boolean, hour: number, dayCount: number) {
-    const vehicle = this.getAvailableParkedVehicle(hour, dayCount)
+  private canStartAutoTrip(v: PooledVehicle, hour: number, isNight: boolean): boolean {
+    const route = v.homeRoute
+    const inWindow = hour >= route.travelHours[0] && hour < route.travelHours[1]
+    const ownerAvailable = this.callbacks.canBoard?.(route.ownerNpcId, this.getHomeParkingPoint(route)) !== false
+    if (inWindow && ownerAvailable) return true
+    return isNight
+  }
+
+  private spawn(isNight: boolean, hour: number) {
+    const vehicle = this.getAvailableAutoVehicle(hour, isNight)
     if (!vehicle) return
 
-    this.startAutomaticTrip(vehicle, isNight, dayCount)
+    this.startAutomaticTrip(vehicle, isNight)
   }
 
-  private startAutomaticTrip(vehicle: PooledVehicle, isNight: boolean, dayCount: number): void {
+  private startAutomaticTrip(vehicle: PooledVehicle, isNight: boolean): void {
     const route = vehicle.homeRoute
     const start = { x: vehicle.wrapper.position.x, z: vehicle.wrapper.position.z }
     const routed = [start, ...this.applyLaneOffset(route.points)]
@@ -373,8 +398,8 @@ export class VehicleManager {
     vehicle.incidentResumePhase = 'driving'
     vehicle.incidentTimer = 0
     vehicle.active = true
-    vehicle.lastTripDay = dayCount
-    this.boardOccupant(vehicle)
+    vehicle.driverless = this.callbacks.canBoard?.(route.ownerNpcId, this.getHomeParkingPoint(route)) === false
+    if (!vehicle.driverless) this.boardOccupant(vehicle)
 
     vehicle.wrapper.visible = true
     vehicle.label.visible = true
@@ -429,7 +454,7 @@ export class VehicleManager {
     return distance <= maxDistance ? { id: vehicle.homeRoute.id, distance } : null
   }
 
-  boardPlayer(vehicleId: string, isNight: boolean, dayCount: number): {
+  boardPlayer(vehicleId: string, isNight: boolean, _dayCount: number): {
     ok: boolean
     ownerNpcId?: string
     ownerName?: string
@@ -448,7 +473,7 @@ export class VehicleManager {
     }
 
     this.boardNpc(vehicle, 'user', false)
-    this.startAutomaticTrip(vehicle, isNight, dayCount)
+    this.startAutomaticTrip(vehicle, isNight)
     return {
       ok: true,
       ownerNpcId: vehicle.homeRoute.ownerNpcId,
@@ -751,9 +776,12 @@ export class VehicleManager {
     vehicle.distance = 0
     vehicle.parkTimer = 0
     vehicle.incidentTimer = 0
+    vehicle.driverless = false
+    vehicle.nextTripAt = performance.now() / 1000 + 20 + Math.random() * 40
   }
 
   private boardOccupant(vehicle: PooledVehicle): void {
+    if (vehicle.driverless) return
     const npcId = vehicle.route?.ownerNpcId
     if (!npcId) return
     this.boardNpc(vehicle, npcId, true)
@@ -799,7 +827,6 @@ export class VehicleManager {
 
   update(gameClock: GameClock, delta: number) {
     const hour = gameClock.getGameHour()
-    const dayCount = gameClock.getState().dayCount
     const period = gameClock.getPeriod()
     const needLights = period === 'night' || period === 'dusk' || period === 'dawn'
     const time = performance.now() / 1000
@@ -807,7 +834,7 @@ export class VehicleManager {
     // Spawn timer
     this.spawnTimer -= delta
     if (this.spawnTimer <= 0) {
-      this.spawn(needLights, hour, dayCount)
+      this.spawn(needLights, hour)
       this.spawnTimer = getSpawnInterval(hour)
     }
 
@@ -1072,7 +1099,7 @@ export class VehicleManager {
     ctx.fillStyle = '#fff7dc'
     ctx.font = '700 28px "Segoe UI", Arial, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(`Xe của ${route.owner} · ${route.owner} lái`, 256, 52)
+    ctx.fillText(vehicle.driverless ? `Xe của ${route.owner} · tự hành trình` : `Xe của ${route.owner} · ${route.owner} lái`, 256, 52)
     ctx.fillStyle = 'rgba(255,255,255,0.72)'
     ctx.font = '600 22px "Segoe UI", Arial, sans-serif'
     ctx.fillText(`${route.purpose}: ${route.from} → ${route.to} · ~${minutes} phút`, 256, 92)
