@@ -121,4 +121,18 @@ describe('CollisionWorld', () => {
 
     expect(a.mesh.position.distanceTo(b.mesh.position)).toBeGreaterThanOrEqual(0.9)
   })
+
+  it('backs out of a dead-end pocket when forward and both sides are blocked', () => {
+    const { scene, world, actors } = setup([
+      { type: 'box', id: 'wallL', minX: -1.2, maxX: -0.5, minZ: -0.5, maxZ: 1 },
+      { type: 'box', id: 'wallR', minX: 0.5, maxX: 1.2, minZ: -0.5, maxZ: 1 },
+      { type: 'box', id: 'wallF', minX: -0.5, maxX: 0.5, minZ: 0.5, maxZ: 1 },
+    ])
+    const npc = actor('npc', scene, 0, 0)
+    actors.push(npc)
+
+    const next = world.moveActor(npc, npc.mesh.position, { x: 0, z: 0.3 }, { allowDetour: true })
+
+    expect(next.z).toBeLessThan(0)
+  })
 })

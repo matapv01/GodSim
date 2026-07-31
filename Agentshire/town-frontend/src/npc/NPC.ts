@@ -15,6 +15,11 @@ const GLOW_COLORS: Record<string, number> = {
 const _labelWorldPos = new THREE.Vector3()
 const _labelNDC = new THREE.Vector3()
 
+const UNSTICK_TIMEOUT_S = 0.8
+const UNSTICK_ESCAPE_DIST = 1.3
+const UNSTICK_RETREAT_DIST = 2.4
+const UNSTICK_OPEN_SPACE_MIN = 0.5
+
 export type NpcState =
   | 'idle'
   | 'walking'
@@ -62,6 +67,9 @@ export class NPC {
   private speed: number = 3
   private moveResolve: ((status: 'arrived' | 'interrupted') => void) | null = null
   private navigationAdapter: NPCNavigationAdapter | null = null
+  private unstickTime = 0
+  private unstickAnchor = new THREE.Vector3()
+  private unstickSide: 1 | -1 = 1
 
   private bobPhase: number = 0
   private isMoving: boolean = false
@@ -564,6 +572,81 @@ export class NPC {
     this.navigationAdapter = adapter
   }
 
+  /**
+   * Called when the NPC makes no real progress for a while. Re-plans the path
+   * first; if the blocker is dynamic (another person / vehicle), sidesteps
+   * around it. When both sides are walled in, retreats instead so it never
+   * stays wedged between two obstacles forever.
+   */
+  private tryUnstick(): void {
+    if (!this.navigationAdapter) return
+    const goal = this.pathQueue.length > 0
+      ? this.pathQueue[this.pathQueue.length - 1]
+      : this.targetPos
+    if (!goal) return
+
+    if (this.navigationAdapter.planPath) {
+      const replanned = this.navigationAdapter.planPath({ x: goal.x, z: goal.z })
+      if (replanned.length > 1) {
+        const [next, ...rest] = replanned
+        this.targetPos = new THREE.Vector3(next.x, 0, next.z)
+        this.pathQueue = rest.map(wp => new THREE.Vector3(wp.x, 0, wp.z))
+        return
+      }
+    }
+
+    const current = this.mesh.position
+    const dx = goal.x - current.x
+    const dz = goal.z - current.z
+    const len = Math.hypot(dx, dz)
+    if (len < 1e-6) return
+    const px = -dz / len
+    const pz = dx / len
+
+    const sideA = this.escapePoint(current, px, pz, 1)
+    const sideB = this.escapePoint(current, px, pz, -1)
+    const openA = sideA.distanceTo(current)
+    const openB = sideB.distanceTo(current)
+    const pickA = openA > openB + 0.15
+      ? true
+      : openB > openA + 0.15
+        ? false
+        : this.unstickSide === 1
+    this.unstickSide = this.unstickSide === 1 ? -1 : 1
+
+    if (pickA ? openA >= UNSTICK_OPEN_SPACE_MIN : openB >= UNSTICK_OPEN_SPACE_MIN) {
+      const escape = pickA ? sideA : sideB
+      this.pathQueue = [goal]
+      this.targetPos = new THREE.Vector3(escape.x, 0, escape.z)
+      return
+    }
+
+    const retreat = new THREE.Vector3(
+      current.x - (dx / len) * UNSTICK_RETREAT_DIST,
+      0,
+      current.z - (dz / len) * UNSTICK_RETREAT_DIST,
+    )
+    this.pathQueue = [goal]
+    this.targetPos = retreat
+  }
+
+  private escapePoint(
+    from: THREE.Vector3,
+    px: number,
+    pz: number,
+    side: 1 | -1,
+  ): THREE.Vector3 {
+    const requested = new THREE.Vector3(
+      from.x + px * UNSTICK_ESCAPE_DIST * side,
+      0,
+      from.z + pz * UNSTICK_ESCAPE_DIST * side,
+    )
+    const projected = this.navigationAdapter?.projectTarget({ x: requested.x, z: requested.z })
+    return projected
+      ? new THREE.Vector3(projected.x, 0, projected.z)
+      : requested
+  }
+
   moveTo(target: { x: number; z: number }, speed?: number): Promise<'arrived' | 'interrupted'> {
     return new Promise<'arrived' | 'interrupted'>((resolve) => {
       if (this.moveResolve) {
@@ -642,6 +725,7 @@ export class NPC {
 
       if (dist < 0.15) {
         current.set(this.targetPos.x, 0, this.targetPos.z)
+        this.unstickTime = 0
         const nextTarget = this.pathQueue.shift()
         if (nextTarget) {
           this.targetPos = nextTarget
@@ -657,6 +741,20 @@ export class NPC {
           z: current.z + nz * step,
         }
         const resolved = this.navigationAdapter?.resolveMovement(current, desired) ?? desired
+        if (this.unstickTime === 0) {
+          this.unstickAnchor.set(current.x, 0, current.z)
+        }
+        this.unstickTime += deltaTime
+        const wander = Math.hypot(
+          current.x - this.unstickAnchor.x,
+          current.z - this.unstickAnchor.z,
+        )
+        if (wander > 0.35) {
+          this.unstickTime = 0
+        } else if (this.unstickTime >= UNSTICK_TIMEOUT_S) {
+          this.unstickTime = 0
+          this.tryUnstick()
+        }
         current.x = resolved.x
         current.z = resolved.z
 

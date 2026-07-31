@@ -189,7 +189,12 @@ export class CollisionWorld {
     const candidates = [delta]
     if (options.allowDetour) {
       const preferredSide = this.hashDirection(actor.id)
-      for (const angle of [Math.PI / 3, -Math.PI / 3, Math.PI / 2, -Math.PI / 2]) {
+      for (const angle of [
+        Math.PI / 3, -Math.PI / 3,
+        Math.PI / 2, -Math.PI / 2,
+        (Math.PI * 2) / 3, -(Math.PI * 2) / 3,
+        Math.PI,
+      ]) {
         candidates.push(this.rotate(delta, angle * preferredSide))
       }
     }
@@ -206,9 +211,9 @@ export class CollisionWorld {
         actor.id,
       )
       const moved = end.clone().sub(start)
-      // Forward progress matters most; travelled distance lets an NPC sidestep
-      // when the direct candidate is fully blocked.
-      const score = moved.dot(forward) * 4 + moved.length() - i * 1e-5
+      // Forward progress matters most, but any movement (even backing up) is
+      // better than standing still so a wedged NPC can escape a dead end.
+      const score = moved.dot(forward) + moved.length() * 2 - i * 1e-5
       if (score > bestScore) {
         bestScore = score
         best = end
