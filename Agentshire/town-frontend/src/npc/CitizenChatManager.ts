@@ -97,6 +97,7 @@ export class CitizenChatManager {
       behavior.resumeFromDialogue()
     }
     this.interaction = null
+    this.deps.getFollowBehavior().stop()
   }
 
   disconnect(): void {
@@ -212,6 +213,8 @@ export class CitizenChatManager {
 
     this.interaction.state = 'active'
     this.interaction.idleTimer = MAX_IDLE_MS
+
+    this.deps.getFollowBehavior().stop()
 
     npc.smoothLookAt({ x: user.mesh.position.x, z: user.mesh.position.z })
 

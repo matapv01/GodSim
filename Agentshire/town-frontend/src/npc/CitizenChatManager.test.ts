@@ -30,7 +30,7 @@ describe('CitizenChatManager indoor conversations', () => {
       getUser: () => user as any,
       getSteward: () => undefined,
       getCameraCtrl: () => ({ follow: vi.fn() }) as any,
-      getFollowBehavior: () => ({ setTarget: vi.fn(), isActive: () => false, start: vi.fn() }) as any,
+      getFollowBehavior: () => ({ setTarget: vi.fn(), isActive: () => false, start: vi.fn(), stop: vi.fn() }) as any,
       getSceneType: () => 'house_a',
       getAvatarUrl: () => undefined,
       onDialogTargetChange: vi.fn(),
