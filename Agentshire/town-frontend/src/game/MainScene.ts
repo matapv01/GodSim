@@ -1233,7 +1233,7 @@ __workflow 演出测试指令:
       { key: 'park_center', name: 'Công viên', x: WAYPOINTS.park_center.x, z: WAYPOINTS.park_center.z, w: 8.0, h: 4.4, c: '#bbf7d0' },
     ]
     const sx = (x: number) => (x / 80) * 100
-    const sz = (z: number) => (z / 56) * 100
+    const sz = (z: number) => (z / 88) * 100
     const sceneType = this.sceneSwitcher?.getSceneType() ?? 'town'
     const mapNpcs = (this.npcManager?.getAll() ?? []).map(n => {
       const behavior = this.dailyScheduler?.getDailyBehaviors().get(n.id)
@@ -1280,18 +1280,16 @@ __workflow 演出测试指令:
           <div style="position:absolute;left:${sx(p.x)}%;top:calc(${sz(p.z)}% + 8px);transform:translateX(-50%);font-size:10px;font-weight:900;color:white;text-shadow:0 1px 3px #000;white-space:nowrap;">${name}</div>`
       }).join('')
     const placeHtml = places.map(p => `
-      <div style="position:absolute;left:${sx(p.x)}%;top:${sz(p.z)}%;width:${(p.w / 56) * 100}%;height:${(p.h / 34) * 100}%;transform:translate(-50%,-50%);border-radius:6px;background:${p.c};border:1px solid rgba(15,23,42,0.75);display:flex;align-items:center;justify-content:center;text-align:center;color:#111827;font-size:10px;font-weight:900;padding:2px;box-sizing:border-box;line-height:1.05;">${p.name}</div>
+      <div style="position:absolute;left:${sx(p.x)}%;top:${sz(p.z)}%;width:${(p.w / 80) * 100}%;height:${(p.h / 88) * 100}%;transform:translate(-50%,-50%);border-radius:6px;background:${p.c};border:1px solid rgba(15,23,42,0.75);display:flex;align-items:center;justify-content:center;text-align:center;color:#111827;font-size:10px;font-weight:900;padding:2px;box-sizing:border-box;line-height:1.05;">${p.name}</div>
     `).join('')
     this.townMapPanel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">
         <div style="font-weight:900;font-size:16px;color:#fff3c4;">Bản đồ thị trấn</div>
         <button type="button" data-close-map style="width:28px;height:28px;border-radius:7px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:white;font-weight:900;cursor:pointer;">×</button>
       </div>
-      <div style="position:relative;width:100%;aspect-ratio:56/34;border-radius:8px;overflow:hidden;background:#345d3a;border:1px solid rgba(255,255,255,0.16);">
-        <div style="position:absolute;left:0;top:91%;width:100%;height:7%;background:#4b5563;"></div>
-        <div style="position:absolute;left:27%;top:18%;width:4%;height:75%;background:#4b5563;"></div>
-        <div style="position:absolute;left:68%;top:18%;width:4%;height:75%;background:#4b5563;"></div>
-        <div style="position:absolute;left:28%;top:53%;width:43%;height:6%;background:#4b5563;"></div>
+      <div style="position:relative;width:100%;aspect-ratio:10/11;border-radius:8px;overflow:hidden;background:#345d3a;border:1px solid rgba(255,255,255,0.16);">
+        <div style="position:absolute;left:30%;top:4.5%;width:40%;height:91%;background:#4b5563;"></div>
+        <div style="position:absolute;left:10%;top:32%;width:85%;height:36%;background:#4b5563;"></div>
         ${placeHtml}
         ${npcs}
       </div>
@@ -3780,7 +3778,7 @@ __workflow 演出测试指令:
   }
 
   private clampPlayerZ(z: number): number {
-    return Math.max(4, Math.min(52, z))
+    return Math.max(4, Math.min(84, z))
   }
 
   private clampPlayerPosition(x: number, z: number): { x: number; z: number } {

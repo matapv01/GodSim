@@ -22,84 +22,84 @@ interface BuildingDef {
 
 const BUILDINGS: BuildingDef[] = [
   {
-    id: 'office', modelKey: 'building_A', label: 'Công ty chính', pos: [48.0, 0, 6.0], scale: 3.0, rotationY: 0,
-    doorOffset: [48.0, 0.05, 13.0], size: [8, 12, 6], color: 0x6688aa,
+    id: 'office', modelKey: 'building_A', label: 'Công ty chính', pos: [62.0, 0, 8.0], scale: 3.0, rotationY: 0,
+    doorOffset: [62.0, 0.05, 14.0], size: [8, 12, 6], color: 0x6688aa,
     windows: [
       { pos: [0, 0.95, 1.01] },
     ],
   },
   {
-    id: 'coworking', modelKey: 'building_A', label: 'Văn phòng nhỏ', pos: [58.0, 0, 6.0], scale: 1.8, rotationY: 0,
-    doorOffset: [58.0, 0.05, 13.0], size: [4, 5, 4], color: 0x6f9fbd,
+    id: 'coworking', modelKey: 'building_A', label: 'Văn phòng nhỏ', pos: [72.0, 0, 8.0], scale: 1.8, rotationY: 0,
+    doorOffset: [72.0, 0.05, 14.0], size: [4, 5, 4], color: 0x6f9fbd,
     windows: [
       { pos: [0, 1.0, 1.01] },
     ],
   },
   {
-    id: 'clinic', modelKey: 'building_H', label: 'Phòng khám', pos: [8.5, 0, 6.0], scale: 1.6, rotationY: 0,
-    doorOffset: [8.5, 0.05, 13.0], size: [3.5, 3.2, 3], color: 0xf4f7fb, roofColor: 0x74b8d8,
+    id: 'clinic', modelKey: 'building_H', label: 'Phòng khám', pos: [16.0, 0, 8.0], scale: 1.6, rotationY: 0,
+    doorOffset: [16.0, 0.05, 11.0], size: [3.5, 3.2, 3], color: 0xf4f7fb, roofColor: 0x74b8d8,
     windows: [
       { pos: [0, 1.0, 1.01] },
     ],
   },
   {
-    id: 'house_a', modelKey: 'building_B', label: 'Nhà Minh', pos: [8.0, 0, 11.0], scale: 1.55, rotationY: 0,
-    doorOffset: [0, 0.05, 17.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0x44aa44,
+    id: 'house_a', modelKey: 'building_B', label: 'Nhà Minh', pos: [11.0, 0, 15.0], scale: 1.55, rotationY: 0,
+    doorOffset: [0, 0.05, 18.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0x44aa44,
     windows: [{ pos: [0, 0.7, 1.01] }],
   },
   {
-    id: 'house_b', modelKey: 'building_C', label: 'Nhà Lan', pos: [8.0, 0, 15.5], scale: 1.55, rotationY: 0,
-    doorOffset: [0, 0.05, 21.5], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0x4488cc,
+    id: 'house_b', modelKey: 'building_C', label: 'Nhà Lan', pos: [17.0, 0, 15.0], scale: 1.55, rotationY: 0,
+    doorOffset: [0, 0.05, 18.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0x4488cc,
     windows: [{ pos: [0, 0.95, 1.01] }],
   },
   {
-    id: 'house_c', modelKey: 'building_D', label: 'Nhà Hà', pos: [8.0, 0, 20.0], scale: 1.55, rotationY: 0,
-    doorOffset: [0, 0.05, 26.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0xcc8844,
+    id: 'house_c', modelKey: 'building_D', label: 'Nhà Hà', pos: [11.0, 0, 22.0], scale: 1.55, rotationY: 0,
+    doorOffset: [0, 0.05, 25.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0xcc8844,
     windows: [{ pos: [0, 0.95, 1.01] }],
   },
   {
-    id: 'house_d', modelKey: 'building_B', label: 'Nhà An', pos: [73.0, 0, 6.0], scale: 1.55, rotationY: 0,
-    doorOffset: [73.0, 0.05, 13.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0xb96fd8,
+    id: 'house_d', modelKey: 'building_B', label: 'Nhà An', pos: [17.0, 0, 22.0], scale: 1.55, rotationY: 0,
+    doorOffset: [0, 0.05, 25.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0xb96fd8,
     windows: [{ pos: [0, 0.7, 1.01] }],
   },
   {
-    id: 'house_e', modelKey: 'building_C', label: 'Nhà Khôi', pos: [72.0, 0, 16.0], scale: 1.55, rotationY: 0,
-    doorOffset: [72.0, 0.05, 22.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0x6688aa,
+    id: 'house_e', modelKey: 'building_C', label: 'Nhà Khôi', pos: [11.0, 0, 65.0], scale: 1.55, rotationY: 0,
+    doorOffset: [0, 0.05, 68.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0x6688aa,
     windows: [{ pos: [0, 0.95, 1.01] }],
   },
   {
-    id: 'house_f', modelKey: 'building_D', label: 'Nhà Vy', pos: [8.0, 0, 49.0], scale: 1.55, rotationY: 0,
-    doorOffset: [0, 0.05, 54.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0xd86fa1,
+    id: 'house_f', modelKey: 'building_D', label: 'Nhà Vy', pos: [17.0, 0, 65.0], scale: 1.55, rotationY: 0,
+    doorOffset: [0, 0.05, 68.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0xd86fa1,
     windows: [{ pos: [0, 0.95, 1.01] }],
   },
   {
-    id: 'house_g', modelKey: 'building_B', label: 'Nhà Bảo', pos: [6.0, 0, 39.0], scale: 1.55, rotationY: 0,
-    doorOffset: [6.0, 0.05, 43.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0x777777,
+    id: 'house_g', modelKey: 'building_B', label: 'Nhà Bảo', pos: [11.0, 0, 73.0], scale: 1.55, rotationY: 0,
+    doorOffset: [0, 0.05, 76.0], size: [2.6, 3.4, 2.6], color: 0xf5f0e8, roofColor: 0x777777,
     windows: [{ pos: [0, 0.7, 1.01] }],
   },
   {
-    id: 'market', modelKey: 'building_E', label: 'Khu chợ', pos: [50.0, 0, 39.0], scale: 2.5, rotationY: 0,
-    doorOffset: [50.0, 0.05, 46.0], size: [8, 4, 5], color: 0xf0f0f0,
+    id: 'market', modelKey: 'building_E', label: 'Khu chợ', pos: [62.0, 0, 78.0], scale: 2.5, rotationY: 0,
+    doorOffset: [62.0, 0.05, 81.0], size: [8, 4, 5], color: 0xf0f0f0,
     windows: [{ pos: [0, 1.1, 1.01] }],
   },
   {
-    id: 'cafe', modelKey: 'building_F', label: 'Quán cà phê', pos: [50.0, 0, 49.0], scale: 2.0, rotationY: 0,
-    doorOffset: [50.0, 0.05, 54.0], size: [5, 3, 4], color: 0xd4a574,
+    id: 'cafe', modelKey: 'building_F', label: 'Quán cà phê', pos: [70.0, 0, 78.0], scale: 2.0, rotationY: 0,
+    doorOffset: [70.0, 0.05, 81.0], size: [5, 3, 4], color: 0xd4a574,
     windows: [{ pos: [0, 1.1, 1.01] }],
   },
   {
-    id: 'restaurant', modelKey: 'building_F', label: 'Quán ăn gia đình', pos: [62.0, 0, 39.0], scale: 1.9, rotationY: 0,
-    doorOffset: [62.0, 0.05, 46.0], size: [5, 3, 3], color: 0xe8b06f, roofColor: 0xb85f48,
+    id: 'restaurant', modelKey: 'building_F', label: 'Quán ăn gia đình', pos: [62.0, 0, 70.0], scale: 1.9, rotationY: 0,
+    doorOffset: [62.0, 0.05, 73.0], size: [5, 3, 3], color: 0xe8b06f, roofColor: 0xb85f48,
     windows: [{ pos: [0, 1.0, 1.01] }],
   },
   {
-    id: 'museum', modelKey: 'building_H', label: 'Nhà văn hóa', pos: [64.0, 0, 48.0], scale: 2.5, rotationY: 0,
-    doorOffset: [64.0, 0.05, 53.0], size: [6, 4, 4], color: 0xe8e8e8,
-    windows: [{ pos: [0, 1.4, 1.01] }],
+    id: 'museum', modelKey: 'building_H', label: 'Nhà văn hóa', pos: [60.0, 0, 19.0], scale: 2.5, rotationY: 180,
+    doorOffset: [60.0, 0.05, 16.0], size: [6, 4, 4], color: 0xe8e8e8,
+    windows: [{ pos: [0, 1.4, -1.01] }],
   },
   {
-    id: 'user_home', modelKey: 'building_G', label: 'Nhà người chơi', pos: [6.0, 0, 45.0], scale: 1.8, rotationY: 0,
-    doorOffset: [6.0, 0.05, 49.0], size: [3, 4, 3], color: 0xf5f0e8, roofColor: 0xddaa44,
+    id: 'user_home', modelKey: 'building_G', label: 'Nhà người chơi', pos: [16.0, 0, 80.0], scale: 1.8, rotationY: 0,
+    doorOffset: [0, 0.05, 83.0], size: [3, 4, 3], color: 0xf5f0e8, roofColor: 0xddaa44,
     windows: [{ pos: [0, 0.95, 1.01] }],
   },
 ]
@@ -217,7 +217,7 @@ export class TownBuilder {
 
   private buildSkyAndFog(): void {
     this.scene.background = new THREE.Color(SKY_COLOR)
-    this.scene.fog = new THREE.Fog(SKY_COLOR, 60, 120)
+    this.scene.fog = new THREE.Fog(SKY_COLOR, 70, 150)
   }
 
   /* ───────── Lighting ───────── */
@@ -230,12 +230,12 @@ export class TownBuilder {
     dir.position.set(40, 40, -20)
     dir.castShadow = true
     dir.shadow.mapSize.set(2048, 2048)
-    dir.shadow.camera.left = -55
-    dir.shadow.camera.right = 55
-    dir.shadow.camera.top = 55
-    dir.shadow.camera.bottom = -55
+    dir.shadow.camera.left = -70
+    dir.shadow.camera.right = 70
+    dir.shadow.camera.top = 70
+    dir.shadow.camera.bottom = -70
     dir.shadow.camera.near = 1
-    dir.shadow.camera.far = 110
+    dir.shadow.camera.far = 150
     dir.shadow.bias = -0.001
     this.townGroup.add(dir)
 
@@ -261,16 +261,17 @@ export class TownBuilder {
     const dirtMat = new THREE.MeshLambertMaterial({ color: DIRT_COLOR })
     const whiteMat = new THREE.MeshLambertMaterial({ color: 0xffffff })
 
-    const grass = new THREE.Mesh(new THREE.PlaneGeometry(80, 56), grassMat)
+    const grass = new THREE.Mesh(new THREE.PlaneGeometry(80, 88), grassMat)
     grass.rotation.x = -Math.PI / 2
-    grass.position.set(40, 0, 28)
+    grass.position.set(40, 0, 44)
     grass.receiveShadow = true
     this.townGroup.add(grass)
 
     const sidewalkPositions: [number, number, number, number, number][] = [
-      [20.2, 0.05, 28.0, 1.4, 46],
-      [42.6, 0.05, 28.0, 1.4, 46],
-      [40.0, 0.05, 36.3, 76.0, 1.4],
+      [23, 0.05, 44, 1.4, 80],
+      [57, 0.05, 44, 1.4, 80],
+      [42, 0.05, 27, 68, 1.4],
+      [42, 0.05, 61, 68, 1.4],
     ]
     const swGeo = new THREE.PlaneGeometry(1, 1)
     for (const [x, y, z, w, d] of sidewalkPositions) {
@@ -282,18 +283,15 @@ export class TownBuilder {
       this.townGroup.add(sw)
     }
 
-    const plaza = new THREE.Mesh(new THREE.PlaneGeometry(12, 7), plazaMat)
+    const plaza = new THREE.Mesh(new THREE.PlaneGeometry(8, 7), plazaMat)
     plaza.rotation.x = -Math.PI / 2
-    plaza.position.set(27.4, 0.05, 18.6)
+    plaza.position.set(76, 0.05, 24)
     plaza.receiveShadow = true
     this.townGroup.add(plaza)
 
     const roads: Array<{ x: number; z: number; w: number; d: number }> = [
-      { x: 40, z: 32, w: 80, d: 8.0 },
-      { x: 16, z: 28, w: 8.0, d: 48.0 },
-      { x: 38.8, z: 28, w: 8.0, d: 48.0 },
-      { x: 27.4, z: 10.5, w: 30.8, d: 8.0 },
-      { x: 27.4, z: 26.75, w: 30.8, d: 8.0 },
+      { x: 40, z: 44, w: 32, d: 80 },
+      { x: 42, z: 44, w: 68, d: 32 },
     ]
     for (const def of roads) {
       const road = new THREE.Mesh(new THREE.PlaneGeometry(def.w, def.d), roadMat)
@@ -303,59 +301,34 @@ export class TownBuilder {
       this.townGroup.add(road)
     }
 
-    const dashGeo = new THREE.PlaneGeometry(3, 0.15)
-    for (const x of [38, 40, 42]) {
-      for (let i = 0; i < 12; i++) {
-        const line = new THREE.Mesh(dashGeo, whiteMat)
-        line.rotation.x = -Math.PI / 2
-        line.position.set(5 + i * 6, 0.065, 32)
-        this.townGroup.add(line)
-      }
-    }
-
     const vDashGeo = new THREE.PlaneGeometry(0.15, 3)
-    for (const x of [16, 38.8]) {
-      for (const z of [18, 20, 22]) {
-        for (let i = 0; i < 10; i++) {
-          const line = new THREE.Mesh(vDashGeo, whiteMat)
-          line.rotation.x = -Math.PI / 2
-          line.position.set(x, 0.065, 6 + i * 5)
-          this.townGroup.add(line)
-        }
-      }
+    for (let i = 0; i < 13; i++) {
+      const line = new THREE.Mesh(vDashGeo, whiteMat)
+      line.rotation.x = -Math.PI / 2
+      line.position.set(40, 0.065, 8 + i * 6)
+      this.townGroup.add(line)
     }
 
     const hDashGeo = new THREE.PlaneGeometry(3, 0.15)
-    for (const z of [8.5, 10.5, 12.5]) {
-      for (let i = 0; i < 8; i++) {
-        const line = new THREE.Mesh(hDashGeo, whiteMat)
-        line.rotation.x = -Math.PI / 2
-        line.position.set(13 + i * 4, 0.065, z)
-        this.townGroup.add(line)
-      }
-    }
-    for (const z of [24.75, 26.75, 28.75]) {
-      for (let i = 0; i < 8; i++) {
-        const line = new THREE.Mesh(hDashGeo, whiteMat)
-        line.rotation.x = -Math.PI / 2
-        line.position.set(13 + i * 4, 0.065, z)
-        this.townGroup.add(line)
-      }
+    for (let i = 0; i < 11; i++) {
+      const line = new THREE.Mesh(hDashGeo, whiteMat)
+      line.rotation.x = -Math.PI / 2
+      line.position.set(10 + i * 6, 0.065, 44)
+      this.townGroup.add(line)
     }
 
     const crossGeo = new THREE.PlaneGeometry(0.3, 2)
     for (const [cx, cz, horizontal] of [
-      [16, 10.5, false], [38.8, 10.5, false], [16, 26.75, false], [38.8, 26.75, false],
-      [27.4, 32, true],
+      [40, 28, true], [40, 60, true], [24, 44, false], [56, 44, false],
     ] as Array<[number, number, boolean]>) {
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 20; i++) {
         const stripe = new THREE.Mesh(crossGeo, whiteMat)
         stripe.rotation.x = -Math.PI / 2
         if (horizontal) {
-          stripe.position.set(cx + i * 0.7 - 3.85, 0.065, cz)
+          stripe.position.set(cx + i * 1.0 - 10, 0.065, cz)
         } else {
           stripe.rotation.z = Math.PI / 2
-          stripe.position.set(cx, 0.065, cz + i * 0.7 - 3.85)
+          stripe.position.set(cx, 0.065, cz + i * 1.0 - 10)
         }
         this.townGroup.add(stripe)
       }
@@ -363,7 +336,7 @@ export class TownBuilder {
 
     const dirt = new THREE.Mesh(new THREE.PlaneGeometry(12, 5), dirtMat)
     dirt.rotation.x = -Math.PI / 2
-    dirt.position.set(56, 0.01, 23)
+    dirt.position.set(66, 0.01, 24)
     dirt.receiveShadow = true
     // this.townGroup.add(dirt)
   }
@@ -454,8 +427,8 @@ export class TownBuilder {
       this.addPlaceSign(def.label, x, dz, height)
     }
 
-    this.addPlaceSign('Quảng trường', 27.4, 15.4, 2.6, 0x2f6f68)
-    this.addPlaceSign('Công viên', 56, 20.3, 2.4, 0x2f6f48)
+    this.addPlaceSign('Quảng trường', 76, 20.0, 2.6, 0x2f6f68)
+    this.addPlaceSign('Công viên', 66, 20.6, 2.4, 0x2f6f48)
   }
 
   private addPlaceSign(label: string, x: number, z: number, y: number, accent = 0x2f5f8f): void {
@@ -556,17 +529,34 @@ export class TownBuilder {
     const DEG = Math.PI / 180
 
     const lightDefs: Array<{ x: number; z: number; rotY: number }> = [
-      { x: 11.4, z: 8.0,  rotY: 0 },
-      { x: 11.4, z: 17.0, rotY: 0 },
-      { x: 11.4, z: 25.0, rotY: 0 },
-      { x: 20.8, z: 16.0, rotY: -180 * DEG },
-      { x: 20.8, z: 19.0, rotY: -180 * DEG },
-      { x: 43.2, z: 8.0,  rotY: -180 * DEG },
-      { x: 43.2, z: 15.0, rotY: -180 * DEG },
-      { x: 43.2, z: 24.0, rotY: -180 * DEG },
-      { x: 12.0, z: 36.8, rotY: 90 * DEG },
-      { x: 40.0, z: 36.8, rotY: 90 * DEG },
-      { x: 68.0, z: 36.8, rotY: 90 * DEG },
+      { x: 23, z: 8,  rotY: -180 * DEG },
+      { x: 23, z: 16, rotY: -180 * DEG },
+      { x: 23, z: 24, rotY: -180 * DEG },
+      { x: 23, z: 32, rotY: -180 * DEG },
+      { x: 23, z: 52, rotY: -180 * DEG },
+      { x: 23, z: 60, rotY: -180 * DEG },
+      { x: 23, z: 68, rotY: -180 * DEG },
+      { x: 23, z: 76, rotY: -180 * DEG },
+      { x: 57, z: 8,  rotY: 0 },
+      { x: 57, z: 16, rotY: 0 },
+      { x: 57, z: 24, rotY: 0 },
+      { x: 57, z: 32, rotY: 0 },
+      { x: 57, z: 52, rotY: 0 },
+      { x: 57, z: 60, rotY: 0 },
+      { x: 57, z: 68, rotY: 0 },
+      { x: 57, z: 76, rotY: 0 },
+      { x: 14, z: 27, rotY: 90 * DEG },
+      { x: 22, z: 27, rotY: 90 * DEG },
+      { x: 30, z: 27, rotY: 90 * DEG },
+      { x: 50, z: 27, rotY: 90 * DEG },
+      { x: 58, z: 27, rotY: 90 * DEG },
+      { x: 66, z: 27, rotY: 90 * DEG },
+      { x: 14, z: 61, rotY: -90 * DEG },
+      { x: 22, z: 61, rotY: -90 * DEG },
+      { x: 30, z: 61, rotY: -90 * DEG },
+      { x: 50, z: 61, rotY: -90 * DEG },
+      { x: 58, z: 61, rotY: -90 * DEG },
+      { x: 66, z: 61, rotY: -90 * DEG },
     ]
 
     const poleMat = new THREE.MeshLambertMaterial({ color: 0x555555 })
@@ -622,10 +612,11 @@ export class TownBuilder {
 
   private buildTrees(assets: AssetLoader): void {
     const treePositions: [number, number, boolean][] = [
-      [21.6, 15.3, true], [33.2, 15.3, true], [21.6, 21.9, true], [33.2, 21.9, true],
-      [52.0, 20.0, false], [60.0, 20.0, false], [52.0, 26.0, false], [60.0, 26.0, false],
-      [45.0, 24.0, true], [74.5, 24.0, true],
-      [4.5, 10.0, true], [4.5, 25.0, true],
+      [5.5, 10, true], [21.5, 10, true], [5.5, 19, true], [21.5, 19, true], [13.5, 6, true],
+      [58.5, 12, false], [67, 12, false], [57, 26, true],
+      [63.5, 22.5, true], [68.5, 22.5, true], [63.5, 25.5, true], [68.5, 25.5, true],
+      [5.5, 68, true], [21.5, 68, true], [5.5, 76, true], [21.5, 76, true], [13.5, 61, true],
+      [57.5, 66, false], [66.5, 66, false], [76.5, 66, false], [57.5, 74, false], [76.5, 74, false], [70, 61.5, true],
     ]
 
     const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8b6914 })
@@ -666,10 +657,10 @@ export class TownBuilder {
 
   private buildBenches(assets: AssetLoader): void {
     const plazaBenches: [number, number, number][] = [
-      [23.2, 0, 15.8], [31.6, 0, 15.8], [23.2, 0, 21.4], [31.6, 0, 21.4],
+      [73, 0, 22.5], [73, 0, 25.5],
     ]
     const parkBenches: [number, number, number][] = [
-      [53.5, 0, 23], [58.5, 0, 23],
+      [63, 0, 24], [69, 0, 24],
     ]
 
     const seatMat = new THREE.MeshLambertMaterial({ color: 0x8b6c42 })
@@ -719,19 +710,19 @@ export class TownBuilder {
     this.collisionObstacles.push({
       type: 'circle',
       id: 'plaza_fountain',
-      x: 27.4,
-      z: 18.6,
+      x: 76,
+      z: 24,
       radius: 1.4,
     })
 
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.6, 0.3, 12), stoneMat)
-    base.position.set(27.4, 0.15, 18.6)
+    base.position.set(76, 0.15, 24)
     base.castShadow = true
     base.receiveShadow = true
     this.townGroup.add(base)
 
     const wall = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.5, 12), stoneMat)
-    wall.position.set(27.4, 0.55, 18.6)
+    wall.position.set(76, 0.55, 24)
     this.townGroup.add(wall)
 
     const capybara = assets.getPropModel('capybara')
@@ -757,7 +748,7 @@ export class TownBuilder {
       const targetSize = 4.0
       const scale = maxDim > 0 ? targetSize / maxDim : 8.0
       const yOffset = -box.min.y * scale
-      this.placeModel(capybara, 27.4, 0.8 + yOffset, 18.6, scale)
+      this.placeModel(capybara, 76, 0.8 + yOffset, 24, scale)
     }
   }
 
@@ -768,10 +759,9 @@ export class TownBuilder {
     const petalGeo = new THREE.SphereGeometry(0.08, 5, 4)
 
     const bedCenters: [number, number][] = [
-      [4.2, 13.0], [4.2, 18.0], [4.2, 22.5],
-      [45.0, 12.0], [64.0, 12.0], [45.0, 21.0],
-      [44.0, 40.0], [68.0, 40.0],
-      [11.5, 37.5], [11.5, 40.5],
+      [62.8, 24.0], [69.2, 24.0], [72.6, 24.0], [79.4, 24.0],
+      [58.5, 14.5], [65.5, 14.5],
+      [5.0, 12.5], [5.0, 17.5], [21.5, 12.5], [21.5, 17.5],
     ]
 
     for (const [cx, cz] of bedCenters) {
@@ -800,11 +790,14 @@ export class TownBuilder {
 
   private buildFireHydrants(assets: AssetLoader): void {
     const positions: [number, number][] = [
-      [20.5, 14.8],
-      [20.5, 22.4],
-      [43.5, 8.0],
-      [11.5, 36.8],
-      [76.5, 36.8],
+      [22.6, 12],
+      [22.6, 66],
+      [57.4, 12],
+      [57.4, 66],
+      [14, 27.6],
+      [66, 27.6],
+      [14, 60.4],
+      [66, 60.4],
     ]
 
     for (const [x, z] of positions) {

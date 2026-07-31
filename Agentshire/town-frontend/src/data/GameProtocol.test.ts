@@ -46,8 +46,8 @@ describe('BUILDING_REGISTRY data integrity', () => {
 describe('WAYPOINTS data integrity', () => {
   it('contains gathering_point north of fountain in plaza', () => {
     expect(WAYPOINTS.gathering_point).toBeDefined()
-    expect(WAYPOINTS.gathering_point.x).toBe(27.4)
-    expect(WAYPOINTS.gathering_point.z).toBe(20.4)
+    expect(WAYPOINTS.gathering_point.x).toBe(76)
+    expect(WAYPOINTS.gathering_point.z).toBe(25.6)
   })
 
   it('gathering_point is clear of the plaza fountain', () => {

@@ -442,23 +442,23 @@ export class WeatherEffects {
   }
 
   private initSnowGround(): void {
-    const geo = new THREE.PlaneGeometry(84, 60)
+    const geo = new THREE.PlaneGeometry(84, 92)
     const mat = new THREE.MeshBasicMaterial({ color: 0xf0f4fa, transparent: true, opacity: 0, depthWrite: false })
     this.snowGround = new THREE.Mesh(geo, mat)
     this.snowGround.rotation.x = -Math.PI / 2
-    this.snowGround.position.set(40, 0.03, 28)
+    this.snowGround.position.set(40, 0.03, 44)
     this.snowGround.visible = false
     this.scene.add(this.snowGround)
   }
 
   private initFogPlane(): void {
-    const geo = new THREE.PlaneGeometry(100, 60, 1, 1)
+    const geo = new THREE.PlaneGeometry(104, 92, 1, 1)
     const mat = new THREE.MeshBasicMaterial({
       color: 0xcccccc, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide,
     })
     this.fogPlane = new THREE.Mesh(geo, mat)
     this.fogPlane.rotation.x = -Math.PI / 2
-    this.fogPlane.position.set(40, 1.5, 28)
+    this.fogPlane.position.set(40, 1.5, 44)
     this.fogPlane.visible = false
     this.scene.add(this.fogPlane)
   }

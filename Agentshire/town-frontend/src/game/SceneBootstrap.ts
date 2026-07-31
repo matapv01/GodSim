@@ -169,15 +169,15 @@ export class SceneBootstrap {
     const stewardNpc = npcManager.get('steward')
 
     if (userNpc) userNpc.setVisible(true)
-    cameraCtrl.moveTo({ x: 27.4, z: 18.6 })
+    cameraCtrl.moveTo({ x: 76, z: 24 })
 
     await Promise.all([
-      userNpc?.moveTo({ x: 27.4, z: 21.2 }, 2.5),
-      stewardNpc?.moveTo({ x: 27.4, z: 15.6 }, 3),
+      userNpc?.moveTo({ x: 76, z: 25.6 }, 2.5),
+      stewardNpc?.moveTo({ x: 76, z: 20 }, 3),
     ])
 
-    if (stewardNpc) stewardNpc.lookAtTarget?.({ x: 27.4, z: 21.2 })
-    if (userNpc) userNpc.lookAtTarget?.({ x: 27.4, z: 15.6 })
+    if (stewardNpc) stewardNpc.lookAtTarget?.({ x: 76, z: 25.6 })
+    if (userNpc) userNpc.lookAtTarget?.({ x: 76, z: 20 })
 
     await this.delay(200)
 

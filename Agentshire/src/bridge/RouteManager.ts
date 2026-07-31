@@ -2,11 +2,11 @@
 import type { GameEvent } from '../../town-frontend/src/data/GameProtocol.js'
 import { CITIZEN_DESTINATION_POINTS, ROUTE_GRAPHS, type RouteNode, type RouteSceneId } from './data/route-config.js'
 
-export const CITIZEN_SPAWN_ORIGIN = { x: 40, z: 34 }
-export const PLAZA_CENTER = { x: 27.4, z: 18.6 }
+export const CITIZEN_SPAWN_ORIGIN = { x: 40, z: 44 }
+export const PLAZA_CENTER = { x: 76, z: 24 }
 export const LEAVE_PLAZA_MIN_DISTANCE = 6.2
 export const GREET_RING_RADIUS = 2.2
-export const STEWARD_FACE_POS = { x: 27.4, z: 15.6 }
+export const STEWARD_FACE_POS = { x: 76, z: 20 }
 
 /** Manages NPC navigation: A* route planning on the town/office graph, move-and-wait with timeout, and destination slot allocation to prevent overcrowding */
 export class RouteManager {

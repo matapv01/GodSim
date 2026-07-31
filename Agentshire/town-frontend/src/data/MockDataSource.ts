@@ -122,7 +122,7 @@ export class MockDataSource implements IWorldDataSource {
     this.emit({ type: 'dialog_message', npcId: 'steward', text: `太好了！我这就去迎接居民们！`, isStreaming: false })
     await this.delay(2000)
 
-    this.emit({ type: 'npc_move_to', npcId: 'steward', target: { x: 20, y: 0, z: 23 }, speed: 4 })
+    this.emit({ type: 'npc_move_to', npcId: 'steward', target: { x: 76, y: 0, z: 22 }, speed: 4 })
     this.emit({ type: 'camera_move', follow: 'steward', durationMs: 1000 })
     await this.delay(2500)
 
@@ -136,12 +136,14 @@ export class MockDataSource implements IWorldDataSource {
     }
     await this.delay(500)
 
-    this.emit({ type: 'npc_move_to', npcId: 'steward', target: { x: 18, y: 0, z: 13 }, speed: 3 })
+    this.emit({ type: 'npc_move_to', npcId: 'steward', target: { x: 76, y: 0, z: 20 }, speed: 3 })
     for (let i = 0; i < cfg.citizens.length; i++) {
       const c = cfg.citizens[i]
-      this.emit({ type: 'npc_move_to', npcId: c.id, target: { x: 14 + i * 2.5, y: 0, z: 15 }, speed: 3 })
+      const col = i % 4
+      const row = Math.floor(i / 4)
+      this.emit({ type: 'npc_move_to', npcId: c.id, target: { x: 73 + col * 2, y: 0, z: 26 + row * 1.6 }, speed: 3 })
     }
-    this.emit({ type: 'camera_move', target: { x: 18, y: 0, z: 14 }, durationMs: 2000 })
+    this.emit({ type: 'camera_move', target: { x: 76, y: 0, z: 23 }, durationMs: 2000 })
     await this.delay(3500)
 
     this.emit({ type: 'dialog_message', npcId: 'steward', text: `Người quan sát, cho phép tôi giới thiệu cư dân trong thị trấn.`, isStreaming: false })
@@ -173,11 +175,11 @@ export class MockDataSource implements IWorldDataSource {
 
   private async runReturnSequence(): Promise<void> {
     const cfg = this.townConfig!
-    this.emit({ type: 'npc_move_to', npcId: 'user', target: { x: 20, y: 0, z: 18 }, speed: 2.5 })
+    this.emit({ type: 'npc_move_to', npcId: 'user', target: { x: 76, y: 0, z: 22 }, speed: 2.5 })
     this.emit({ type: 'camera_move', follow: 'user', durationMs: 1000 })
     await this.delay(2000)
 
-    this.emit({ type: 'npc_move_to', npcId: 'user', target: { x: 18, y: 0, z: 15 }, speed: 2.5 })
+    this.emit({ type: 'npc_move_to', npcId: 'user', target: { x: 76, y: 0, z: 25.6 }, speed: 2.5 })
     await this.delay(1500)
   }
 
@@ -230,7 +232,7 @@ export class MockDataSource implements IWorldDataSource {
     this.narrative.on('npc_move', async (p) => {
       const t = p.target as { x: number; z: number }
       this.emit({ type: 'npc_move_to', npcId: resolve(p.id as string), target: { x: t.x, y: 0, z: t.z }, speed: p.speed as number })
-      const dist = Math.hypot(t.x - 18, t.z - 13)
+      const dist = Math.hypot(t.x - 76, t.z - 20)
       await this.delay(Math.max(800, (dist / ((p.speed as number) || 3)) * 1000))
     })
 
