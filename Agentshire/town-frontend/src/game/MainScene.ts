@@ -19,6 +19,7 @@ import { VFXSystem } from './visual/VFXSystem'
 import { getAudioSystem } from '../audio/AudioSystem'
 import { AmbientSoundManager } from '../audio/AmbientSoundManager'
 import { BGMManager } from '../audio/BGMManager'
+import { StreamBGM } from '../audio/StreamBGM'
 import { NPC } from '../npc/NPC'
 import { NPCManager } from '../npc/NPCManager'
 import { EncounterManager } from '../npc/EncounterManager'
@@ -120,6 +121,8 @@ export class MainScene implements GameScene {
   private lastWeatherSocialReactionAt = 0
   private ambientSound = new AmbientSoundManager()
   private bgm = new BGMManager()
+  private streamBgm = new StreamBGM({ onFallback: () => this.initLocalBgm() })
+  private bgmInitialized = false
   private timeHUD!: TimeHUD
   private eventLogPanel!: EventLogPanel
   private socialFeedPanel!: SocialFeedPanel
@@ -347,7 +350,7 @@ export class MainScene implements GameScene {
         types: () => ['clear','cloudy','drizzle','rain','heavyRain','storm','lightSnow','snow','blizzard','fog','sandstorm','aurora'],
       },
       audio: {
-        bgmVolume: (v: number) => this.bgm.setVolume(v),
+        bgmVolume: (v: number) => { this.bgm.setVolume(v); this.streamBgm.setVolume(v) },
         ambientVolume: (v: number) => this.ambientSound.setVolume(v),
         mute: () => { getAudioSystem().muted = true },
         unmute: () => { getAudioSystem().muted = false },
@@ -361,7 +364,9 @@ export class MainScene implements GameScene {
     const sfxGain = audio.getSfxGain()
     if (actx && sfxGain) {
       this.ambientSound.init(actx, sfxGain)
-      this.bgm.init(actx, sfxGain).catch(() => {})
+      const streamReady = await this.streamBgm.init()
+      if (streamReady) this.bgmInitialized = true
+      else this.initLocalBgm()
     }
 
     this.bubbles = new ChatBubbleSystem(this.ui.getGameContainer(), this.engine.camera, this.engine.renderer)
@@ -1337,7 +1342,17 @@ __workflow 演出测试指令:
       }))
   }
 
+  private initLocalBgm(): void {
+    if (this.bgmInitialized) return
+    this.bgmInitialized = true
+    const audio = getAudioSystem()
+    const actx = audio.getAudioContext()
+    const sfxGain = audio.getSfxGain()
+    if (actx && sfxGain) this.bgm.init(actx, sfxGain).catch(() => {})
+  }
+
   setMusicEnabled(enabled: boolean): void {
+    this.streamBgm.setEnabled(enabled)
     if (enabled) {
       this.bgm.setEnabled(true)
       this.ambientSound.setEnabled(true)
@@ -4172,6 +4187,7 @@ __workflow 演出测试指令:
         clockState.period,
         curScene,
       )
+      this.streamBgm.update(clockState.period, curScene)
     }
 
     const activeScene = curScene === 'office' ? this.officeScene
