@@ -10,7 +10,14 @@ const CAR_MODELS = ['car_sedan', 'car_hatchback', 'car_taxi'] as const
 const ROAD_Y = 0.06
 const LANE_OFFSET = 4.0
 
-const RED_LIGHT_HOLD_DISTANCE = 16
+// Stop lines sit just outside the central intersection.
+// Vertical road x 32-48, horizontal road z 36-52.
+const STOP_LINE_Z_POS = 34 // southbound (+z), north edge of crossing
+const STOP_LINE_Z_NEG = 54 // northbound (-z), south edge of crossing
+const STOP_LINE_X_POS = 30 // eastbound (+x), west edge of crossing
+const STOP_LINE_X_NEG = 50 // westbound (-x), east edge of crossing
+const RED_LIGHT_BRAKE_DISTANCE = 28
+const RED_LIGHT_STOP_EPSILON = 0.35
 const RED_LIGHT_VIOLATION_PROBABILITY = 0.18
 const RED_LIGHT_VIOLATION_WINDOW_MS = 25_000
 const CHASE_ARRIVE_DISTANCE = 4.0
@@ -44,6 +51,7 @@ export interface VehicleIncident {
   victimNpcId: string
   driverName: string
   ownerName: string
+  driverNpcId?: string
   position: RoadPoint
   speed: number
 }
@@ -225,6 +233,7 @@ interface PooledVehicle {
   redLight: boolean
   redLightHold: boolean
   redLightViolationAt: number
+  redLightStopGap: number
   homeRoute: VehicleRoute
   route: VehicleRoute | null
   routePoints: RoadPoint[]
@@ -393,6 +402,7 @@ export class VehicleManager {
         redLight: false,
         redLightHold: false,
         redLightViolationAt: 0,
+        redLightStopGap: 1.5 + Math.random() * 4,
         homeRoute,
         route: homeRoute,
         routePoints: [],
@@ -905,7 +915,9 @@ export class VehicleManager {
     if (len <= 1e-4) return
     const axis: 'x' | 'z' = Math.abs(dz) >= Math.abs(dx) ? 'z' : 'x'
     const dirSign = axis === 'z' ? Math.sign(dz) : Math.sign(dx)
-    const line = axis === 'z' ? (dirSign > 0 ? 34 : 50) : (dirSign > 0 ? 30 : 50)
+    const line = axis === 'z'
+      ? (dirSign > 0 ? STOP_LINE_Z_POS : STOP_LINE_Z_NEG)
+      : (dirSign > 0 ? STOP_LINE_X_POS : STOP_LINE_X_NEG)
     const crossed = axis === 'z'
       ? (dirSign > 0 ? from.z < line && to.z >= line : from.z > line && to.z <= line)
       : (dirSign > 0 ? from.x < line && to.x >= line : from.x > line && to.x <= line)
@@ -917,10 +929,10 @@ export class VehicleManager {
   private getRedLightInfo(
     v: PooledVehicle,
     previous: RoadPoint,
-    pose: RoadPoint,
-  ): { hold: boolean; axis: 'x' | 'z'; signal: TrafficSignal; crossed: boolean } {
-    const none: { hold: boolean; axis: 'x' | 'z'; signal: TrafficSignal; crossed: boolean } = {
-      hold: false,
+  ): { braking: boolean; stopDist: number; axis: 'x' | 'z'; signal: TrafficSignal; crossed: boolean } {
+    const none: { braking: boolean; stopDist: number; axis: 'x' | 'z'; signal: TrafficSignal; crossed: boolean } = {
+      braking: false,
+      stopDist: Number.POSITIVE_INFINITY,
       axis: 'z',
       signal: 'green',
       crossed: false,
@@ -928,6 +940,7 @@ export class VehicleManager {
     if (!this.trafficLights) return none
     if (v.phase !== 'driving' && v.phase !== 'returning') return none
     if (this.chaseTargetId === v.id) return none
+    const pose = this.sampleRoute(v.routePoints, v.segmentLengths, Math.min(v.totalLength, v.distance))
     const dx = pose.x - previous.x
     const dz = pose.z - previous.z
     const len = Math.sqrt(dx * dx + dz * dz)
@@ -936,17 +949,21 @@ export class VehicleManager {
     const signal = this.trafficLights.getSignal(axis)
     if (signal === 'green') return { ...none, axis, signal }
     const dirSign = axis === 'z' ? Math.sign(dz) : Math.sign(dx)
-    const line = axis === 'z' ? (dirSign > 0 ? 34 : 50) : (dirSign > 0 ? 30 : 50)
-    const approachDist = axis === 'z'
-      ? (dirSign > 0 ? previous.z - line : line - previous.z)
-      : (dirSign > 0 ? previous.x - line : line - previous.x)
+    const line = axis === 'z'
+      ? (dirSign > 0 ? STOP_LINE_Z_POS : STOP_LINE_Z_NEG)
+      : (dirSign > 0 ? STOP_LINE_X_POS : STOP_LINE_X_NEG)
+    // Each vehicle keeps a small personal gap so a queue staggers instead of
+    // piling up on the exact stop line.
+    const effLine = line - dirSign * v.redLightStopGap
+    const stopDist = axis === 'z'
+      ? (dirSign > 0 ? effLine - previous.z : previous.z - effLine)
+      : (dirSign > 0 ? effLine - previous.x : previous.x - effLine)
     const crossed = axis === 'z'
       ? (dirSign > 0 ? previous.z < line && pose.z >= line : previous.z > line && pose.z <= line)
       : (dirSign > 0 ? previous.x < line && pose.x >= line : previous.x > line && pose.x <= line)
-    if (approachDist <= 0 || v.redLight || approachDist > RED_LIGHT_HOLD_DISTANCE) {
-      return { hold: false, axis, signal, crossed }
-    }
-    return { hold: true, axis, signal, crossed: false }
+    // Red-light runners (v.redLight) keep going and get flagged for the patrol.
+    const braking = !v.redLight && stopDist >= 0 && stopDist <= RED_LIGHT_BRAKE_DISTANCE
+    return { braking, stopDist, axis, signal, crossed }
   }
 
   private startChase(offender: PooledVehicle): void {
@@ -1054,7 +1071,6 @@ export class VehicleManager {
           v.pulledOver = false
           v.wrongLane = false
           if (this.activeTrafficStop?.offenderId === v.id) this.activeTrafficStop = null
-          this.rebuildRoutePoints(v)
         }
         if (v.homeRoute.id === PATROL_ROUTE_ID) {
           if (this.activeTrafficStop?.offenderId) {
@@ -1064,9 +1080,15 @@ export class VehicleManager {
               this.activeTrafficStop = null
             }
           }
-          this.rebuildRoutePoints(v)
+        }
+        if (v.crashExitNpcId) {
+          this.boardOccupant(v)
+          v.crashExitNpcId = undefined
         }
         v.phase = v.incidentResumePhase
+        // Rebuild from the actual position so the vehicle drives on smoothly
+        // instead of snapping back onto its pre-incident route line.
+        this.rebuildRoutePoints(v)
         v.taillightMat.opacity = needLights ? 0.9 : 0
         this.setVehicleLabel(
           v,
@@ -1086,6 +1108,9 @@ export class VehicleManager {
           v.crashExitNpcId = undefined
         }
         v.phase = v.incidentResumePhase
+        // Rebuild from the actual (pushed-apart) position so the vehicle
+        // continues cleanly after the collision separation.
+        this.rebuildRoutePoints(v)
         v.taillightMat.opacity = needLights ? 0.9 : 0
         this.setVehicleLabel(
           v,
@@ -1115,7 +1140,29 @@ export class VehicleManager {
         this.setVehicleLabel(v, v.route, Math.max(2, Math.round(v.duration / 2)), 'returning')
       }
 
-      v.distance += delta * (v.totalLength / v.duration)
+      const previous = { x: v.wrapper.position.x, z: v.wrapper.position.z }
+      const bump = Math.sin(time * 12 + v.distance) * 0.015
+      const nominalSpeed = v.totalLength / Math.max(0.1, v.duration)
+
+      const redInfo = this.getRedLightInfo(v, previous)
+      let advance = delta * nominalSpeed
+      if (redInfo.braking) {
+        v.redLightHold = true
+        if (redInfo.stopDist <= RED_LIGHT_STOP_EPSILON) {
+          // Fully stopped at the line: hold until the signal turns green.
+          v.wrapper.position.y = ROAD_Y + bump
+          this.syncOccupants(v)
+          v.headlight.intensity = needLights ? 1.5 : 0
+          v.taillightMat.opacity = needLights ? 0.9 : 0
+          continue
+        }
+        // Braking zone: slow down smoothly as the stop line approaches.
+        const brake = Math.max(0.04, Math.min(1, redInfo.stopDist / RED_LIGHT_BRAKE_DISTANCE))
+        advance = delta * nominalSpeed * brake
+      } else {
+        v.redLightHold = false
+      }
+      v.distance += advance
       if (v.distance >= v.totalLength) {
         if (v.phase === 'driving') {
           const last = v.routePoints[v.routePoints.length - 1]
@@ -1134,22 +1181,7 @@ export class VehicleManager {
         continue
       }
 
-      const previous = { x: v.wrapper.position.x, z: v.wrapper.position.z }
       const pose = this.sampleRoute(v.routePoints, v.segmentLengths, v.distance)
-      const bump = Math.sin(time * 12 + v.distance) * 0.015
-
-      const redInfo = this.getRedLightInfo(v, previous, pose)
-      if (redInfo.hold) {
-        v.redLightHold = true
-        v.distance = Math.max(0, v.distance - delta * (v.totalLength / v.duration))
-        v.wrapper.position.y = ROAD_Y + bump
-        v.wrapper.rotation.y = pose.rotationY
-        this.syncOccupants(v)
-        v.headlight.intensity = needLights ? 1.5 : 0
-        v.taillightMat.opacity = needLights ? 0.9 : 0
-        continue
-      }
-      v.redLightHold = false
       if (redInfo.signal === 'red' && redInfo.crossed && v.redLight) {
         v.redLightViolationAt = Date.now()
       }
@@ -1164,7 +1196,7 @@ export class VehicleManager {
       } else {
         // Blocked (pedestrian / object / another vehicle): hold position and
         // rewind route progress so the vehicle resumes from where it actually is.
-        v.distance = Math.max(0, v.distance - delta * (v.totalLength / v.duration))
+        v.distance = Math.max(0, v.distance - advance)
       }
       v.wrapper.position.y = ROAD_Y + bump
       v.wrapper.rotation.y = pose.rotationY
@@ -1180,6 +1212,7 @@ export class VehicleManager {
         victimNpcId: victim.id,
         driverName: v.route.owner,
         ownerName: v.route.owner,
+        driverNpcId: v.route.ownerNpcId,
         position: { x: pose.x, z: pose.z },
         speed: v.totalLength / Math.max(0.1, v.duration),
       }) !== false) {
@@ -1188,6 +1221,7 @@ export class VehicleManager {
         v.phase = 'incident'
         v.incidentTimer = TRAFFIC_INCIDENT_DURATION_MS / 1000
         v.taillightMat.opacity = 1
+        this.exitCrashDriver(v)
         this.setVehicleLabel(v, v.route, Math.ceil(v.incidentTimer / 2), 'incident')
       }
     }

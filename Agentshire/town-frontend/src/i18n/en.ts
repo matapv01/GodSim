@@ -252,6 +252,9 @@ const en: Record<string, string> = {
   'police_traffic_stop.log_red': 'Officer {officer} pulled over {owner} for running a red light and issued a warning.',
   'police_traffic_stop.toast_pulled_over': 'You were pulled over! Stay in place until the officer finishes.',
 
+  'camera.first_person': 'First-person view (V to switch)',
+  'camera.third_person': 'Overview view (V to switch)',
+
   'drive_by.hitchhike_boarded': 'Thanks for the ride!',
 
   'ride.invite_button': 'Invite into car',

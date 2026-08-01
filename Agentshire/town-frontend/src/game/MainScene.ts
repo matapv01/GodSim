@@ -87,6 +87,7 @@ type ActiveTrafficIncident = {
   victim: NPC
   audience: NPC[]
   officer: NPC | null
+  driver: NPC | null
   elapsedMs: number
   nextBeat: number
   baseVehicleRotationY: number
@@ -2874,6 +2875,12 @@ __workflow 演出测试指令:
       this.tryUseNearbyInteraction()
       return
     }
+    if (key === 'v') {
+      event.preventDefault()
+      const fp = this.cameraCtrl.toggleFirstPerson()
+      this.ui.showToast(fp ? t('camera.first_person') : t('camera.third_person'))
+      return
+    }
     if (!this.isPlayerMoveKey(key)) return
     event.preventDefault()
     this.playerKeys.add(key)
@@ -3361,6 +3368,7 @@ __workflow 演出测试指令:
       victim,
       audience,
       officer,
+      driver: event.driverNpcId ? this.npcManager.get(event.driverNpcId) ?? null : null,
       elapsedMs: 0,
       nextBeat: 1,
       baseVehicleRotationY: event.vehicle.rotation.y,
@@ -3404,7 +3412,8 @@ __workflow 演出测试指令:
     if (!incident) return
     incident.elapsedMs += deltaMs
 
-    const { event, victim, audience, officer } = incident
+    const { event, victim, audience, officer, driver } = incident
+    const driverMesh = driver?.mesh ?? event.vehicle
     const policePresent = officer != null
     const fighting = !policePresent && incident.elapsedMs >= 6_200 && incident.elapsedMs <= 14_500
     event.vehicle.rotation.y = incident.baseVehicleRotationY
@@ -3414,8 +3423,9 @@ __workflow 演出测试指令:
     while (incident.nextBeat < thresholds.length && incident.elapsedMs >= thresholds[incident.nextBeat]) {
       const beat = incident.nextBeat++
       if (beat === 1) {
+        driver?.playAnim('frustrated')
         this.bubbles.show(
-          event.vehicle,
+          driverMesh,
           t('traffic_incident.driver_reply', { victim: victim.label ?? victim.name }),
           3200,
         )
@@ -3459,7 +3469,7 @@ __workflow 演出测试指令:
           this.bubbles.show(mediator.mesh, t('traffic_incident.crowd_stop'), 3200)
         }
       } else if (beat === 7) {
-        this.bubbles.show(event.vehicle, t('traffic_incident.driver_end'), 2400)
+        this.bubbles.show(driverMesh, t('traffic_incident.driver_end'), 2400)
       }
     }
 

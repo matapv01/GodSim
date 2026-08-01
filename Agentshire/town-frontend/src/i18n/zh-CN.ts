@@ -252,6 +252,9 @@ const zhCN: Record<string, string> = {
   'police_traffic_stop.log_red': '警察{officer}因{owner}闯红灯将其拦下并给予警告。',
   'police_traffic_stop.toast_pulled_over': '你被警察拦下了！请原地停车等待处理。',
 
+  'camera.first_person': '第一人称视角（按 V 切换）',
+  'camera.third_person': '俯瞰视角（按 V 切换）',
+
   'drive_by.hitchhike_boarded': '谢谢你让我搭一段顺风车！',
 
   'ride.invite_button': '邀请上车',

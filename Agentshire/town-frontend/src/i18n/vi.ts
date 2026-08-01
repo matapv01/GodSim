@@ -233,6 +233,9 @@ const vi: Record<string, string> = {
   'police_traffic_stop.log_red': 'Cảnh sát {officer} dừng xe của {owner} vì vượt đèn đỏ, nhắc nhở rồi cho tiếp tục di chuyển.',
   'police_traffic_stop.toast_pulled_over': 'Bạn đã bị dừng xe! Hãy đứng yên tại chỗ đợi cảnh sát xử lý xong.',
 
+  'camera.first_person': 'Góc nhìn thứ nhất (phím V để đổi)',
+  'camera.third_person': 'Góc nhìn tổng quan (phím V để đổi)',
+
   'drive_by.hitchhike_boarded': 'Cảm ơn đã cho tôi đi nhờ một quãng!',
 
   'ride.invite_button': 'Mời lên xe',

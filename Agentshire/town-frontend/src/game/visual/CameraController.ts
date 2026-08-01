@@ -27,8 +27,8 @@ export class CameraController {
 
   private static readonly DRAG_SCALE = 0.06
   private static readonly AUTO_PILOT_LERP = 0.01
-  private static readonly ZOOM_MIN = 0.5
-  private static readonly ZOOM_MAX = 1.6
+  private static readonly ZOOM_MIN = 0.3
+  private static readonly ZOOM_MAX = 3.2
   private zoomLevel = 1.0
   private static readonly PATROL_POINTS = [
     { x: 40.0, z: 44.0 },
@@ -36,10 +36,18 @@ export class CameraController {
     { x: 66.0, z: 24.0 },
     { x: 40.0, z: 10.0 },
     { x: 16.0, z: 16.0 },
-    { x: 62.0, z: 8.0 },
+    { x: 54.0, z: 8.0 },
     { x: 40.0, z: 78.0 },
-    { x: 70.0, z: 78.0 },
+    { x: 62.0, z: 78.0 },
   ]
+
+  private firstPersonEnabled = false
+  private fpsYaw = 0
+  private fpsPitch = 0.1
+  private fpsEyeHeight = 1.7
+  private static readonly FPS_PITCH_LIMIT = Math.PI / 2.1
+  private static readonly FPS_EYE_HEIGHT_MIN = 0.8
+  private static readonly FPS_EYE_HEIGHT_MAX = 12
 
   constructor(camera: THREE.PerspectiveCamera, container: HTMLElement) {
     this.camera = camera
@@ -60,6 +68,8 @@ export class CameraController {
       this.autoPilotEnabled = false
       this.autoPilotTarget = null
       this.targetLookAt.set(target.position.x, 0, target.position.z)
+      const box = new THREE.Box3().setFromObject(target)
+      this.fpsEyeHeight = Math.max(CameraController.FPS_EYE_HEIGHT_MIN + 0.9, box.max.y * 0.92)
     }
   }
 
@@ -74,21 +84,56 @@ export class CameraController {
 
   setAutoPilot(enabled: boolean): void {
     this.autoPilotEnabled = enabled
+    if (enabled) this.firstPersonEnabled = false
     if (!enabled) {
       this.autoPilotTarget = null
     }
+  }
+
+  /** Toggle first-person view. Returns true when first-person becomes active. */
+  toggleFirstPerson(): boolean {
+    this.firstPersonEnabled = !this.firstPersonEnabled
+    if (this.firstPersonEnabled) {
+      this.autoPilotEnabled = false
+      this.autoPilotTarget = null
+      const f = new THREE.Vector3().subVectors(this.currentLookAt, this.camera.position)
+      const len = f.length()
+      if (len > 0.0001) {
+        this.fpsYaw = Math.atan2(f.x, f.z)
+        this.fpsPitch = Math.asin(Math.max(-1, Math.min(1, f.y / len)))
+        this.fpsPitch = Math.max(
+          -CameraController.FPS_PITCH_LIMIT,
+          Math.min(CameraController.FPS_PITCH_LIMIT, this.fpsPitch),
+        )
+      }
+    }
+    return this.firstPersonEnabled
+  }
+
+  isFirstPerson(): boolean {
+    return this.firstPersonEnabled
   }
 
   /** Called by Input system's drag gesture */
   onDrag(phase: 'start' | 'move' | 'end', delta: { x: number; y: number }, totalDelta: { x: number; y: number }): void {
     if (phase === 'start') {
       this.isDragging = true
+      this.lastInteractionTime = performance.now()
+      if (this.firstPersonEnabled) return
       this.dragStartLookAt.copy(this.targetLookAt)
       this.followTarget = null
       this.autoPilotEnabled = false
       this.autoPilotTarget = null
-      this.lastInteractionTime = performance.now()
     } else if (phase === 'move' && this.isDragging) {
+      if (this.firstPersonEnabled) {
+        this.fpsYaw -= totalDelta.x * CameraController.DRAG_SCALE * 0.4
+        this.fpsPitch -= totalDelta.y * CameraController.DRAG_SCALE * 0.4
+        this.fpsPitch = Math.max(
+          -CameraController.FPS_PITCH_LIMIT,
+          Math.min(CameraController.FPS_PITCH_LIMIT, this.fpsPitch),
+        )
+        return
+      }
       this.targetLookAt.set(
         this.dragStartLookAt.x - totalDelta.x * CameraController.DRAG_SCALE,
         0,
@@ -113,7 +158,14 @@ export class CameraController {
 
   private onWheel = (e: WheelEvent): void => {
     e.preventDefault()
-    this.applyZoom(e.deltaY > 0 ? 1.06 : 0.94)
+    if (this.firstPersonEnabled) {
+      this.fpsEyeHeight = Math.max(
+        CameraController.FPS_EYE_HEIGHT_MIN,
+        Math.min(CameraController.FPS_EYE_HEIGHT_MAX, this.fpsEyeHeight * (e.deltaY > 0 ? 1.12 : 0.9)),
+      )
+    } else {
+      this.applyZoom(e.deltaY > 0 ? 1.06 : 0.94)
+    }
     this.lastInteractionTime = performance.now()
     this.followTarget = null
     this.autoPilotEnabled = false
@@ -129,6 +181,10 @@ export class CameraController {
   }
 
   update(_deltaTime: number): void {
+    if (this.firstPersonEnabled) {
+      this.updateFirstPerson()
+      return
+    }
     if (this.followTarget) {
       this.targetLookAt.set(
         this.followTarget.position.x,
@@ -162,6 +218,21 @@ export class CameraController {
     this.autoPilotTarget = new THREE.Vector3(points[idx].x, 0, points[idx].z)
   }
 
+  private updateFirstPerson(): void {
+    const base = this.followTarget ? this.followTarget.position : this.currentLookAt
+    const eye = new THREE.Vector3(base.x, base.y + this.fpsEyeHeight, base.z)
+    this.targetLookAt.set(base.x, 0, base.z)
+    this.currentLookAt.lerp(this.targetLookAt, 0.25)
+    this.camera.position.lerp(eye, 0.4)
+    const cp = Math.cos(this.fpsPitch)
+    const dir = new THREE.Vector3(
+      Math.sin(this.fpsYaw) * cp,
+      Math.sin(this.fpsPitch),
+      Math.cos(this.fpsYaw) * cp,
+    )
+    this.camera.lookAt(this.camera.position.clone().add(dir.multiplyScalar(10)))
+  }
+
   private updateCameraPosition(immediate?: boolean): void {
     const pos = this.currentLookAt.clone().add(this.cameraOffset)
     if (immediate) {
@@ -174,6 +245,7 @@ export class CameraController {
 
   enterOfficeMode(): void {
     this.officeMode = true
+    this.firstPersonEnabled = false
     this.followTarget = null
     this.autoPilotEnabled = false
     this.autoPilotTarget = null
@@ -198,6 +270,7 @@ export class CameraController {
   }
 
   animateTo(target: { x: number; z: number }, durationMs = 2000): Promise<void> {
+    this.firstPersonEnabled = false
     this.followTarget = null
     this.autoPilotEnabled = false
     this.autoPilotTarget = null
